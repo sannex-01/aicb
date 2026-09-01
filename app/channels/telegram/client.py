@@ -1,0 +1,105 @@
+from typing import List, Dict, Any, Optional
+import httpx
+from app.core.config import settings
+from app.core.logger import logger
+
+
+class TelegramClient:
+    """Telegram Bot API Client."""
+
+    def __init__(self, token: Optional[str] = None):
+        self.token = token or settings.TELEGRAM_BOT_TOKEN
+
+    def _url(self, method: str) -> str:
+        if not self.token:
+            raise ValueError("TELEGRAM_BOT_TOKEN is not configured.")
+        return f"https://api.telegram.org/bot{self.token}/{method}"
+
+    async def _post(self, method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            res = await client.post(self._url(method), json=payload)
+            data = res.json()
+            if not data.get("ok"):
+                logger.error(f"Telegram API {method} error: {data}")
+            return data
+
+    async def send_message(
+        self,
+        chat_id: int | str,
+        text: str,
+        parse_mode: str = "Markdown",
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Sends a text message with optional inline keyboard or custom keyboard."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": text,
+            "parse_mode": parse_mode,
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        return await self._post("sendMessage", payload)
+
+    async def send_inline_buttons(
+        self,
+        chat_id: int | str,
+        text: str,
+        buttons: List[List[Dict[str, str]]], # [[{"text": "Btn 1", "callback_data": "btn_1"}]]
+    ) -> Dict[str, Any]:
+        """Sends inline button grid."""
+        markup = {"inline_keyboard": buttons}
+        return await self.send_message(chat_id, text, reply_markup=markup)
+
+    async def send_webapp_button(
+        self,
+        chat_id: int | str,
+        text: str,
+        button_text: str,
+        webapp_url: str,
+    ) -> Dict[str, Any]:
+        """Sends an inline button opening a Telegram MiniApp or Payment Webview."""
+        markup = {
+            "inline_keyboard": [
+                [{"text": button_text, "web_app": {"url": webapp_url}}]
+            ]
+        }
+        return await self.send_message(chat_id, text, reply_markup=markup)
+
+    async def send_invoice(
+        self,
+        chat_id: int | str,
+        title: str,
+        description: str,
+        payload: str,
+        provider_token: str,
+        currency: str,
+        prices: List[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        """Sends a native Telegram payment invoice."""
+        body = {
+            "chat_id": chat_id,
+            "title": title,
+            "description": description,
+            "payload": payload,
+            "provider_token": provider_token or settings.TELEGRAM_PAYMENT_PROVIDER_TOKEN,
+            "currency": currency.upper(),
+            "prices": prices,
+        }
+        return await self._post("sendInvoice", body)
+
+    async def answer_callback_query(self, callback_query_id: str, text: Optional[str] = None) -> Dict[str, Any]:
+        """Acknowledges button clicks on Telegram."""
+        payload: Dict[str, Any] = {"callback_query_id": callback_query_id}
+        if text:
+            payload["text"] = text
+        return await self._post("answerCallbackQuery", payload)
+
+    async def answer_pre_checkout_query(self, pre_checkout_query_id: str, ok: bool = True, error_message: Optional[str] = None) -> Dict[str, Any]:
+        """Confirms pre-checkout validity before Telegram executes payment."""
+        payload: Dict[str, Any] = {
+            "pre_checkout_query_id": pre_checkout_query_id,
+            "ok": ok,
+        }
+        if not ok and error_message:
+            payload["error_message"] = error_message
+        return await self._post("answerPreCheckoutQuery", payload)
