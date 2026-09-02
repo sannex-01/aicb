@@ -27,18 +27,26 @@ class TelegramClient:
         self,
         chat_id: int | str,
         text: str,
-        parse_mode: str = "Markdown",
+        parse_mode: Optional[str] = "Markdown",
         reply_markup: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Sends a text message with optional inline keyboard or custom keyboard."""
+        """Sends a text message with optional inline keyboard or custom keyboard, with fallback to plain text."""
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
             "text": text,
-            "parse_mode": parse_mode,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
-        return await self._post("sendMessage", payload)
+            
+        res = await self._post("sendMessage", payload)
+        if not res.get("ok") and parse_mode:
+            # Fallback retry without Markdown formatting in case of unescaped characters
+            logger.info("Retrying sendMessage without parse_mode markdown formatting...")
+            payload.pop("parse_mode", None)
+            res = await self._post("sendMessage", payload)
+        return res
 
     async def send_inline_buttons(
         self,
