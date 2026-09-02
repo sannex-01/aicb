@@ -103,3 +103,14 @@ class TelegramClient:
         if not ok and error_message:
             payload["error_message"] = error_message
         return await self._post("answerPreCheckoutQuery", payload)
+
+    async def set_chat_menu_button(self, webapp_url: str, text: str = "Store") -> Dict[str, Any]:
+        """Configures Telegram Bot menu button to open Mini App webapp."""
+        payload = {
+            "menu_button": {
+                "type": "web_app",
+                "text": text,
+                "web_app": {"url": webapp_url},
+            }
+        }
+        return await self._post("setChatMenuButton", payload)
