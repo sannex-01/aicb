@@ -40,8 +40,9 @@ async def handle_telegram_webhook(
         action_data = cb.get("data", "")
         from_user = cb.get("from", {})
         user_id = str(from_user.get("id"))
-        customer_name = from_user.get("first_name", "Telegram User")
-        chat_id = cb.get("message", {}).get("chat", {}).get("id")
+        message_obj = cb.get("message", {})
+        chat_id = message_obj.get("chat", {}).get("id")
+        message_id = message_obj.get("message_id")
 
         await tg_client.answer_callback_query(cb_id)
 
@@ -53,15 +54,33 @@ async def handle_telegram_webhook(
             user_input=action_data,
         )
 
-        if flow_res.get("type") == "buttons":
-            # Convert button format to Telegram inline keyboard format
+        inline_kb = None
+        if flow_res.get("type") == "buttons" and flow_res.get("buttons"):
             inline_kb = [
                 [{"text": b["title"], "callback_data": b["id"]}]
                 for b in flow_res["buttons"]
             ]
-            await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
-        else:
-            await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
+
+        # Edit the existing message in-place for a clean, app-like experience
+        edit_success = False
+        if message_id and chat_id:
+            try:
+                res = await tg_client.edit_inline_buttons(
+                    chat_id=chat_id,
+                    message_id=message_id,
+                    text=flow_res["text"],
+                    buttons=inline_kb,
+                )
+                if res.get("ok"):
+                    edit_success = True
+            except Exception as e:
+                logger.warning(f"In-place message edit failed, will send fresh message: {e}")
+
+        if not edit_success and chat_id:
+            if inline_kb:
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
+            else:
+                await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
 
         return {"ok": True}
 

@@ -50,6 +50,36 @@ class TelegramClient:
         markup = {"inline_keyboard": buttons}
         return await self.send_message(chat_id, text, reply_markup=markup)
 
+    async def edit_message_text(
+        self,
+        chat_id: int | str,
+        message_id: int,
+        text: str,
+        parse_mode: str = "Markdown",
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Edits an existing message text in-place on Telegram."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "message_id": message_id,
+            "text": text,
+            "parse_mode": parse_mode,
+        }
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+        return await self._post("editMessageText", payload)
+
+    async def edit_inline_buttons(
+        self,
+        chat_id: int | str,
+        message_id: int,
+        text: str,
+        buttons: Optional[List[List[Dict[str, str]]]] = None,
+    ) -> Dict[str, Any]:
+        """Edits an existing message's text and its inline keyboard in-place."""
+        markup = {"inline_keyboard": buttons} if buttons is not None else None
+        return await self.edit_message_text(chat_id, message_id, text, reply_markup=markup)
+
     async def send_webapp_button(
         self,
         chat_id: int | str,
