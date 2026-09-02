@@ -82,6 +82,14 @@ async def handle_telegram_webhook(
             else:
                 await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
 
+        # Track interactive button action telemetry
+        telemetry_client.track(
+            channel="telegram",
+            customer_id=user_id,
+            event="button_click",
+            metadata={"action": action_data[:100]},
+        )
+
         return {"ok": True}
 
     # 2. Handle Inbound Text Messages
