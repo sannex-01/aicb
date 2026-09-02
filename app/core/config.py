@@ -104,7 +104,7 @@ class Settings(BaseSettings):
 
     # Sannex Agent Telemetry & AgentOS Sync
     SANNEX_API_KEY: Optional[str] = None
-    SANNEX_HOST: str = "https://api.sannex.ng"
+    SANNEX_HOST: str = "https://agentos.aicb.sannex.ng"
     SYNC_INTERVAL_HOURS: int = 12
     ENABLE_TELEMETRY: bool = True
 
