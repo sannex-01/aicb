@@ -83,15 +83,17 @@ aicb/
 ├── app/
 │   ├── main.py                     # FastAPI application & lifespan
 │   ├── core/                       # Config, database, security, logger
-│   ├── channels/                   # WhatsApp, Telegram, Slack
-│   ├── commerce/                   # Unified catalog & payments (Paystack, Flutterwave, Monnify, Stripe, Bumpa)
-│   ├── ai/                         # Multi-LLM providers (Gemini, OpenAI, Claude), prompts, memory, RAG, tools
-│   ├── flows/                      # Deterministic interactive button engine & definitions
+│   ├── channels/                   # WhatsApp, Telegram, Slack, Mini App endpoints
+│   ├── commerce/                   # CartManager, Catalog & Payments (Paystack, Flutterwave, Stripe)
+│   ├── ai/                         # Multi-LLM providers, prompts, memory, RAG, tool calling
+│   ├── flows/                      # Deterministic 0-token fast-path button engine
 │   ├── telemetry/                  # Sannex telemetry dispatcher & 12h sync worker
 │   └── models/                     # SQLAlchemy models
+├── miniapp/                        # Standalone Telegram Mini App (React + Vite + Tailwind)
 ├── doctor.py                       # Pre-flight diagnostic tool
 ├── Dockerfile                      # Production container image
-├── docker-compose.yml
+├── docker-compose.yml              # Local development compose (ports 8422, 8423)
+├── docker-compose.prod.yml         # Coolify production deployment stack
 ├── requirements.txt
 └── .env.example
 ```
