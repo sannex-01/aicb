@@ -140,6 +140,7 @@ async def handle_telegram_webhook(
             or text.lower().startswith("flow_")
         )
 
+        sent_reply_text = ""
         if is_fast_path:
             flow_res = await FlowEngine.handle_action(
                 db=db,
@@ -147,6 +148,7 @@ async def handle_telegram_webhook(
                 action_id=text,
                 user_input=text,
             )
+            sent_reply_text = flow_res.get("text", "")
             inline_kb = [
                 [{"text": b["title"], "callback_data": b["id"]}]
                 for b in flow_res.get("buttons", [])
@@ -160,6 +162,7 @@ async def handle_telegram_webhook(
                 action_id=text,
                 user_input=text,
             )
+            sent_reply_text = flow_res.get("text", "")
             inline_kb = [
                 [{"text": b["title"], "callback_data": b["id"]}]
                 for b in flow_res.get("buttons", [])
@@ -191,6 +194,7 @@ async def handle_telegram_webhook(
                 formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
                 if not formatted_reply and inline_kb:
                     formatted_reply = "Please see the link below:"
+                sent_reply_text = formatted_reply
                     
                 if inline_kb:
                     await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
@@ -202,9 +206,10 @@ async def handle_telegram_webhook(
                     [{"text": b["title"], "callback_data": b["id"]}]
                     for b in MAIN_MENU_BUTTONS
                 ]
+                sent_reply_text = "👋 I received your message! Please select from our interactive menu below to browse products, check your cart, or track an order:"
                 await tg_client.send_inline_buttons(
                     chat_id=chat_id,
-                    text="👋 I received your message! Please select from our interactive menu below to browse products, check your cart, or track an order:",
+                    text=sent_reply_text,
                     buttons=fallback_kb,
                 )
 
@@ -212,6 +217,16 @@ async def handle_telegram_webhook(
             channel="telegram",
             customer_id=user_id,
             event="message_sent",
+        )
+
+        # Sync conversation transcript so Conversations CRM in AgentOS updates in real time
+        telemetry_client.sync_conversation(
+            channel="telegram",
+            customer_id=user_id,
+            messages=[
+                {"role": "user", "content": text},
+                {"role": "assistant", "content": sent_reply_text or "Interactive menu sent"},
+            ],
         )
 
     # 3. Handle Pre-Checkout Query for Telegram Payments

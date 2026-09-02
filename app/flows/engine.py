@@ -174,6 +174,21 @@ class FlowEngine:
             # Empty the cart now that order is generated
             await CartManager.clear_cart(db, session)
 
+            # Track payment initiation telemetry even if not yet completed
+            from app.telemetry.client import telemetry_client
+            telemetry_client.track(
+                channel=session.channel,
+                customer_id=session.customer_identifier,
+                event="payment_initiated",
+                status="pending",
+                amount=total_amount,
+                metadata={
+                    "order_reference": order_ref,
+                    "currency": currency,
+                    "checkout_url": checkout_url,
+                },
+            )
+
             order_summary = [
                 f"🎉 *Order #{order_ref} Created!*",
                 f"\n💵 *Total to Pay:* {total_amount:,.2f} {currency}",
