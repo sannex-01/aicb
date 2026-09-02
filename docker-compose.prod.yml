@@ -1,0 +1,43 @@
+services:
+  aicb:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${AICB_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "false"
+      PORT: 8000
+      HOST: 0.0.0.0
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/aicb.db}
+    volumes:
+      - aicb_data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  miniapp:
+    build:
+      context: ./miniapp
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "${MINIAPP_PORT:-3001}:80"
+    depends_on:
+      - aicb
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:80/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  aicb_data:
