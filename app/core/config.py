@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     APP_NAME: str = "AICB Assistant"
     ENVIRONMENT: Literal["development", "production"] = "development"
     DEBUG: bool = True
-    PORT: int = 8000
+    PORT: int = 8422
     HOST: str = "0.0.0.0"
 
     # Bot Operating Mode: 'conversational' | 'interactive_flow' | 'hybrid'

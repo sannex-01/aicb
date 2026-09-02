@@ -4,7 +4,7 @@ services:
     container_name: aicb-engine
     restart: unless-stopped
     ports:
-      - "${AICB_PORT:-8000}:8000"
+      - "${AICB_PORT:-8422}:8000"
     env_file:
       - .env
     volumes:
@@ -23,6 +23,6 @@ services:
     container_name: aicb-miniapp
     restart: unless-stopped
     ports:
-      - "${MINIAPP_PORT:-3001}:80"
+      - "${MINIAPP_PORT:-8423}:80"
     depends_on:
       - aicb
