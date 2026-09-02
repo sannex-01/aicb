@@ -10,6 +10,7 @@ from app.channels.telegram.client import TelegramClient
 from app.ai.orchestrator import AIOrchestrator
 from app.ai.memory import MemoryManager
 from app.flows.engine import FlowEngine
+from app.flows.definitions import MAIN_MENU_BUTTONS
 from app.telemetry.client import telemetry_client
 
 router = APIRouter(prefix="/webhooks/telegram", tags=["Telegram Webhook"])
