@@ -117,24 +117,30 @@ async def handle_whatsapp_message(
                         )
                     else:
                         await wa_client.send_text_message(to=wa_id, body=flow_res["text"])
-                else:
-                    # Route to AI Orchestrator
-                    ai_reply = await AIOrchestrator.process_message(
-                        db=db,
-                        channel="whatsapp",
-                        customer_identifier=wa_id,
-                        user_message=user_text,
-                        customer_name=customer_name,
-                    )
-                    
-                    # WhatsApp doesn't support free-form URL buttons, so we convert markdown links to text
-                    import re
-                    def format_wa_links(match):
-                        return f"*{match.group(1)}*: {match.group(2)}"
-                    
-                    formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", format_wa_links, ai_reply)
-                    
-                    await wa_client.send_text_message(to=wa_id, body=formatted_reply)
+                    # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured
+                    try:
+                        ai_reply = await AIOrchestrator.process_message(
+                            db=db,
+                            channel="whatsapp",
+                            customer_identifier=wa_id,
+                            user_message=user_text,
+                            customer_name=customer_name,
+                        )
+                        
+                        # WhatsApp doesn't support free-form URL buttons, so we convert markdown links to text
+                        import re
+                        def format_wa_links(match):
+                            return f"*{match.group(1)}*: {match.group(2)}"
+                        
+                        formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", format_wa_links, ai_reply)
+                        await wa_client.send_text_message(to=wa_id, body=formatted_reply)
+                    except Exception as e:
+                        logger.warning(f"AI Orchestrator unavailable ({e}). Falling back to interactive menu buttons.")
+                        await wa_client.send_quick_reply_buttons(
+                            to=wa_id,
+                            body="👋 I received your message! Please select an option from our menu below:",
+                            buttons=MAIN_MENU_BUTTONS,
+                        )
 
                 # Track outgoing message telemetry
                 telemetry_client.track(

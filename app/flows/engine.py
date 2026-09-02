@@ -46,26 +46,27 @@ class FlowEngine:
             products = await CatalogManager.search_products(db, limit=6)
             if not products:
                 return {
-                    "type": "text",
+                    "type": "buttons",
                     "text": "🛍️ Our catalog is currently being updated. Please check back shortly!",
+                    "buttons": MAIN_MENU_BUTTONS,
                 }
 
             product_lines = []
+            buttons = []
             for p in products:
-                product_lines.append(f"• *{p.title}* - {p.price:,.2f} {p.currency}\n  _{p.description or ''}_\n  👉 Add to cart: tap below or reply `add {p.title}`")
+                product_lines.append(f"• *{p.title}* — {p.price:,.2f} {p.currency}\n  _{p.description or 'In stock'}_\n  👉 Tap below to add to cart")
+                buttons.append({"id": f"cart_add_{p.id}", "title": f"🛒 Buy {p.title[:20]}"})
+
+            buttons.append({"id": "flow_view_cart", "title": "🛒 View Cart"})
+            buttons.append({"id": "flow_main_menu", "title": "🏠 Menu"})
 
             reply_text = "🛍️ *Available Products & Services:*\n\n" + "\n\n".join(product_lines)
-            reply_text += "\n\n_To purchase any product, just type its name or tap below!_"
 
             await MemoryManager.update_flow_state(db, session, active_flow="catalog", current_step="viewing")
             return {
                 "type": "buttons",
                 "text": reply_text,
-                "buttons": [
-                    {"id": "flow_view_cart", "title": "🛒 View Cart"},
-                    {"id": "flow_checkout", "title": "💳 Checkout"},
-                    {"id": "flow_main_menu", "title": "🏠 Menu"},
-                ],
+                "buttons": buttons,
             }
 
         # 3. Add to Cart via Button Click (e.g. "cart_add_1")
@@ -185,7 +186,40 @@ class FlowEngine:
             }
 
         # 7. Track Order Flow
-        elif action == "flow_track_order":
+        elif action == "flow_track_order" or session.active_flow == "track_order" or action_id.upper().startswith("ORD-"):
+            ref_to_check = (user_input or action_id).strip().upper()
+            if ref_to_check.startswith("ORD-"):
+                stmt = select(Order).where(Order.order_reference == ref_to_check)
+                res = await db.execute(stmt)
+                order = res.scalars().first()
+                await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
+                if order:
+                    status_emoji = "✅" if order.status == "paid" else "⏳" if order.status == "pending" else "📦"
+                    items_detail = ""
+                    try:
+                        parsed_items = json.loads(order.items_json) if order.items_json else []
+                        items_detail = "\n" + "\n".join([f"  • {it.get('quantity', 1)}x {it.get('title', 'Item')} ({it.get('price', 0):,.2f} {order.currency})" for it in parsed_items])
+                    except Exception:
+                        pass
+
+                    return {
+                        "type": "buttons",
+                        "text": (
+                            f"{status_emoji} *Order #{order.order_reference} Details*\n\n"
+                            f"• *Status:* {order.status.upper()}\n"
+                            f"• *Total:* {order.total_amount:,.2f} {order.currency}\n"
+                            f"• *Items:*{items_detail}\n"
+                            f"• *Date:* {order.created_at.strftime('%Y-%m-%d %H:%M UTC') if order.created_at else 'Recent'}"
+                        ),
+                        "buttons": MAIN_MENU_BUTTONS,
+                    }
+                else:
+                    return {
+                        "type": "buttons",
+                        "text": f"❌ No order found matching reference `{ref_to_check}`. Please double check your order number or tap below:",
+                        "buttons": MAIN_MENU_BUTTONS,
+                    }
+
             await MemoryManager.update_flow_state(db, session, active_flow="track_order", current_step="awaiting_reference")
             return {
                 "type": "text",

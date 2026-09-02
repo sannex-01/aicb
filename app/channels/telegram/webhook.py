@@ -125,33 +125,61 @@ async def handle_telegram_webhook(
                 for b in flow_res.get("buttons", [])
             ]
             await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
-        else:
-            # Route to AI Orchestrator
-            ai_reply = await AIOrchestrator.process_message(
+        elif session.active_flow or text.upper().startswith("ORD-"):
+            # Active flow state processing (e.g. order tracking or cart input)
+            flow_res = await FlowEngine.handle_action(
                 db=db,
-                channel="telegram",
-                customer_identifier=user_id,
-                user_message=text,
-                customer_name=customer_name,
+                session=session,
+                action_id=text,
+                user_input=text,
             )
-            
-            import re
-            inline_kb = []
-            
-            def extract_tg_links(match):
-                title = match.group(1)
-                url = match.group(2)
-                inline_kb.append([{"text": title, "url": url}])
-                return ""
-                
-            formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
-            if not formatted_reply and inline_kb:
-                formatted_reply = "Please see the link below:"
-                
+            inline_kb = [
+                [{"text": b["title"], "callback_data": b["id"]}]
+                for b in flow_res.get("buttons", [])
+            ]
             if inline_kb:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
             else:
-                await tg_client.send_message(chat_id=chat_id, text=formatted_reply)
+                await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
+        else:
+            # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured or errors
+            try:
+                ai_reply = await AIOrchestrator.process_message(
+                    db=db,
+                    channel="telegram",
+                    customer_identifier=user_id,
+                    user_message=text,
+                    customer_name=customer_name,
+                )
+                
+                import re
+                inline_kb = []
+                
+                def extract_tg_links(match):
+                    title = match.group(1)
+                    url = match.group(2)
+                    inline_kb.append([{"text": title, "url": url}])
+                    return ""
+                    
+                formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
+                if not formatted_reply and inline_kb:
+                    formatted_reply = "Please see the link below:"
+                    
+                if inline_kb:
+                    await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
+                else:
+                    await tg_client.send_message(chat_id=chat_id, text=formatted_reply)
+            except Exception as e:
+                logger.warning(f"AI Orchestrator unavailable ({e}). Falling back to interactive menu buttons.")
+                fallback_kb = [
+                    [{"text": b["title"], "callback_data": b["id"]}]
+                    for b in MAIN_MENU_BUTTONS
+                ]
+                await tg_client.send_inline_buttons(
+                    chat_id=chat_id,
+                    text="👋 I received your message! Please select from our interactive menu below to browse products, check your cart, or track an order:",
+                    buttons=fallback_kb,
+                )
 
         telemetry_client.track(
             channel="telegram",
