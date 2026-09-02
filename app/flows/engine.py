@@ -1,6 +1,7 @@
 import json
 import uuid
 from typing import Dict, Any, Optional, Tuple, List
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.session import ConversationSession
 from app.models.order import Order
