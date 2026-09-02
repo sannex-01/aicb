@@ -40,6 +40,11 @@ class PaystackClient:
                 "reference": reference,
             }
 
+        # Auto-derive callback URL from BOT_DOMAIN if not explicitly set
+        derived_callback = callback_url or settings.PAYSTACK_CALLBACK_URL
+        if not derived_callback and settings.BOT_DOMAIN:
+            derived_callback = f"{settings.BOT_DOMAIN.rstrip('/')}/api/v1/webhooks/payments/paystack/callback"
+
         amount_kobo = int(round(amount * 100))
         url = f"{PAYSTACK_BASE_URL}/transaction/initialize"
 
@@ -48,7 +53,7 @@ class PaystackClient:
             "currency": currency.upper(),
             "email": email,
             "reference": reference,
-            "callback_url": callback_url or settings.PAYSTACK_CALLBACK_URL,
+            "callback_url": derived_callback or None,
             "metadata": metadata or {},
         }
 

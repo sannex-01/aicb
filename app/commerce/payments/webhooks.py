@@ -2,6 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
+from fastapi.responses import HTMLResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
@@ -109,6 +110,155 @@ async def handle_paystack_webhook(
             await _notify_customer_payment_success(db, order)
 
     return {"status": "ok"}
+
+
+# ==============================================================================
+# Paystack Callback (Browser Redirect after Payment)
+# ==============================================================================
+@router.get("/paystack/callback")
+async def handle_paystack_callback(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Paystack redirects the customer's browser here after checkout.
+    We immediately verify payment and update the order status.
+    Returns an HTML page that auto-redirects to the Telegram bot.
+    """
+    from app.commerce.payments.paystack import PaystackClient
+
+    reference = request.query_params.get("trxref") or request.query_params.get("reference")
+    if not reference:
+        return HTMLResponse(
+            content=_callback_html("❌ Missing Reference", "No payment reference was provided.", redirect_url=None),
+            status_code=400,
+        )
+
+    # Check if order exists
+    stmt = select(Order).where(Order.order_reference == reference)
+    res = await db.execute(stmt)
+    order = res.scalars().first()
+
+    if not order:
+        return HTMLResponse(
+            content=_callback_html("❌ Order Not Found", f"No order found for reference {reference}.", redirect_url=None),
+            status_code=404,
+        )
+
+    # Already paid? Show confirmation directly
+    if order.status == "paid":
+        redirect_url = _get_bot_redirect_url(order)
+        return HTMLResponse(
+            content=_callback_html(
+                "✅ Payment Already Confirmed",
+                f"Your payment of {order.total_amount:,.2f} {order.currency} for Order {order.order_reference} was already confirmed!",
+                redirect_url=redirect_url,
+            ),
+        )
+
+    # Verify with Paystack API
+    try:
+        result = await PaystackClient().verify_payment(reference)
+        if result.get("status") == "success":
+            order.status = "paid"
+            order.payment_reference = reference
+            order.payment_gateway = "paystack"
+
+            payment_log = PaymentLog(
+                order_reference=reference,
+                gateway="paystack",
+                gateway_reference=reference,
+                amount=result.get("amount", 0),
+                currency=result.get("currency", "NGN"),
+                status="success",
+                payload_json=json.dumps(result.get("raw", {})),
+            )
+            db.add(payment_log)
+            await db.commit()
+
+            telemetry_client.track(
+                channel=order.channel,
+                customer_id=order.customer_identifier,
+                event="payment_success",
+                amount=result.get("amount", 0),
+                status="success",
+                metadata={"gateway": "paystack", "order_ref": reference, "source": "callback"},
+            )
+
+            await _notify_customer_payment_success(db, order)
+
+            redirect_url = _get_bot_redirect_url(order)
+            return HTMLResponse(
+                content=_callback_html(
+                    "🎉 Payment Successful!",
+                    f"Your payment of {order.total_amount:,.2f} {order.currency} for Order {order.order_reference} has been confirmed.",
+                    redirect_url=redirect_url,
+                ),
+            )
+        else:
+            return HTMLResponse(
+                content=_callback_html(
+                    "⏳ Payment Pending",
+                    f"Your payment for Order {order.order_reference} has not been confirmed yet. Please wait a moment and try again.",
+                    redirect_url=None,
+                ),
+            )
+    except Exception as e:
+        logger.error(f"Paystack callback verification error: {e}")
+        return HTMLResponse(
+            content=_callback_html(
+                "⚠️ Verification Error",
+                "We couldn't verify your payment right now. Don't worry — if you completed payment, our system will confirm it shortly via webhook.",
+                redirect_url=None,
+            ),
+        )
+
+
+def _get_bot_redirect_url(order: Order) -> str:
+    """Returns a redirect URL to send the customer back to the bot."""
+    if order.channel == "telegram":
+        # Try to get telegram bot username from settings
+        bot_token = settings.TELEGRAM_BOT_TOKEN
+        if bot_token:
+            # We'll use the generic t.me link — the actual username comes from the bot
+            return f"https://t.me/"
+    return ""
+
+
+def _callback_html(title: str, message: str, redirect_url: str | None) -> str:
+    """Generates a minimal, branded HTML page for the payment callback."""
+    redirect_meta = ""
+    redirect_link = ""
+    if redirect_url:
+        redirect_meta = f'<meta http-equiv="refresh" content="4;url={redirect_url}">'
+        redirect_link = f'<a href="{redirect_url}" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#008060;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Return to Chat →</a>'
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    {redirect_meta}
+    <title>{title}</title>
+    <style>
+        * {{ margin:0; padding:0; box-sizing:border-box; }}
+        body {{ font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#0a0a0a; color:#e5e5e5; display:flex; align-items:center; justify-content:center; min-height:100vh; padding:20px; }}
+        .card {{ background:#1a1a1a; border:1px solid #333; border-radius:16px; padding:40px; max-width:420px; width:100%; text-align:center; }}
+        h1 {{ font-size:24px; margin-bottom:12px; }}
+        p {{ font-size:14px; color:#999; line-height:1.6; }}
+        .redirect-note {{ font-size:12px; color:#666; margin-top:16px; }}
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>{title}</h1>
+        <p>{message}</p>
+        {redirect_link}
+        {f'<p class="redirect-note">Redirecting you back to the chat in a few seconds...</p>' if redirect_url else ''}
+    </div>
+</body>
+</html>"""
+
 
 
 # ==============================================================================

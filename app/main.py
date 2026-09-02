@@ -72,6 +72,42 @@ async def root():
     }
 
 
+def _mask_key(key: str | None) -> str | None:
+    """Returns a masked preview of a secret key: first 12 chars + ... + last 4 chars."""
+    if not key:
+        return None
+    if len(key) <= 16:
+        return key[:4] + "..." + key[-2:]
+    return key[:12] + "..." + key[-4:]
+
+
+@app.get("/api/v1/gateway-info", tags=["Gateway"])
+async def gateway_info():
+    """Returns masked key previews and active gateway configuration for the AgentOS dashboard."""
+    return {
+        "active_gateway": settings.DEFAULT_PAYMENT_GATEWAY,
+        "bot_domain": settings.BOT_DOMAIN,
+        "paystack": {
+            "configured": bool(settings.PAYSTACK_SECRET_KEY),
+            "secret_key_preview": _mask_key(settings.PAYSTACK_SECRET_KEY),
+            "public_key_preview": _mask_key(settings.PAYSTACK_PUBLIC_KEY),
+        },
+        "flutterwave": {
+            "configured": bool(settings.FLUTTERWAVE_SECRET_KEY),
+            "secret_key_preview": _mask_key(settings.FLUTTERWAVE_SECRET_KEY),
+            "public_key_preview": _mask_key(settings.FLUTTERWAVE_PUBLIC_KEY),
+        },
+        "monnify": {
+            "configured": bool(settings.MONNIFY_API_KEY),
+            "api_key_preview": _mask_key(settings.MONNIFY_API_KEY),
+        },
+        "stripe": {
+            "configured": bool(settings.STRIPE_SECRET_KEY),
+            "secret_key_preview": _mask_key(settings.STRIPE_SECRET_KEY),
+        },
+    }
+
+
 # Include Routers under /api/v1
 app.include_router(whatsapp_router, prefix="/api/v1")
 app.include_router(telegram_router, prefix="/api/v1")

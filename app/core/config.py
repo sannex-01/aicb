@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     DEBUG: bool = True
     PORT: int = 8422
     HOST: str = "0.0.0.0"
+    BOT_DOMAIN: Optional[str] = None  # e.g. https://aicb.sannex.ng — used for callback URLs
 
     # Bot Operating Mode: 'conversational' | 'interactive_flow' | 'hybrid'
     BOT_MODE: Literal["conversational", "interactive_flow", "hybrid"] = "hybrid"
@@ -83,7 +84,7 @@ class Settings(BaseSettings):
     # Paystack
     PAYSTACK_SECRET_KEY: Optional[str] = None
     PAYSTACK_PUBLIC_KEY: Optional[str] = None
-    PAYSTACK_CALLBACK_URL: str = "https://yourdomain.com/payments/paystack/callback"
+    PAYSTACK_CALLBACK_URL: str = ""  # Auto-derived from BOT_DOMAIN if empty
 
     # Flutterwave
     FLUTTERWAVE_SECRET_KEY: Optional[str] = None

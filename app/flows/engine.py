@@ -197,11 +197,100 @@ class FlowEngine:
                 f"\n_We will notify you immediately once payment is confirmed!_",
             ]
             return {
-                "type": "text",
+                "type": "buttons",
                 "text": "\n".join(order_summary),
+                "buttons": [
+                    {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ I've Paid"},
+                    {"id": "flow_track_order", "title": "📦 Track Order"},
+                    {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+                ],
             }
 
-        # 7. Track Order Flow
+        # 7. Confirm Payment (Manual Fallback Button)
+        elif action.startswith("flow_confirm_payment_"):
+            order_ref = action_id.replace("flow_confirm_payment_", "").strip().upper()
+            if order_ref:
+                stmt = select(Order).where(Order.order_reference == order_ref)
+                res = await db.execute(stmt)
+                order = res.scalars().first()
+                await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
+
+                if not order:
+                    return {
+                        "type": "buttons",
+                        "text": f"❌ No order found for reference `{order_ref}`.",
+                        "buttons": MAIN_MENU_BUTTONS,
+                    }
+
+                if order.status == "paid":
+                    return {
+                        "type": "buttons",
+                        "text": f"✅ *Payment Already Confirmed!*\n\nYour payment for Order *{order_ref}* has been received. Thank you!",
+                        "buttons": MAIN_MENU_BUTTONS,
+                    }
+
+                # Attempt verification via payment gateway
+                try:
+                    result = await UnifiedPaymentManager.verify_payment(
+                        reference=order_ref,
+                        gateway=order.payment_gateway or "paystack",
+                    )
+                    if result.get("status") == "success":
+                        order.status = "paid"
+                        order.payment_reference = order_ref
+                        await db.commit()
+
+                        from app.telemetry.client import telemetry_client
+                        telemetry_client.track(
+                            channel=session.channel,
+                            customer_id=session.customer_identifier,
+                            event="payment_success",
+                            status="success",
+                            amount=order.total_amount,
+                            metadata={"gateway": order.payment_gateway, "order_ref": order_ref, "source": "manual_confirm"},
+                        )
+
+                        return {
+                            "type": "buttons",
+                            "text": (
+                                f"🎉 *Payment Confirmed!*\n\n"
+                                f"We have received your payment of *{order.total_amount:,.2f} {order.currency}* for Order *{order_ref}*.\n\n"
+                                f"Your order is now being processed! Thank you for your business."
+                            ),
+                            "buttons": MAIN_MENU_BUTTONS,
+                        }
+                    else:
+                        return {
+                            "type": "buttons",
+                            "text": (
+                                f"⏳ *Payment Not Yet Received*\n\n"
+                                f"We haven't received your payment for Order *{order_ref}* yet.\n\n"
+                                f"If you've already paid, please wait a few moments and try again. "
+                                f"If not, tap below to pay now:\n\n{order.checkout_url or ''}"
+                            ),
+                            "buttons": [
+                                {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ Check Again"},
+                                {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+                            ],
+                        }
+                except Exception as e:
+                    logger.error(f"Payment verification error for {order_ref}: {e}")
+                    return {
+                        "type": "buttons",
+                        "text": f"⚠️ Could not verify payment for Order *{order_ref}* right now. Please try again in a moment.",
+                        "buttons": [
+                            {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ Try Again"},
+                            {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+                        ],
+                    }
+
+            return {
+                "type": "buttons",
+                "text": "❌ Invalid payment confirmation request.",
+                "buttons": MAIN_MENU_BUTTONS,
+            }
+
+        # 8. Track Order Flow
         elif action == "flow_track_order" or session.active_flow == "track_order" or action_id.upper().startswith("ORD-"):
             ref_to_check = (user_input or action_id).strip().upper()
             if ref_to_check.startswith("ORD-"):
