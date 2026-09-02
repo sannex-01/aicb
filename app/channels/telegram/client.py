@@ -10,14 +10,14 @@ class TelegramClient:
     def __init__(self, token: Optional[str] = None):
         self.token = token or settings.TELEGRAM_BOT_TOKEN
 
-    def _url(self, method: str) -> str:
-        if not self.token:
-            raise ValueError("TELEGRAM_BOT_TOKEN is not configured.")
-        return f"https://api.telegram.org/bot{self.token}/{method}"
-
     async def _post(self, method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+        if not self.token:
+            logger.info(f"[DEV MOCK] Telegram API {method} payload: {payload}")
+            return {"ok": True, "result": {"message_id": 9999, "status": "mocked"}}
+
+        url = f"https://api.telegram.org/bot{self.token}/{method}"
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(self._url(method), json=payload)
+            res = await client.post(url, json=payload)
             data = res.json()
             if not data.get("ok"):
                 logger.error(f"Telegram API {method} error: {data}")

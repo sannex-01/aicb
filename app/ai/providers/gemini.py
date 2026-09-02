@@ -90,3 +90,79 @@ class GeminiProvider(BaseLLMProvider):
         except Exception as e:
             logger.error(f"Gemini generation error: {e}")
             raise
+
+    async def generate_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: str,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+        model_name: Optional[str] = None,
+    ):
+        model = model_name or settings.GEMINI_MODEL
+
+        contents = []
+        for msg in messages:
+            role = "user" if msg["role"] in ["user", "tool"] else "model"
+            content_text = msg.get("content", "")
+            if msg.get("role") == "tool":
+                content_text = f"[Tool Output for {msg.get('name', 'tool')}]: {content_text}"
+            contents.append(types.Content(
+                role=role,
+                parts=[types.Part.from_text(text=content_text)]
+            ))
+
+        gemini_tools = None
+        if tools:
+            declarations = []
+            for t in tools:
+                declarations.append(types.FunctionDeclaration(
+                    name=t["name"],
+                    description=t.get("description", ""),
+                    parameters=t.get("parameters", {}),
+                ))
+            gemini_tools = [types.Tool(function_declarations=declarations)]
+
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+            tools=gemini_tools,
+        )
+
+        try:
+            # Check if using the async client wrapper or sync wrapper
+            # For simplicity, we'll use the sync streaming and wrap in an async generator
+            import asyncio
+            
+            def _sync_generate():
+                return self.client.models.generate_content_stream(
+                    model=model,
+                    contents=contents,
+                    config=config,
+                )
+            
+            response_stream = await asyncio.to_thread(_sync_generate)
+            
+            tool_calls = []
+            for chunk in response_stream:
+                if chunk.candidates:
+                    candidate = chunk.candidates[0]
+                    for part in candidate.content.parts:
+                        if part.function_call:
+                            args = part.function_call.args
+                            tool_calls.append(ToolCall(
+                                id=f"call_{part.function_call.name}_{len(tool_calls)}",
+                                name=part.function_call.name,
+                                arguments=dict(args) if args else {},
+                            ))
+                        elif part.text:
+                            yield part.text
+
+            if tool_calls:
+                yield {"type": "tool_calls", "calls": tool_calls}
+
+        except Exception as e:
+            logger.error(f"Gemini streaming error: {e}")
+            raise

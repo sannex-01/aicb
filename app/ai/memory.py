@@ -6,6 +6,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.logger import logger
 from app.models.session import ConversationSession, MessageLog
+from app.models.config_override import ConfigOverride
+from app.telemetry.client import telemetry_client
 
 
 class MemoryManager:
@@ -41,12 +43,18 @@ class MemoryManager:
             return session
 
         # Check if session has expired
-        if session.expires_at and session.expires_at < now:
-            logger.info(f"Session {session_key} expired at {session.expires_at}. Resetting active context.")
-            session.memory_json = "[]"
-            session.active_flow = None
-            session.current_step = None
-            session.state_data = "{}"
+        if session.expires_at:
+            # Ensure expires_at is timezone-aware
+            expires_at_aware = session.expires_at
+            if expires_at_aware.tzinfo is None:
+                expires_at_aware = expires_at_aware.replace(tzinfo=timezone.utc)
+            
+            if expires_at_aware < now:
+                logger.info(f"Session {session_key} expired at {session.expires_at}. Resetting active context.")
+                session.memory_json = "[]"
+                session.active_flow = None
+                session.current_step = None
+                session.state_data = "{}"
 
         # Refresh expiry and active time
         session.last_active_at = now
@@ -83,6 +91,20 @@ class MemoryManager:
         )
         db.add(log_entry)
 
+        # Track chat_transcript telemetry event
+        telemetry_client.track(
+            channel=session.channel,
+            customer_id=session.customer_identifier,
+            event="chat_transcript",
+            metadata={
+                "messages": [{
+                    "role": role,
+                    "content": content,
+                    "created_at": datetime.now(timezone.utc).isoformat()
+                }]
+            }
+        )
+
         # 2. Update sliding memory
         history = MemoryManager.get_history(session)
         msg_payload = {
@@ -96,8 +118,13 @@ class MemoryManager:
         history.append(msg_payload)
 
         # Trim to sliding window size
-        if len(history) > settings.MEMORY_WINDOW_SIZE * 2:
-            history = history[-(settings.MEMORY_WINDOW_SIZE * 2):]
+        stmt = select(ConfigOverride).where(ConfigOverride.key == "memory_window_size")
+        result = await db.execute(stmt)
+        override = result.scalars().first()
+        window_size = int(override.value) if override and override.value.isdigit() else settings.MEMORY_WINDOW_SIZE
+
+        if len(history) > window_size * 2:
+            history = history[-(window_size * 2):]
 
         session.memory_json = json.dumps(history)
         session.last_active_at = datetime.now(timezone.utc)

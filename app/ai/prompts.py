@@ -42,7 +42,8 @@ async def get_system_prompt(
         "2. When a customer confirms they want to place an order, use `create_order` tool.\n"
         "3. When ready for checkout, use `generate_payment_link` tool and share the link with the customer.\n"
         "4. If a customer is frustrated, requests human assistance, or has a critical issue, use `escalate_to_human`.\n"
-        "5. Keep responses concise, formatted with clear bullet points, and friendly."
+        "5. Keep responses concise, formatted with clear bullet points, and friendly.\n"
+        "6. IMPORTANT: When providing a payment link or any actionable URL, ALWAYS format it as a Markdown link (e.g. `[Pay Now](https://...)` or `[View Catalog](https://...)`). The system will parse this into interactive buttons."
     )
 
     return "\n".join(context_parts)

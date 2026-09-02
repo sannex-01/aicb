@@ -4,10 +4,12 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.commerce.catalog_provider import CatalogManager
+from app.commerce.cart import CartManager
 from app.commerce.payments.unified import UnifiedPaymentManager
 from app.channels.slack.client import SlackDispatcher
 from app.channels.slack.fallback import get_support_contact_message
 from app.models.order import Order
+from app.ai.memory import MemoryManager
 from app.core.logger import logger
 
 
@@ -27,6 +29,46 @@ TOOL_DEFINITIONS = [
                     "description": "Optional category filter",
                 },
             },
+        },
+    },
+    {
+        "name": "add_to_cart",
+        "description": "Adds one or more items to the customer's active shopping cart.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "description": "List of products to add to cart",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "product_id": {"type": "integer"},
+                            "title": {"type": "string"},
+                            "quantity": {"type": "integer"},
+                            "price": {"type": "number"},
+                        },
+                        "required": ["title", "price"],
+                    },
+                },
+            },
+            "required": ["items"],
+        },
+    },
+    {
+        "name": "view_cart",
+        "description": "Retrieves the customer's current shopping cart, including all items and subtotal.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+        },
+    },
+    {
+        "name": "clear_cart",
+        "description": "Clears all items from the customer's active shopping cart.",
+        "parameters": {
+            "type": "object",
+            "properties": {},
         },
     },
     {
@@ -142,6 +184,47 @@ class ToolExecutor:
                 ]
             }
 
+        elif name == "add_to_cart":
+            session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+            items = arguments.get("items", [])
+            added_titles = []
+            for itm in items:
+                await CartManager.add_item(
+                    db=db,
+                    session=session,
+                    item_id=itm.get("product_id"),
+                    title=itm.get("title"),
+                    price=float(itm.get("price", 0.0)),
+                    quantity=int(itm.get("quantity", 1)),
+                )
+                added_titles.append(itm.get("title"))
+
+            cart = CartManager.get_cart(session)
+            return {
+                "status": "success",
+                "message": f"Added {', '.join(added_titles)} to your cart.",
+                "cart_summary": CartManager.format_cart_message(cart),
+                "items_count": len(cart),
+                "subtotal": CartManager.calculate_subtotal(cart),
+            }
+
+        elif name == "view_cart":
+            session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+            cart = CartManager.get_cart(session)
+            return {
+                "cart_summary": CartManager.format_cart_message(cart),
+                "items": cart,
+                "subtotal": CartManager.calculate_subtotal(cart),
+            }
+
+        elif name == "clear_cart":
+            session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+            await CartManager.clear_cart(db, session)
+            return {
+                "status": "success",
+                "message": "Cart has been cleared.",
+            }
+
         elif name == "create_order":
             items = arguments.get("items", [])
             if not items:
@@ -189,6 +272,11 @@ class ToolExecutor:
             email = order.customer_email or f"customer_{customer_identifier.replace('+', '')}@example.com"
 
             try:
+                metadata = {
+                    "channel": channel,
+                    "customer_id": customer_identifier,
+                    "order_reference": order.order_reference,
+                }
                 payment_res = await UnifiedPaymentManager.create_payment_link(
                     amount=order.total_amount,
                     currency=order.currency,
@@ -197,6 +285,7 @@ class ToolExecutor:
                     gateway=gateway,
                     customer_name=order.customer_name,
                     customer_phone=order.customer_phone,
+                    metadata=metadata,
                 )
                 checkout_url = payment_res.get("checkout_url")
                 order.checkout_url = checkout_url

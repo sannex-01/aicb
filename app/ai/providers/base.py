@@ -31,3 +31,16 @@ class BaseLLMProvider(ABC):
     ) -> LLMResponse:
         """Generates response with optional tool calls."""
         pass
+
+    @abstractmethod
+    async def generate_stream(
+        self,
+        messages: List[Dict[str, Any]],
+        system_prompt: str,
+        tools: Optional[List[Dict[str, Any]]] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1024,
+        model_name: Optional[str] = None,
+    ):
+        """Yields string chunks of the final response, or returns a list of ToolCalls if it decides to call tools."""
+        pass

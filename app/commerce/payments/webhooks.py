@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from sqlalchemy import select
@@ -92,6 +93,17 @@ async def handle_paystack_webhook(
                 amount=amount,
                 status="success",
                 metadata={"gateway": "paystack", "order_ref": reference},
+            )
+
+            # Sync receipt message to conversation transcript
+            telemetry_client.sync_conversation(
+                channel=order.channel,
+                customer_id=order.customer_identifier,
+                messages=[{
+                    "role": "assistant",
+                    "content": f"🎉 Payment Successful! Received {order.total_amount:,.2f} {order.currency} for Order {order.order_reference}.",
+                    "created_at": datetime.now(timezone.utc).isoformat(),
+                }],
             )
 
             await _notify_customer_payment_success(db, order)

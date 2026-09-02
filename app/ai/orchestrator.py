@@ -133,3 +133,111 @@ class AIOrchestrator:
         )
 
         return final_reply
+
+    @staticmethod
+    async def process_message_stream(
+        db: AsyncSession,
+        channel: str,
+        customer_identifier: str,
+        user_message: str,
+        customer_name: Optional[str] = None,
+    ):
+        session = await MemoryManager.get_or_create_session(
+            db, channel=channel, customer_identifier=customer_identifier
+        )
+
+        stmt = select(ConfigOverride)
+        res = await db.execute(stmt)
+        overrides = {row.key: row.value for row in res.scalars().all()}
+
+        provider_name = overrides.get("llm_provider", settings.LLM_PROVIDER)
+        model_name = overrides.get("model_name")
+        temperature = float(overrides.get("temperature", settings.LLM_TEMPERATURE))
+        max_tokens = int(overrides.get("max_tokens", settings.LLM_MAX_TOKENS))
+
+        rag_context = await RAGEngine.retrieve_relevant_context(db, query=user_message, top_k=3)
+
+        system_prompt = await get_system_prompt(
+            db,
+            customer_name=customer_name,
+            channel=channel,
+            rag_context=rag_context if rag_context else None,
+        )
+
+        history = MemoryManager.get_history(session)
+        messages: List[Dict[str, Any]] = [
+            {"role": msg["role"], "content": msg["content"]}
+            for msg in history
+        ]
+        messages.append({"role": "user", "content": user_message})
+
+        provider = get_llm_provider(provider_name)
+
+        max_tool_iterations = 4
+        current_iteration = 0
+        final_reply = ""
+        tool_execution_logs: List[Dict[str, Any]] = []
+
+        while current_iteration < max_tool_iterations:
+            current_iteration += 1
+
+            stream = provider.generate_stream(
+                messages=messages,
+                system_prompt=system_prompt,
+                tools=TOOL_DEFINITIONS,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                model_name=model_name,
+            )
+            
+            tool_calls = None
+            async for chunk in stream:
+                if isinstance(chunk, dict) and chunk.get("type") == "tool_calls":
+                    tool_calls = chunk["calls"]
+                elif isinstance(chunk, str):
+                    final_reply += chunk
+                    yield chunk
+
+            if tool_calls:
+                assistant_tool_msg = {
+                    "role": "assistant",
+                    "content": "Let me check that for you.",
+                }
+                messages.append(assistant_tool_msg)
+
+                for tc in tool_calls:
+                    tool_result = await ToolExecutor.execute(
+                        db=db,
+                        name=tc.name,
+                        arguments=tc.arguments,
+                        customer_identifier=customer_identifier,
+                        channel=channel,
+                    )
+                    tool_execution_logs.append({
+                        "name": tc.name,
+                        "args": tc.arguments,
+                        "result": tool_result,
+                    })
+
+                    messages.append({
+                        "role": "tool",
+                        "name": tc.name,
+                        "content": json.dumps(tool_result),
+                    })
+                continue
+
+            break
+
+        await MemoryManager.add_message(
+            db=db,
+            session=session,
+            role="user",
+            content=user_message,
+        )
+        await MemoryManager.add_message(
+            db=db,
+            session=session,
+            role="assistant",
+            content=final_reply,
+            tool_calls=tool_execution_logs if tool_execution_logs else None,
+        )

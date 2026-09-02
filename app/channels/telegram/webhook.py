@@ -105,8 +105,15 @@ async def handle_telegram_webhook(
 
         session = await MemoryManager.get_or_create_session(db, channel="telegram", customer_identifier=user_id)
 
-        # Handle menu / start commands
-        if text.lower() in ["/start", "start", "menu", "/menu", "help"]:
+        # Handle Fast-Path System Handlers (0 LLM Tokens)
+        fast_path_triggers = ["/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout", "clear cart"]
+        is_fast_path = (
+            text.lower().strip() in fast_path_triggers
+            or text.lower().startswith("cart_")
+            or text.lower().startswith("flow_")
+        )
+
+        if is_fast_path:
             flow_res = await FlowEngine.handle_action(
                 db=db,
                 session=session,
@@ -127,7 +134,24 @@ async def handle_telegram_webhook(
                 user_message=text,
                 customer_name=customer_name,
             )
-            await tg_client.send_message(chat_id=chat_id, text=ai_reply)
+            
+            import re
+            inline_kb = []
+            
+            def extract_tg_links(match):
+                title = match.group(1)
+                url = match.group(2)
+                inline_kb.append([{"text": title, "url": url}])
+                return ""
+                
+            formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
+            if not formatted_reply and inline_kb:
+                formatted_reply = "Please see the link below:"
+                
+            if inline_kb:
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
+            else:
+                await tg_client.send_message(chat_id=chat_id, text=formatted_reply)
 
         telemetry_client.track(
             channel="telegram",

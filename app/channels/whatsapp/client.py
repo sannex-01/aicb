@@ -15,20 +15,28 @@ class WhatsAppClient:
 
     def _url(self) -> str:
         if not self.phone_number_id:
-            raise ValueError("META_PHONE_NUMBER_ID is not configured.")
+            logger.warning("META_PHONE_NUMBER_ID is not configured. Outgoing message skipped.")
+            return ""
         return f"https://graph.facebook.com/{GRAPH_API_VERSION}/{self.phone_number_id}/messages"
 
     def _headers(self) -> Dict[str, str]:
         if not self.token:
-            raise ValueError("META_WHATSAPP_TOKEN is not configured.")
+            logger.warning("META_WHATSAPP_TOKEN is not configured.")
+            return {}
         return {
             "Authorization": f"Bearer {self.token}",
             "Content-Type": "application/json",
         }
 
     async def _send(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        url = self._url()
+        headers = self._headers()
+        if not url or not headers:
+            logger.info(f"[DEV MOCK] WhatsApp message payload: {payload}")
+            return {"status": "mocked", "payload": payload}
+
         async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(self._url(), json=payload, headers=self._headers())
+            res = await client.post(url, json=payload, headers=headers)
             data = res.json()
             if res.status_code not in [200, 201]:
                 logger.error(f"WhatsApp message send error: {res.status_code} - {res.text}")

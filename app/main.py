@@ -9,6 +9,7 @@ from app.core.database import init_db, get_db
 from app.core.logger import logger
 from app.channels.whatsapp.webhook import router as whatsapp_router
 from app.channels.telegram.webhook import router as telegram_router
+from app.channels.miniapp.endpoints import router as miniapp_router
 from app.commerce.payments.webhooks import router as payments_router
 from app.commerce.bumpa.webhook import router as bumpa_router
 from app.telemetry.sync_worker import router as sync_router, start_sync_scheduler, shutdown_sync_scheduler
@@ -25,14 +26,14 @@ async def lifespan(app: FastAPI):
     # 2. Start Background 12h Sync Scheduler
     start_sync_scheduler()
 
-    logger.info(f"✨ {settings.APP_NAME} is active and ready (Mode: {settings.BOT_MODE.upper()})")
+    logger.info(f"AICB Assistant is active and ready (Mode: {settings.BOT_MODE.upper()})")
 
     yield
 
     # Shutdown hooks
     shutdown_sync_scheduler()
     telemetry_client.close()
-    logger.info(f"🛑 {settings.APP_NAME} shut down gracefully.")
+    logger.info(f"AICB Assistant shut down gracefully.")
 
 
 app = FastAPI(
@@ -74,6 +75,7 @@ async def root():
 # Include Routers under /api/v1
 app.include_router(whatsapp_router, prefix="/api/v1")
 app.include_router(telegram_router, prefix="/api/v1")
+app.include_router(miniapp_router, prefix="/api/v1")
 app.include_router(payments_router, prefix="/api/v1")
 app.include_router(bumpa_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")

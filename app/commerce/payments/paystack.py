@@ -32,6 +32,14 @@ class PaystackClient:
         metadata: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Initializes a transaction on Paystack (amount converted to kobo/cents)."""
+        if not self.secret_key:
+            logger.warning("PAYSTACK_SECRET_KEY is not configured. Generating mock checkout link for development.")
+            return {
+                "checkout_url": f"https://checkout.paystack.com/mock-{reference.lower()}",
+                "access_code": f"mock_code_{reference.lower()}",
+                "reference": reference,
+            }
+
         amount_kobo = int(round(amount * 100))
         url = f"{PAYSTACK_BASE_URL}/transaction/initialize"
 

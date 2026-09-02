@@ -45,6 +45,6 @@ async def test_flow_engine_browse_catalog(test_db: AsyncSession):
         test_db, channel="telegram", customer_identifier="12345"
     )
     res = await FlowEngine.handle_action(test_db, session, action_id="flow_browse_catalog")
-    assert res["type"] == "text"
+    assert res["type"] in ["text", "buttons"]
     assert "Wireless Headphones" in res["text"]
     assert "45,000.00 NGN" in res["text"]

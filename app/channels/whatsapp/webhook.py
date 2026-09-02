@@ -93,8 +93,16 @@ async def handle_whatsapp_message(
 
                 session = await MemoryManager.get_or_create_session(db, channel="whatsapp", customer_identifier=wa_id)
 
-                # Determine Routing: Interactive Flow vs AI Orchestration
-                if action_id or user_text.lower() in ["menu", "start", "/start", "help"]:
+                # Determine Routing: Fast-Path System Handlers (0 LLM Tokens) vs AI Orchestration
+                fast_path_triggers = ["menu", "start", "/start", "help", "cart", "/cart", "checkout", "clear cart"]
+                is_fast_path = (
+                    action_id
+                    or user_text.lower().strip() in fast_path_triggers
+                    or user_text.lower().startswith("cart_")
+                    or user_text.lower().startswith("flow_")
+                )
+
+                if is_fast_path:
                     flow_res = await FlowEngine.handle_action(
                         db=db,
                         session=session,
@@ -118,7 +126,15 @@ async def handle_whatsapp_message(
                         user_message=user_text,
                         customer_name=customer_name,
                     )
-                    await wa_client.send_text_message(to=wa_id, body=ai_reply)
+                    
+                    # WhatsApp doesn't support free-form URL buttons, so we convert markdown links to text
+                    import re
+                    def format_wa_links(match):
+                        return f"*{match.group(1)}*: {match.group(2)}"
+                    
+                    formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", format_wa_links, ai_reply)
+                    
+                    await wa_client.send_text_message(to=wa_id, body=formatted_reply)
 
                 # Track outgoing message telemetry
                 telemetry_client.track(
