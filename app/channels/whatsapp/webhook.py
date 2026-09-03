@@ -110,29 +110,30 @@ async def handle_whatsapp_message(
                         action_id=action_id or user_text,
                         user_input=user_text,
                     )
-                    if flow_res.get("type") == "buttons":
+                    if flow_res.buttons:
                         await wa_client.send_button_message(
                             to=wa_id,
-                            body=flow_res["text"],
-                            buttons=flow_res["buttons"],
+                            body=flow_res.text,
+                            buttons=[{"id": b.id, "title": b.title} for b in flow_res.buttons],
                         )
                     else:
-                        await wa_client.send_text_message(to=wa_id, body=flow_res["text"])
+                        await wa_client.send_text_message(to=wa_id, body=flow_res.text)
                     # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured
                     try:
-                        ai_reply = await AIOrchestrator.process_message(
+                        ai_resp = await AIOrchestrator.process_message(
                             db=db,
                             channel="whatsapp",
                             customer_identifier=wa_id,
                             user_message=user_text,
                             customer_name=customer_name,
                         )
-                        
+                        ai_reply = ai_resp.text
+
                         # WhatsApp doesn't support free-form URL buttons, so we convert markdown links to text
                         import re
                         def format_wa_links(match):
                             return f"*{match.group(1)}*: {match.group(2)}"
-                        
+
                         formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", format_wa_links, ai_reply)
                         await wa_client.send_text_message(to=wa_id, body=formatted_reply)
                     except Exception as e:

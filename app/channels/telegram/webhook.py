@@ -56,10 +56,10 @@ async def handle_telegram_webhook(
         )
 
         inline_kb = None
-        if flow_res.get("type") == "buttons" and flow_res.get("buttons"):
+        if flow_res.buttons:
             inline_kb = [
-                [{"text": b["title"], "callback_data": b["id"]}]
-                for b in flow_res["buttons"]
+                [{"text": b.title, "callback_data": b.id}]
+                for b in flow_res.buttons
             ]
 
         # Edit the existing message in-place for a clean, app-like experience
@@ -69,7 +69,7 @@ async def handle_telegram_webhook(
                 res = await tg_client.edit_inline_buttons(
                     chat_id=chat_id,
                     message_id=message_id,
-                    text=flow_res["text"],
+                    text=flow_res.text,
                     buttons=inline_kb,
                 )
                 if res.get("ok"):
@@ -79,9 +79,9 @@ async def handle_telegram_webhook(
 
         if not edit_success and chat_id:
             if inline_kb:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
             else:
-                await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
+                await tg_client.send_message(chat_id=chat_id, text=flow_res.text)
 
         # Track interactive button action telemetry
         telemetry_client.track(
@@ -149,12 +149,12 @@ async def handle_telegram_webhook(
                 action_id=text,
                 user_input=text,
             )
-            sent_reply_text = flow_res.get("text", "")
+            sent_reply_text = flow_res.text
             inline_kb = [
-                [{"text": b["title"], "callback_data": b["id"]}]
-                for b in flow_res.get("buttons", [])
+                [{"text": b.title, "callback_data": b.id}]
+                for b in flow_res.buttons
             ]
-            await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
+            await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
         elif session.active_flow or text.upper().startswith("ORD-"):
             # Active flow state processing (e.g. order tracking or cart input)
             flow_res = await FlowEngine.handle_action(
@@ -163,40 +163,41 @@ async def handle_telegram_webhook(
                 action_id=text,
                 user_input=text,
             )
-            sent_reply_text = flow_res.get("text", "")
+            sent_reply_text = flow_res.text
             inline_kb = [
-                [{"text": b["title"], "callback_data": b["id"]}]
-                for b in flow_res.get("buttons", [])
+                [{"text": b.title, "callback_data": b.id}]
+                for b in flow_res.buttons
             ]
             if inline_kb:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res["text"], buttons=inline_kb)
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
             else:
-                await tg_client.send_message(chat_id=chat_id, text=flow_res["text"])
+                await tg_client.send_message(chat_id=chat_id, text=flow_res.text)
         else:
             # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured or errors
             try:
-                ai_reply = await AIOrchestrator.process_message(
+                ai_resp = await AIOrchestrator.process_message(
                     db=db,
                     channel="telegram",
                     customer_identifier=user_id,
                     user_message=text,
                     customer_name=customer_name,
                 )
-                
+                ai_reply = ai_resp.text
+
                 import re
                 inline_kb = []
-                
+
                 def extract_tg_links(match):
                     title = match.group(1)
                     url = match.group(2)
                     inline_kb.append([{"text": title, "url": url}])
                     return ""
-                    
+
                 formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
                 if not formatted_reply and inline_kb:
                     formatted_reply = "Please see the link below:"
                 sent_reply_text = formatted_reply
-                    
+
                 if inline_kb:
                     await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
                 else:

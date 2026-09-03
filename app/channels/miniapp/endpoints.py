@@ -48,9 +48,11 @@ async def stream_chat(req: ChatRequest, db: AsyncSession = Depends(get_db)):
             customer_name=req.first_name,
         )
         async for chunk in stream:
-            # Yield SSE formatted chunks
-            yield f"data: {json.dumps({'content': chunk})}\n\n"
-        
+            if isinstance(chunk, str):
+                yield f"data: {json.dumps({'content': chunk})}\n\n"
+            elif isinstance(chunk, dict) and chunk.get("type") == "final":
+                yield f"data: {json.dumps({'final': chunk['data'].model_dump()})}\n\n"
+
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

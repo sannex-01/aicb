@@ -12,6 +12,7 @@ from app.models.session import ConversationSession
 from app.models.config_override import ConfigOverride
 from app.core.config import settings
 from app.core.logger import logger
+from app.schemas.bot_response import BotResponse, ProductCard
 
 
 class AIOrchestrator:
@@ -24,7 +25,7 @@ class AIOrchestrator:
         customer_identifier: str,
         user_message: str,
         customer_name: Optional[str] = None,
-    ) -> str:
+    ) -> BotResponse:
         # 1. Get or create session & memory
         session = await MemoryManager.get_or_create_session(
             db, channel=channel, customer_identifier=customer_identifier
@@ -67,6 +68,8 @@ class AIOrchestrator:
         current_iteration = 0
         final_reply = ""
         tool_execution_logs: List[Dict[str, Any]] = []
+        collected_product_cards: List[Dict[str, Any]] = []
+        collected_checkout_url: Optional[str] = None
 
         while current_iteration < max_tool_iterations:
             current_iteration += 1
@@ -103,6 +106,12 @@ class AIOrchestrator:
                         "result": tool_result,
                     })
 
+                    presentation = tool_result.get("presentation") if isinstance(tool_result, dict) else None
+                    if presentation:
+                        collected_product_cards.extend(presentation.get("product_cards", []))
+                        if presentation.get("checkout_url"):
+                            collected_checkout_url = presentation["checkout_url"]
+
                     # Append tool result to messages for next LLM iteration
                     messages.append({
                         "role": "tool",
@@ -132,7 +141,11 @@ class AIOrchestrator:
             tool_calls=tool_execution_logs if tool_execution_logs else None,
         )
 
-        return final_reply
+        return BotResponse(
+            text=final_reply,
+            product_cards=[ProductCard(**c) for c in collected_product_cards],
+            checkout_url=collected_checkout_url,
+        )
 
     @staticmethod
     async def process_message_stream(
@@ -177,6 +190,8 @@ class AIOrchestrator:
         current_iteration = 0
         final_reply = ""
         tool_execution_logs: List[Dict[str, Any]] = []
+        collected_product_cards: List[Dict[str, Any]] = []
+        collected_checkout_url: Optional[str] = None
 
         while current_iteration < max_tool_iterations:
             current_iteration += 1
@@ -189,7 +204,7 @@ class AIOrchestrator:
                 max_tokens=max_tokens,
                 model_name=model_name,
             )
-            
+
             tool_calls = None
             async for chunk in stream:
                 if isinstance(chunk, dict) and chunk.get("type") == "tool_calls":
@@ -219,6 +234,12 @@ class AIOrchestrator:
                         "result": tool_result,
                     })
 
+                    presentation = tool_result.get("presentation") if isinstance(tool_result, dict) else None
+                    if presentation:
+                        collected_product_cards.extend(presentation.get("product_cards", []))
+                        if presentation.get("checkout_url"):
+                            collected_checkout_url = presentation["checkout_url"]
+
                     messages.append({
                         "role": "tool",
                         "name": tc.name,
@@ -241,3 +262,12 @@ class AIOrchestrator:
             content=final_reply,
             tool_calls=tool_execution_logs if tool_execution_logs else None,
         )
+
+        yield {
+            "type": "final",
+            "data": BotResponse(
+                text=final_reply,
+                product_cards=[ProductCard(**c) for c in collected_product_cards],
+                checkout_url=collected_checkout_url,
+            ),
+        }

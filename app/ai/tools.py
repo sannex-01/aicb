@@ -181,7 +181,21 @@ class ToolExecutor:
                         "in_stock": item.in_stock,
                     }
                     for item in items
-                ]
+                ],
+                "presentation": {
+                    "product_cards": [
+                        {
+                            "id": item.id,
+                            "title": item.title,
+                            "description": item.description,
+                            "price": item.price,
+                            "currency": item.currency,
+                            "image_url": item.image_url,
+                            "buy_action_id": f"cart_add_{item.id}",
+                        }
+                        for item in items
+                    ]
+                },
             }
 
         elif name == "add_to_cart":
@@ -298,6 +312,7 @@ class ToolExecutor:
                     "currency": order.currency,
                     "checkout_url": checkout_url,
                     "message": f"Please complete your payment of {order.total_amount:,.2f} {order.currency} via this secure link: {checkout_url}",
+                    "presentation": {"checkout_url": checkout_url},
                 }
             except Exception as e:
                 logger.error(f"Payment link creation error: {e}")

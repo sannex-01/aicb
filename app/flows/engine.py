@@ -17,7 +17,12 @@ from app.flows.definitions import (
     CART_EMPTY_BUTTONS,
     get_main_menu_text,
 )
+from app.schemas.bot_response import BotResponse, ResponseButton, ProductCard
 from app.core.logger import logger
+
+
+def _buttons(raw: List[Dict[str, Any]]) -> List[ResponseButton]:
+    return [ResponseButton(**b) for b in raw]
 
 
 class FlowEngine:
@@ -29,7 +34,7 @@ class FlowEngine:
         session: ConversationSession,
         action_id: str,
         user_input: Optional[str] = None,
-    ) -> Dict[str, Any]:
+    ) -> BotResponse:
         """Handles interactive button callbacks and progression."""
         action = action_id.lower().strip()
         logger.info(f"Flow engine processing action: {action}")
@@ -37,27 +42,37 @@ class FlowEngine:
         # 1. Main Menu Trigger
         if action in ["flow_main_menu", "/start", "menu", "start"]:
             await MemoryManager.update_flow_state(db, session, active_flow="main_menu", current_step="root")
-            return {
-                "type": "buttons",
-                "text": get_main_menu_text(),
-                "buttons": MAIN_MENU_BUTTONS,
-            }
+            return BotResponse(
+                text=get_main_menu_text(),
+                buttons=_buttons(MAIN_MENU_BUTTONS),
+            )
 
         # 2. Browse Products Flow
         elif action == "flow_browse_catalog":
             products = await CatalogManager.search_products(db, limit=6)
             if not products:
-                return {
-                    "type": "buttons",
-                    "text": "🛍️ Our catalog is currently being updated. Please check back shortly!",
-                    "buttons": MAIN_MENU_BUTTONS,
-                }
+                return BotResponse(
+                    text="🛍️ Our catalog is currently being updated. Please check back shortly!",
+                    buttons=_buttons(MAIN_MENU_BUTTONS),
+                )
 
             product_lines = []
             buttons = []
+            product_cards = []
             for p in products:
                 product_lines.append(f"• *{p.title}* — {p.price:,.2f} {p.currency}\n  _{p.description or 'In stock'}_\n  👉 Tap below to add to cart")
                 buttons.append({"id": f"cart_add_{p.id}", "title": f"🛒 Buy {p.title[:20]}"})
+                product_cards.append(
+                    ProductCard(
+                        id=p.id,
+                        title=p.title,
+                        description=p.description,
+                        price=p.price,
+                        currency=p.currency,
+                        image_url=p.image_url,
+                        buy_action_id=f"cart_add_{p.id}",
+                    )
+                )
 
             buttons.append({"id": "flow_view_cart", "title": "🛒 View Cart"})
             buttons.append({"id": "flow_main_menu", "title": "🏠 Menu"})
@@ -65,11 +80,11 @@ class FlowEngine:
             reply_text = "🛍️ *Available Products & Services:*\n\n" + "\n\n".join(product_lines)
 
             await MemoryManager.update_flow_state(db, session, active_flow="catalog", current_step="viewing")
-            return {
-                "type": "buttons",
-                "text": reply_text,
-                "buttons": buttons,
-            }
+            return BotResponse(
+                text=reply_text,
+                buttons=_buttons(buttons),
+                product_cards=product_cards,
+            )
 
         # 3. Add to Cart via Button Click (e.g. "cart_add_1")
         elif action.startswith("cart_add_"):
@@ -89,51 +104,45 @@ class FlowEngine:
                     currency=product.currency,
                 )
                 cart_msg = CartManager.format_cart_message(cart)
-                return {
-                    "type": "buttons",
-                    "text": f"✅ *Added 1x {product.title} to your cart!*\n\n{cart_msg}",
-                    "buttons": CART_BUTTONS,
-                }
+                return BotResponse(
+                    text=f"✅ *Added 1x {product.title} to your cart!*\n\n{cart_msg}",
+                    buttons=_buttons(CART_BUTTONS),
+                )
             else:
-                return {
-                    "type": "buttons",
-                    "text": "Could not find that product. Please select from our catalog:",
-                    "buttons": MAIN_MENU_BUTTONS,
-                }
+                return BotResponse(
+                    text="Could not find that product. Please select from our catalog:",
+                    buttons=_buttons(MAIN_MENU_BUTTONS),
+                )
 
         # 4. View Cart
         elif action in ["flow_view_cart", "cart", "view_cart"]:
             cart = CartManager.get_cart(session)
             if not cart:
-                return {
-                    "type": "buttons",
-                    "text": "🛒 *Your Shopping Cart is Empty!*\n\nBrowse our products to start adding items.",
-                    "buttons": CART_EMPTY_BUTTONS,
-                }
-            return {
-                "type": "buttons",
-                "text": CartManager.format_cart_message(cart),
-                "buttons": CART_BUTTONS,
-            }
+                return BotResponse(
+                    text="🛒 *Your Shopping Cart is Empty!*\n\nBrowse our products to start adding items.",
+                    buttons=_buttons(CART_EMPTY_BUTTONS),
+                )
+            return BotResponse(
+                text=CartManager.format_cart_message(cart),
+                buttons=_buttons(CART_BUTTONS),
+            )
 
         # 5. Clear Cart
         elif action in ["flow_clear_cart", "clear_cart"]:
             await CartManager.clear_cart(db, session)
-            return {
-                "type": "buttons",
-                "text": "🗑️ *Your cart has been cleared.*",
-                "buttons": CART_EMPTY_BUTTONS,
-            }
+            return BotResponse(
+                text="🗑️ *Your cart has been cleared.*",
+                buttons=_buttons(CART_EMPTY_BUTTONS),
+            )
 
         # 6. Checkout Flow (Zero LLM Tokens)
         elif action in ["flow_checkout", "checkout"]:
             cart = CartManager.get_cart(session)
             if not cart:
-                return {
-                    "type": "buttons",
-                    "text": "🛒 *Your cart is currently empty!* Please add items first before checking out.",
-                    "buttons": CART_EMPTY_BUTTONS,
-                }
+                return BotResponse(
+                    text="🛒 *Your cart is currently empty!* Please add items first before checking out.",
+                    buttons=_buttons(CART_EMPTY_BUTTONS),
+                )
 
             total_amount = CartManager.calculate_subtotal(cart)
             currency = cart[0].get("currency", "NGN") if cart else "NGN"
@@ -197,15 +206,15 @@ class FlowEngine:
                 f"{checkout_url}",
                 f"\n_We will notify you immediately once payment is confirmed!_",
             ]
-            return {
-                "type": "buttons",
-                "text": "\n".join(order_summary),
-                "buttons": [
+            return BotResponse(
+                text="\n".join(order_summary),
+                buttons=_buttons([
                     {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ I've Paid"},
                     {"id": "flow_track_order", "title": "📦 Track Order"},
                     {"id": "flow_main_menu", "title": "🏠 Main Menu"},
-                ],
-            }
+                ]),
+                checkout_url=checkout_url,
+            )
 
         # 7. Confirm Payment (Manual Fallback Button)
         elif action.startswith("flow_confirm_payment_"):
@@ -217,18 +226,16 @@ class FlowEngine:
                 await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
 
                 if not order:
-                    return {
-                        "type": "buttons",
-                        "text": f"❌ No order found for reference `{order_ref}`.",
-                        "buttons": MAIN_MENU_BUTTONS,
-                    }
+                    return BotResponse(
+                        text=f"❌ No order found for reference `{order_ref}`.",
+                        buttons=_buttons(MAIN_MENU_BUTTONS),
+                    )
 
                 if order.status == "paid":
-                    return {
-                        "type": "buttons",
-                        "text": f"✅ *Payment Already Confirmed!*\n\nYour payment for Order *{order_ref}* has been received. Thank you!",
-                        "buttons": MAIN_MENU_BUTTONS,
-                    }
+                    return BotResponse(
+                        text=f"✅ *Payment Already Confirmed!*\n\nYour payment for Order *{order_ref}* has been received. Thank you!",
+                        buttons=_buttons(MAIN_MENU_BUTTONS),
+                    )
 
                 # Attempt verification via payment gateway
                 try:
@@ -251,49 +258,46 @@ class FlowEngine:
                             metadata={"gateway": order.payment_gateway, "order_ref": order_ref, "source": "manual_confirm"},
                         )
 
-                        return {
-                            "type": "buttons",
-                            "text": (
+                        return BotResponse(
+                            text=(
                                 f"🎉 *Payment Confirmed!*\n\n"
                                 f"We have received your payment of *{order.total_amount:,.2f} {order.currency}* for Order *{order_ref}*.\n\n"
                                 f"Your order is now being processed! Thank you for your business."
                             ),
-                            "buttons": MAIN_MENU_BUTTONS,
-                        }
+                            buttons=_buttons(MAIN_MENU_BUTTONS),
+                        )
                     else:
                         now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                         checkout_link = f"\n\n👉 *Pay Now via Paystack:*\n{order.checkout_url}" if order.checkout_url else ""
-                        return {
-                            "type": "buttons",
-                            "text": (
+                        return BotResponse(
+                            text=(
                                 f"⏳ *Payment Not Yet Received*\n\n"
                                 f"We haven't received payment for Order *{order_ref}* yet (Checked at `{now_str}`).\n\n"
                                 f"If you've already paid, please wait a few moments and tap **Check Again** below.{checkout_link}"
                             ),
-                            "buttons": [
+                            buttons=_buttons([
                                 {"id": f"flow_confirm_payment_{order_ref}", "title": "🔄 Check Again"},
                                 {"id": "flow_track_order", "title": "📦 Track Order"},
                                 {"id": "flow_main_menu", "title": "🏠 Main Menu"},
-                            ],
-                        }
+                            ]),
+                            checkout_url=order.checkout_url,
+                        )
                 except Exception as e:
                     logger.error(f"Payment verification error for {order_ref}: {e}")
                     now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
-                    return {
-                        "type": "buttons",
-                        "text": f"⚠️ Could not verify payment for Order *{order_ref}* right now (Checked at `{now_str}`). Please try again in a moment.",
-                        "buttons": [
+                    return BotResponse(
+                        text=f"⚠️ Could not verify payment for Order *{order_ref}* right now (Checked at `{now_str}`). Please try again in a moment.",
+                        buttons=_buttons([
                             {"id": f"flow_confirm_payment_{order_ref}", "title": "🔄 Try Again"},
                             {"id": "flow_track_order", "title": "📦 Track Order"},
                             {"id": "flow_main_menu", "title": "🏠 Main Menu"},
-                        ],
-                    }
+                        ]),
+                    )
 
-            return {
-                "type": "buttons",
-                "text": "❌ Invalid payment confirmation request.",
-                "buttons": MAIN_MENU_BUTTONS,
-            }
+            return BotResponse(
+                text="❌ Invalid payment confirmation request.",
+                buttons=_buttons(MAIN_MENU_BUTTONS),
+            )
 
         # 8. Track Order Flow
         elif action == "flow_track_order" or session.active_flow == "track_order" or action_id.upper().startswith("ORD-"):
@@ -312,6 +316,7 @@ class FlowEngine:
                     except Exception:
                         pass
 
+                    checkout_url_val: Optional[str] = None
                     if order.status == "pending":
                         buttons = [
                             {"id": f"flow_confirm_payment_{order.order_reference}", "title": "✅ I've Paid"},
@@ -319,13 +324,13 @@ class FlowEngine:
                             {"id": "flow_main_menu", "title": "🏠 Main Menu"},
                         ]
                         pay_now_section = f"\n\n👉 *Pay Now via Paystack:*\n{order.checkout_url}" if order.checkout_url else ""
+                        checkout_url_val = order.checkout_url
                     else:
                         buttons = MAIN_MENU_BUTTONS
                         pay_now_section = ""
 
-                    return {
-                        "type": "buttons",
-                        "text": (
+                    return BotResponse(
+                        text=(
                             f"{status_emoji} *Order #{order.order_reference} Details*\n\n"
                             f"• *Status:* {order.status.upper()}\n"
                             f"• *Total:* {order.total_amount:,.2f} {order.currency}\n"
@@ -333,31 +338,24 @@ class FlowEngine:
                             f"• *Date:* {order.created_at.strftime('%Y-%m-%d %H:%M UTC') if order.created_at else 'Recent'}"
                             f"{pay_now_section}"
                         ),
-                        "buttons": buttons,
-                    }
+                        buttons=_buttons(buttons),
+                        checkout_url=checkout_url_val,
+                    )
                 else:
-                    return {
-                        "type": "buttons",
-                        "text": f"❌ No order found matching reference `{ref_to_check}`. Please double check your order number or tap below:",
-                        "buttons": MAIN_MENU_BUTTONS,
-                    }
+                    return BotResponse(
+                        text=f"❌ No order found matching reference `{ref_to_check}`. Please double check your order number or tap below:",
+                        buttons=_buttons(MAIN_MENU_BUTTONS),
+                    )
 
             await MemoryManager.update_flow_state(db, session, active_flow="track_order", current_step="awaiting_reference")
-            return {
-                "type": "text",
-                "text": "📦 Please reply with your *Order Reference* (e.g. `ORD-AB12CD34`) to check your order status.",
-            }
+            return BotResponse(
+                text="📦 Please reply with your *Order Reference* (e.g. `ORD-AB12CD34`) to check your order status.",
+            )
 
-        # 8. Talk to Human / Contact Support
+        # 9. Talk to Human / Contact Support
         elif action == "flow_contact_support":
             support_msg = get_support_contact_message()
             await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
-            return {
-                "type": "text",
-                "text": support_msg,
-            }
+            return BotResponse(text=support_msg)
 
-        return {
-            "type": "text",
-            "text": "How else can we assist you today?",
-        }
+        return BotResponse(text="How else can we assist you today?")
