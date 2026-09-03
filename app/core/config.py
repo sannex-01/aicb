@@ -78,20 +78,15 @@ class Settings(BaseSettings):
     BUMPA_STORE_ID: Optional[str] = None
     BUMPA_API_BASE_URL: str = "https://api.getbumpa.com/v1"
 
-    # Payment Gateway Defaults
+    # Payments
     DEFAULT_PAYMENT_GATEWAY: Literal["paystack", "flutterwave", "monnify", "stripe"] = "paystack"
-
-    # Paystack
     PAYSTACK_SECRET_KEY: Optional[str] = None
     PAYSTACK_PUBLIC_KEY: Optional[str] = None
     PAYSTACK_CALLBACK_URL: str = ""  # Auto-derived from BOT_DOMAIN if empty
-
-    # Flutterwave
+    BOT_DOMAIN: str = "https://aicb.sannex.ng"
     FLUTTERWAVE_SECRET_KEY: Optional[str] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
     FLUTTERWAVE_SECRET_HASH: Optional[str] = None
-
-    # Monnify
     MONNIFY_API_KEY: Optional[str] = None
     MONNIFY_SECRET_KEY: Optional[str] = None
     MONNIFY_CONTRACT_CODE: Optional[str] = None
@@ -102,6 +97,19 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: Optional[str] = None
     STRIPE_SUCCESS_URL: str = "https://yourdomain.com/payments/stripe/success"
     STRIPE_CANCEL_URL: str = "https://yourdomain.com/payments/stripe/cancel"
+
+    # Media & Storage (Cloudinary / Cloudflare R2)
+    STORAGE_PROVIDER: Literal["cloudinary", "cloudflare_r2", "local"] = "cloudinary"
+    CLOUDINARY_CLOUD_NAME: Optional[str] = None
+    CLOUDINARY_API_KEY: Optional[str] = None
+    CLOUDINARY_API_SECRET: Optional[str] = None
+    CLOUDINARY_FOLDER: str = "aicb_assets"
+
+    R2_ACCOUNT_ID: Optional[str] = None
+    R2_ACCESS_KEY_ID: Optional[str] = None
+    R2_SECRET_ACCESS_KEY: Optional[str] = None
+    R2_BUCKET_NAME: Optional[str] = None
+    R2_PUBLIC_URL: Optional[str] = None
 
     # Sannex Agent Telemetry & AgentOS Sync
     SANNEX_API_KEY: Optional[str] = None

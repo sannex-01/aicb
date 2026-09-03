@@ -105,6 +105,22 @@ async def gateway_info():
             "configured": bool(settings.STRIPE_SECRET_KEY),
             "secret_key_preview": _mask_key(settings.STRIPE_SECRET_KEY),
         },
+        "storage": {
+            "provider": settings.STORAGE_PROVIDER,
+            "cloudinary": {
+                "configured": bool(settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_CLOUD_NAME),
+                "cloud_name": settings.CLOUDINARY_CLOUD_NAME,
+                "api_key_preview": _mask_key(settings.CLOUDINARY_API_KEY),
+                "folder": settings.CLOUDINARY_FOLDER,
+            },
+            "cloudflare_r2": {
+                "configured": bool(settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID),
+                "account_id": settings.R2_ACCOUNT_ID,
+                "bucket_name": settings.R2_BUCKET_NAME,
+                "access_key_preview": _mask_key(settings.R2_ACCESS_KEY_ID),
+                "public_url": settings.R2_PUBLIC_URL,
+            },
+        },
     }
 
 
