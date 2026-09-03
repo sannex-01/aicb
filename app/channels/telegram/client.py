@@ -63,7 +63,7 @@ class TelegramClient:
         chat_id: int | str,
         message_id: int,
         text: str,
-        parse_mode: str = "Markdown",
+        parse_mode: Optional[str] = "Markdown",
         reply_markup: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Edits an existing message text in-place on Telegram."""
@@ -71,11 +71,24 @@ class TelegramClient:
             "chat_id": chat_id,
             "message_id": message_id,
             "text": text,
-            "parse_mode": parse_mode,
         }
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
         if reply_markup:
             payload["reply_markup"] = reply_markup
-        return await self._post("editMessageText", payload)
+
+        res = await self._post("editMessageText", payload)
+        if not res.get("ok"):
+            desc = res.get("description", "").lower()
+            if "message is not modified" in desc:
+                return {"ok": True, "not_modified": True}
+            if parse_mode:
+                # Retry without Markdown formatting in case of unescaped special chars
+                payload.pop("parse_mode", None)
+                res = await self._post("editMessageText", payload)
+                if not res.get("ok") and "message is not modified" in res.get("description", "").lower():
+                    return {"ok": True, "not_modified": True}
+        return res
 
     async def edit_inline_buttons(
         self,

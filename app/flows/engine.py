@@ -1,5 +1,6 @@
 import json
 import uuid
+from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -260,26 +261,30 @@ class FlowEngine:
                             "buttons": MAIN_MENU_BUTTONS,
                         }
                     else:
+                        now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
+                        checkout_link = f"\n\n👉 *Pay Now via Paystack:*\n{order.checkout_url}" if order.checkout_url else ""
                         return {
                             "type": "buttons",
                             "text": (
                                 f"⏳ *Payment Not Yet Received*\n\n"
-                                f"We haven't received your payment for Order *{order_ref}* yet.\n\n"
-                                f"If you've already paid, please wait a few moments and try again. "
-                                f"If not, tap below to pay now:\n\n{order.checkout_url or ''}"
+                                f"We haven't received payment for Order *{order_ref}* yet (Checked at `{now_str}`).\n\n"
+                                f"If you've already paid, please wait a few moments and tap **Check Again** below.{checkout_link}"
                             ),
                             "buttons": [
-                                {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ Check Again"},
+                                {"id": f"flow_confirm_payment_{order_ref}", "title": "🔄 Check Again"},
+                                {"id": "flow_track_order", "title": "📦 Track Order"},
                                 {"id": "flow_main_menu", "title": "🏠 Main Menu"},
                             ],
                         }
                 except Exception as e:
                     logger.error(f"Payment verification error for {order_ref}: {e}")
+                    now_str = datetime.now(timezone.utc).strftime("%H:%M:%S UTC")
                     return {
                         "type": "buttons",
-                        "text": f"⚠️ Could not verify payment for Order *{order_ref}* right now. Please try again in a moment.",
+                        "text": f"⚠️ Could not verify payment for Order *{order_ref}* right now (Checked at `{now_str}`). Please try again in a moment.",
                         "buttons": [
-                            {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ Try Again"},
+                            {"id": f"flow_confirm_payment_{order_ref}", "title": "🔄 Try Again"},
+                            {"id": "flow_track_order", "title": "📦 Track Order"},
                             {"id": "flow_main_menu", "title": "🏠 Main Menu"},
                         ],
                     }
@@ -307,6 +312,17 @@ class FlowEngine:
                     except Exception:
                         pass
 
+                    if order.status == "pending":
+                        buttons = [
+                            {"id": f"flow_confirm_payment_{order.order_reference}", "title": "✅ I've Paid"},
+                            {"id": "flow_browse_products", "title": "🛍️ Browse Products"},
+                            {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+                        ]
+                        pay_now_section = f"\n\n👉 *Pay Now via Paystack:*\n{order.checkout_url}" if order.checkout_url else ""
+                    else:
+                        buttons = MAIN_MENU_BUTTONS
+                        pay_now_section = ""
+
                     return {
                         "type": "buttons",
                         "text": (
@@ -315,8 +331,9 @@ class FlowEngine:
                             f"• *Total:* {order.total_amount:,.2f} {order.currency}\n"
                             f"• *Items:*{items_detail}\n"
                             f"• *Date:* {order.created_at.strftime('%Y-%m-%d %H:%M UTC') if order.created_at else 'Recent'}"
+                            f"{pay_now_section}"
                         ),
-                        "buttons": MAIN_MENU_BUTTONS,
+                        "buttons": buttons,
                     }
                 else:
                     return {
