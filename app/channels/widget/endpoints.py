@@ -1,6 +1,6 @@
 import json
 from typing import Optional
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.core.config import settings
+from app.core.rate_limit import limiter
 from app.ai.memory import MemoryManager
 from app.ai.orchestrator import AIOrchestrator
 from app.flows.engine import FlowEngine
@@ -19,10 +20,10 @@ router = APIRouter(prefix="/widget", tags=["Website Widget"])
 # NOTE: unlike every other inbound surface in this service (signed webhooks),
 # /api/v1/widget/* is reachable directly from arbitrary third-party browser JS
 # since widget.js is by design embedded in public page source — its endpoint
-# URLs are trivially discoverable and there is no per-request auth. Recommend
-# adding rate limiting (e.g. slowapi, per session_id + per IP) scoped to this
-# router before wide rollout; not added here to avoid introducing a new
-# dependency without sign-off.
+# URLs are trivially discoverable and there is no per-request auth. Rate
+# limited below (per client IP — session_id is client-supplied and trivially
+# spoofable) via slowapi; chat/stream is limited tighter since it costs a
+# real LLM call.
 
 
 class WidgetActionRequest(BaseModel):
@@ -45,7 +46,8 @@ class WidgetProfileRequest(BaseModel):
 
 
 @router.post("/profile")
-async def widget_submit_profile(req: WidgetProfileRequest, db: AsyncSession = Depends(get_db)) -> dict:
+@limiter.limit("10/minute")
+async def widget_submit_profile(request: Request, req: WidgetProfileRequest, db: AsyncSession = Depends(get_db)) -> dict:
     """One-shot submission of the autofill-friendly form shown immediately on
     panel open (see widget/src/profile-form.ts) — collected fresh every
     session, never persisted as a Customer row (widget has no durable
@@ -62,7 +64,8 @@ async def widget_submit_profile(req: WidgetProfileRequest, db: AsyncSession = De
 
 
 @router.post("/chat/stream")
-async def widget_chat_stream(req: WidgetChatRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("15/minute")
+async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: AsyncSession = Depends(get_db)):
     """Streams the LLM response to the website widget using SSE."""
 
     session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
@@ -102,7 +105,8 @@ async def widget_chat_stream(req: WidgetChatRequest, db: AsyncSession = Depends(
 
 
 @router.post("/action", response_model=BotResponse)
-async def widget_action(req: WidgetActionRequest, db: AsyncSession = Depends(get_db)) -> BotResponse:
+@limiter.limit("30/minute")
+async def widget_action(request: Request, req: WidgetActionRequest, db: AsyncSession = Depends(get_db)) -> BotResponse:
     """Dispatches a widget button/product-card click (e.g. cart_add_12, flow_checkout)
     into the same deterministic flow engine every other channel uses."""
     session = await MemoryManager.get_or_create_session(
@@ -117,7 +121,8 @@ async def widget_action(req: WidgetActionRequest, db: AsyncSession = Depends(get
 
 
 @router.get("/config")
-async def widget_config(db: AsyncSession = Depends(get_db)) -> dict:
+@limiter.limit("60/minute")
+async def widget_config(request: Request, db: AsyncSession = Depends(get_db)) -> dict:
     """Minimal launcher metadata for the floating widget (business name, welcome
     message, and whether to show the profile form immediately on open vs. defer
     it to the same chat-based collection WhatsApp/Telegram use at checkout)."""

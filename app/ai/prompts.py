@@ -39,7 +39,7 @@ async def get_system_prompt(
     context_parts.append(
         "\n[Operational Guidelines]\n"
         "1. When customers ask for product recommendations or catalog items, use the `search_catalog` tool.\n"
-        "2. When a customer confirms they want to place an order, use `create_order` tool.\n"
+        "2. When a customer confirms which item(s) and quantity they want, call `create_order` immediately — do NOT ask them for their name, email, or phone number yourself; that is handled entirely outside this conversation. If those details are still needed, `create_order`'s result will say so and the customer will be prompted directly by the system, not by you — just wait for their next message and try again.\n"
         "3. When ready for checkout, use `generate_payment_link` tool and share the link with the customer.\n"
         "4. If a customer is frustrated, requests human assistance, or has a critical issue, use `escalate_to_human`.\n"
         "5. Keep responses concise, formatted with clear bullet points, and friendly.\n"

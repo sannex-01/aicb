@@ -76,7 +76,15 @@ TOOL_DEFINITIONS = [
     },
     {
         "name": "create_order",
-        "description": "Creates an order for the customer with chosen products.",
+        "description": (
+            "Creates an order for the customer with chosen products. Call this "
+            "immediately once the customer has confirmed what they want to buy — "
+            "do NOT ask the customer for their name, email, or phone number "
+            "yourself first. The system already handles collecting and "
+            "verifying those details outside of this conversation; if they are "
+            "still missing, this tool's result will tell you so and the "
+            "customer will be prompted directly by the system, not by you."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
@@ -94,9 +102,6 @@ TOOL_DEFINITIONS = [
                         "required": ["title", "quantity", "price"],
                     },
                 },
-                "customer_name": {"type": "string", "description": "Customer full name"},
-                "customer_phone": {"type": "string", "description": "Customer phone number"},
-                "customer_email": {"type": "string", "description": "Customer email address"},
                 "shipping_address": {"type": "string", "description": "Customer delivery address if applicable"},
             },
             "required": ["items"],
@@ -368,7 +373,8 @@ class ToolExecutor:
     ) -> Optional[Dict[str, Optional[str]]]:
         """Resolves a complete {name, email, phone} profile for checkout, preferring
         explicit tool-call arguments, falling back to a stored Customer profile
-        (WhatsApp/Telegram only). Returns None if no complete profile is available —
+        (WhatsApp/Telegram) or the widget's one-shot form submission for this
+        session (widget). Returns None if no complete profile is available —
         callers must then interrupt with the profile_collect flow rather than
         proceeding with placeholder data."""
         name = arguments.get("customer_name")
@@ -383,6 +389,15 @@ class ToolExecutor:
                 phone = phone or stored.phone_number
             if channel == "whatsapp":
                 phone = phone or customer_identifier
+        elif channel == "widget":
+            from app.flows.engine import FlowEngine
+
+            session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+            widget_profile = FlowEngine._get_widget_profile(session)
+            if widget_profile:
+                name = name or widget_profile.get("name")
+                email = email or widget_profile.get("email")
+                phone = phone or widget_profile.get("phone")
 
         if name and email and phone:
             return {"name": name, "email": email, "phone": phone}

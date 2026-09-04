@@ -44,7 +44,7 @@ async def perform_sannex_sync(db: AsyncSession) -> Dict[str, Any]:
             config = data.get("config", {})
 
             # 1. Update Config Overrides (Prompt, Temp, Model, etc.)
-            for key in ["system_prompt", "temperature", "model_name", "llm_provider", "bot_mode", "max_tokens", "memory_window_size"]:
+            for key in ["system_prompt", "temperature", "model_name", "llm_provider", "bot_mode", "max_tokens", "memory_window_size", "widget_profile_collection"]:
                 if key in config and config[key] is not None:
                     val_str = str(config[key])
                     stmt = select(ConfigOverride).where(ConfigOverride.key == key)
