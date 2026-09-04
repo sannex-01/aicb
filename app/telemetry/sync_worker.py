@@ -135,11 +135,16 @@ async def _scheduled_sync_job():
 
 
 def start_sync_scheduler():
-    """Starts the periodic background sync job and triggers an immediate sync on startup."""
-    hours = max(settings.SYNC_INTERVAL_HOURS, 1)
-    scheduler.add_job(_scheduled_sync_job, "interval", hours=hours, id="sannex_sync_job", replace_existing=True)
-    scheduler.start()
-    logger.info(f"Sannex 12-hour periodic sync worker started (Interval: {hours}h).")
+    """Starts the periodic background sync job (every 30 minutes by default) and triggers an immediate sync on startup."""
+    if settings.SYNC_INTERVAL_HOURS is not None:
+        minutes = max(settings.SYNC_INTERVAL_HOURS * 60, 1)
+    else:
+        minutes = max(settings.SYNC_INTERVAL_MINUTES, 1)
+
+    scheduler.add_job(_scheduled_sync_job, "interval", minutes=minutes, id="sannex_sync_job", replace_existing=True)
+    if not scheduler.running:
+        scheduler.start()
+    logger.info(f"Sannex periodic sync worker started (Interval: {minutes}m).")
 
     # Trigger immediate sync in background on container startup so catalogs and prompts are never stale or empty
     asyncio.create_task(_scheduled_sync_job())

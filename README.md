@@ -30,9 +30,9 @@ A modular, lightweight, and production-ready AI & Interactive Step Chatbot engin
    - In-process hybrid BM25 and vector similarity search over business knowledge documents and FAQs.
    - Sliding-window conversation memory with configurable TTL auto-expiry (`SESSION_EXPIRY_HOURS`).
 
-6. **Sannex Agent Telemetry & 12h Sync Worker**:
+6. **Sannex Agent Telemetry & 30m Sync Worker**:
    - Asynchronous fire-and-forget telemetry queue with zero latency overhead.
-   - Automatic 12-hour background synchronization (plus manual `POST /api/v1/sync`) to pull updated prompts, catalogs, and knowledge bases from AgentOS.
+   - Automatic 30-minute background synchronization (plus manual `POST /api/v1/sync`) to pull updated prompts, catalogs, and knowledge bases from AgentOS.
 
 ---
 
@@ -88,7 +88,7 @@ aicb/
 │   ├── commerce/                   # CartManager, Catalog & Payments (Paystack, Flutterwave, Stripe)
 │   ├── ai/                         # Multi-LLM providers, prompts, memory, RAG, tool calling
 │   ├── flows/                      # Deterministic 0-token fast-path button engine
-│   ├── telemetry/                  # Sannex telemetry dispatcher & 12h sync worker
+│   ├── telemetry/                  # Sannex telemetry dispatcher & 30m sync worker
 │   └── models/                     # SQLAlchemy models
 ├── widget/                         # Embeddable website chat widget (Vite, builds to widget.js)
 ├── doctor.py                       # Pre-flight diagnostic tool

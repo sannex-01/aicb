@@ -30,7 +30,7 @@ async def lifespan(app: FastAPI):
     # 1. Initialize Database Schema
     await init_db()
 
-    # 2. Start Background 12h Sync Scheduler
+    # 2. Start Background 30m Sync Scheduler
     start_sync_scheduler()
 
     logger.info(f"AICB Assistant is active and ready (Mode: {settings.BOT_MODE.upper()})")
