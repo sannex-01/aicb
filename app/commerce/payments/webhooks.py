@@ -215,13 +215,9 @@ async def handle_paystack_callback(
 
 
 def _get_bot_redirect_url(order: Order) -> str:
-    """Returns a redirect URL to send the customer back to the bot."""
-    if order.channel == "telegram":
-        # Try to get telegram bot username from settings
-        bot_token = settings.TELEGRAM_BOT_TOKEN
-        if bot_token:
-            # We'll use the generic t.me link — the actual username comes from the bot
-            return f"https://t.me/"
+    """Returns a redirect URL to send the customer back to the bot chat."""
+    if order.channel == "telegram" and settings.TELEGRAM_BOT_USERNAME:
+        return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME.lstrip('@')}"
     return ""
 
 
