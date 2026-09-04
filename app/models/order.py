@@ -26,8 +26,8 @@ class Order(Base):
     checkout_url = Column(String(500), nullable=True)
     metadata_json = Column(Text, default="{}")
     
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
-    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
 
 class PaymentLog(Base):
@@ -42,4 +42,4 @@ class PaymentLog(Base):
     status = Column(String(50), nullable=False) # success, failed, pending
     payload_json = Column(Text, default="{}")
     
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

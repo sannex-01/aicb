@@ -22,12 +22,12 @@ class ConversationSession(Base):
     # Sliding window conversation memory (serialized JSON list of role/content)
     memory_json = Column(Text, default="[]")
     
-    last_active_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    last_active_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     expires_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc) + timedelta(hours=settings.SESSION_EXPIRY_HOURS)
     )
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     messages = relationship("MessageLog", back_populates="session", cascade="all, delete-orphan")
 
@@ -41,6 +41,6 @@ class MessageLog(Base):
     content = Column(Text, nullable=False)
     tool_calls_json = Column(Text, nullable=True)
     metadata_json = Column(Text, default="{}")
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     session = relationship("ConversationSession", back_populates="messages")
