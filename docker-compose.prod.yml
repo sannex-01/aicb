@@ -30,7 +30,7 @@ services:
       DEBUG: "false"
       PORT: 8000
       HOST: 0.0.0.0
-      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aicb_user}:${POSTGRES_PASSWORD:-aicb_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-aicb}}
+      DATABASE_URL: ${PROD_DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aicb_user}:${POSTGRES_PASSWORD:-aicb_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-aicb}}
     depends_on:
       postgres:
         condition: service_healthy
