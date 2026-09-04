@@ -12,7 +12,19 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string): 
   return node;
 }
 
-function renderButtons(buttons: ResponseButton[], handlers: RenderHandlers): HTMLElement | null {
+/** Removes every button/quick-reply from a rendered turn once one of them
+ * is clicked (matches Telegram editing its inline keyboard away after a
+ * tap) so a customer can't re-trigger a stale action from an earlier point
+ * in the conversation — e.g. tapping "Buy" twice on a product shown three
+ * messages ago. Plain button/quick-reply rows are removed entirely since
+ * nothing useful is left in them; a product card keeps its image/title/
+ * price and only its Buy button is removed. */
+function removeTurnButtons(turnEl: HTMLElement): void {
+  turnEl.querySelectorAll(`.${PREFIX}-buttons`).forEach((row) => row.remove());
+  turnEl.querySelectorAll(`.${PREFIX}-card-buy`).forEach((btn) => btn.remove());
+}
+
+function renderButtons(buttons: ResponseButton[], handlers: RenderHandlers, turnEl: HTMLElement): HTMLElement | null {
   if (!buttons.length) return null;
   const row = el("div", `${PREFIX}-buttons`);
   for (const b of buttons) {
@@ -26,14 +38,17 @@ function renderButtons(buttons: ResponseButton[], handlers: RenderHandlers): HTM
     } else {
       const btn = el("button", `${PREFIX}-btn`);
       btn.textContent = b.title;
-      btn.onclick = () => handlers.onAction(b.id);
+      btn.onclick = () => {
+        removeTurnButtons(turnEl);
+        handlers.onAction(b.id);
+      };
       row.appendChild(btn);
     }
   }
   return row;
 }
 
-function renderProductCard(card: ProductCard, handlers: RenderHandlers): HTMLElement {
+function renderProductCard(card: ProductCard, handlers: RenderHandlers, turnEl: HTMLElement): HTMLElement {
   const wrap = el("div", `${PREFIX}-card`);
 
   if (card.image_url) {
@@ -55,7 +70,10 @@ function renderProductCard(card: ProductCard, handlers: RenderHandlers): HTMLEle
   price.textContent = `${card.price.toLocaleString()} ${card.currency}`;
   const buyBtn = el("button", `${PREFIX}-card-buy`);
   buyBtn.textContent = "Buy";
-  buyBtn.onclick = () => handlers.onAction(card.buy_action_id);
+  buyBtn.onclick = () => {
+    removeTurnButtons(turnEl);
+    handlers.onAction(card.buy_action_id);
+  };
 
   body.appendChild(title);
   body.appendChild(price);
@@ -70,13 +88,16 @@ function placeholderImage(): HTMLElement {
   return ph;
 }
 
-function renderQuickReplies(replies: string[], handlers: RenderHandlers): HTMLElement | null {
+function renderQuickReplies(replies: string[], handlers: RenderHandlers, turnEl: HTMLElement): HTMLElement | null {
   if (!replies.length) return null;
   const row = el("div", `${PREFIX}-buttons`);
   for (const r of replies) {
     const btn = el("button", `${PREFIX}-btn`);
     btn.textContent = r;
-    btn.onclick = () => handlers.onQuickReply(r);
+    btn.onclick = () => {
+      removeTurnButtons(turnEl);
+      handlers.onQuickReply(r);
+    };
     row.appendChild(btn);
   }
   return row;
@@ -90,22 +111,26 @@ export function renderUserMessage(text: string): HTMLElement {
 }
 
 /** Renders a bot turn (text, product cards, buttons, quick replies) as a
- * fragment ready to append to the message list. */
-export function renderBotResponse(resp: BotResponse, handlers: RenderHandlers): DocumentFragment {
-  const frag = document.createDocumentFragment();
+ * single wrapping element ready to append to the message list. Wrapped
+ * (rather than a bare DocumentFragment) so its own buttons can be found
+ * and removed once clicked — matching Telegram's inline keyboard being
+ * edited away after a tap, so a customer can't re-trigger a stale action
+ * from earlier in the conversation. */
+export function renderBotResponse(resp: BotResponse, handlers: RenderHandlers): HTMLElement {
+  const turnEl = el("div", `${PREFIX}-turn`);
 
   if (resp.text) {
     const bubble = el("div", `${PREFIX}-bubble-msg bot`);
     bubble.textContent = resp.text;
-    frag.appendChild(bubble);
+    turnEl.appendChild(bubble);
   }
 
   if (resp.product_cards.length) {
     const cards = el("div", `${PREFIX}-cards`);
     for (const card of resp.product_cards) {
-      cards.appendChild(renderProductCard(card, handlers));
+      cards.appendChild(renderProductCard(card, handlers, turnEl));
     }
-    frag.appendChild(cards);
+    turnEl.appendChild(cards);
   }
 
   // Product cards already carry their own Buy button — drop any button in the
@@ -114,11 +139,11 @@ export function renderBotResponse(resp: BotResponse, handlers: RenderHandlers): 
   // channels that don't render cards).
   const cardActionIds = new Set(resp.product_cards.map((c) => c.buy_action_id));
   const remainingButtons = resp.buttons.filter((b) => !cardActionIds.has(b.id));
-  const buttonsRow = renderButtons(remainingButtons, handlers);
-  if (buttonsRow) frag.appendChild(buttonsRow);
+  const buttonsRow = renderButtons(remainingButtons, handlers, turnEl);
+  if (buttonsRow) turnEl.appendChild(buttonsRow);
 
-  const quickRepliesRow = renderQuickReplies(resp.quick_replies, handlers);
-  if (quickRepliesRow) frag.appendChild(quickRepliesRow);
+  const quickRepliesRow = renderQuickReplies(resp.quick_replies, handlers, turnEl);
+  if (quickRepliesRow) turnEl.appendChild(quickRepliesRow);
 
-  return frag;
+  return turnEl;
 }
