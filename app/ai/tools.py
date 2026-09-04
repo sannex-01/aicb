@@ -7,6 +7,7 @@ from app.commerce.catalog_provider import CatalogManager
 from app.commerce.cart import CartManager
 from app.commerce.customer_profile import get_customer, is_profile_complete
 from app.commerce.payments.unified import UnifiedPaymentManager
+from app.commerce.storage.manager import StorageManager
 from app.channels.slack.client import SlackDispatcher
 from app.channels.slack.fallback import get_support_contact_message
 from app.models.order import Order
@@ -25,7 +26,7 @@ TOOL_DEFINITIONS = [
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "Search keyword or product name (e.g. 'shoes', 'iphone', 'consulting')",
+                    "description": "Search keywords or a natural description of what the customer wants (e.g. 'shoes', 'blue wireless earbuds', 'something for the office') — matching is flexible and word-based, not an exact phrase.",
                 },
                 "category": {
                     "type": "string",
@@ -174,9 +175,32 @@ class ToolExecutor:
         if name == "search_catalog":
             query = arguments.get("query")
             category = arguments.get("category")
-            items = await CatalogManager.search_products(db, query=query, category=category, limit=8)
+            MIN_RESULTS = 3
+            SEARCH_LIMIT = 8
+
+            items = await CatalogManager.search_products(db, query=query, category=category, limit=SEARCH_LIMIT)
+            matched_count = len(items)
+
+            # "Append possible ones too" — when a search comes back thin,
+            # backfill with the same newest+popular ranking used for the
+            # undirected browse case, so the customer still sees something
+            # relevant instead of a bare "no results". The LLM's reply
+            # already distinguishes these in its own words (it can see
+            # matched_count below) — no separate schema field needed.
+            if matched_count < MIN_RESULTS:
+                seen_ids = {item.id for item in items}
+                featured = await CatalogManager.get_featured_products(db, limit=SEARCH_LIMIT)
+                for extra in featured:
+                    if len(items) >= SEARCH_LIMIT:
+                        break
+                    if extra.id not in seen_ids:
+                        items.append(extra)
+                        seen_ids.add(extra.id)
+
             if not items:
                 return {"results": [], "message": "No matching products found."}
+
+            storage_ok = StorageManager.is_configured()
 
             return {
                 "results": [
@@ -190,6 +214,11 @@ class ToolExecutor:
                     }
                     for item in items
                 ],
+                "matched_count": matched_count,
+                "message": (
+                    f"{matched_count} product(s) matched your search."
+                    + (f" Added {len(items) - matched_count} more you might also like since exact matches were limited." if matched_count < MIN_RESULTS and len(items) > matched_count else "")
+                ),
                 "presentation": {
                     "product_cards": [
                         {
@@ -198,7 +227,7 @@ class ToolExecutor:
                             "description": item.description,
                             "price": item.price,
                             "currency": item.currency,
-                            "image_url": item.image_url,
+                            "image_url": item.image_url if storage_ok else None,
                             "buy_action_id": f"cart_add_{item.id}",
                         }
                         for item in items

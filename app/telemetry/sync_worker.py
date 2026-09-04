@@ -93,6 +93,7 @@ async def perform_sannex_sync(db: AsyncSession) -> Dict[str, Any]:
                     c_item.description = p.get("description", c_item.description)
                     c_item.price = float(p.get("price", c_item.price))
                     c_item.currency = p.get("currency", c_item.currency)
+                    c_item.image_url = p.get("image_url", c_item.image_url)
                 else:
                     db.add(CatalogItem(
                         source="agentos",
@@ -101,6 +102,7 @@ async def perform_sannex_sync(db: AsyncSession) -> Dict[str, Any]:
                         description=p.get("description"),
                         price=float(p.get("price", 0.0)),
                         currency=p.get("currency", "NGN"),
+                        image_url=p.get("image_url"),
                     ))
                 summary["catalog_items_synced"] += 1
 

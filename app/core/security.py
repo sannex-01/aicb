@@ -1,6 +1,7 @@
 import hmac
 import hashlib
 from typing import Optional
+from fastapi import Header, HTTPException, status
 from app.core.config import settings
 from app.core.logger import logger
 
@@ -74,3 +75,24 @@ def verify_stripe_signature(payload: bytes, signature_header: Optional[str]) -> 
     except Exception as e:
         logger.error(f"Error validating stripe signature: {e}")
         return False
+
+
+async def verify_dashboard_auth(authorization: Optional[str] = Header(None)) -> None:
+    """Verifies 'Authorization: Bearer <api_key>' sent by agentOS on dashboard-
+    facing calls (catalog reads/writes, gateway-info, order lists, image
+    uploads). Unlike the webhook verifiers above — which pass open when their
+    secret is unconfigured, since they guard inbound third-party webhooks a
+    dev instance may legitimately not have registered yet — this fails
+    closed: these endpoints expose privileged data/actions, so an
+    unconfigured AICB_API_KEY must reject every request rather than silently
+    reproduce today's no-auth state."""
+    if not settings.AICB_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Dashboard API key not configured on this instance.",
+        )
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing bearer token.")
+    token = authorization[len("Bearer "):]
+    if not hmac.compare_digest(token, settings.AICB_API_KEY):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key.")

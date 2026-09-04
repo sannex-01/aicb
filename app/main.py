@@ -12,11 +12,14 @@ from app.core.config import settings
 from app.core.database import init_db, get_db
 from app.core.logger import logger
 from app.core.rate_limit import limiter
+from app.core.security import verify_dashboard_auth
+from app.commerce.storage.manager import StorageManager
 from app.channels.whatsapp.webhook import router as whatsapp_router
 from app.channels.telegram.webhook import router as telegram_router
 from app.channels.widget.endpoints import router as widget_router
 from app.commerce.payments.webhooks import router as payments_router
 from app.commerce.bumpa.webhook import router as bumpa_router
+from app.commerce.catalog_upload import router as catalog_upload_router
 from app.telemetry.sync_worker import router as sync_router, start_sync_scheduler, shutdown_sync_scheduler
 from app.telemetry.client import telemetry_client
 from app.models.catalog import CatalogItem
@@ -92,7 +95,7 @@ def _mask_key(key: str | None) -> str | None:
 
 
 @app.get("/api/v1/gateway-info", tags=["Gateway"])
-async def gateway_info():
+async def gateway_info(_: None = Depends(verify_dashboard_auth)):
     """Returns masked key previews and active gateway configuration for the AgentOS dashboard."""
     return {
         "active_gateway": settings.DEFAULT_PAYMENT_GATEWAY,
@@ -117,6 +120,7 @@ async def gateway_info():
         },
         "storage": {
             "provider": settings.STORAGE_PROVIDER,
+            "configured": StorageManager.is_configured(),
             "cloudinary": {
                 "configured": bool(settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_CLOUD_NAME),
                 "cloud_name": settings.CLOUDINARY_CLOUD_NAME,
@@ -140,6 +144,7 @@ app.include_router(telegram_router, prefix="/api/v1")
 app.include_router(widget_router, prefix="/api/v1")
 app.include_router(payments_router, prefix="/api/v1")
 app.include_router(bumpa_router, prefix="/api/v1")
+app.include_router(catalog_upload_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
 
 
@@ -152,16 +157,16 @@ async def widget_bundle():
     return FileResponse(WIDGET_BUNDLE_PATH, media_type="application/javascript")
 
 
-# Helper Read Endpoints for Developer Verification
+# Dashboard-Facing Endpoints (require Authorization: Bearer <AICB_API_KEY>)
 @app.get("/api/v1/catalog", tags=["Catalog"])
-async def list_catalog_items(db: AsyncSession = Depends(get_db)):
+async def list_catalog_items(db: AsyncSession = Depends(get_db), _: None = Depends(verify_dashboard_auth)):
     stmt = select(CatalogItem).limit(50)
     res = await db.execute(stmt)
     return res.scalars().all()
 
 
 @app.get("/api/v1/orders", tags=["Orders"])
-async def list_orders(db: AsyncSession = Depends(get_db)):
+async def list_orders(db: AsyncSession = Depends(get_db), _: None = Depends(verify_dashboard_auth)):
     stmt = select(Order).order_by(Order.created_at.desc()).limit(20)
     res = await db.execute(stmt)
     return res.scalars().all()

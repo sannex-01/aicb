@@ -117,6 +117,15 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: Optional[str] = None
     R2_PUBLIC_URL: Optional[str] = None
 
+    # Dashboard-facing auth: verifies inbound calls FROM agentOS (catalog
+    # reads/writes, gateway-info, order lists, image uploads). Set this to
+    # the exact same value as this bot's `api_key` in agentOS's client_bots
+    # table (shown with a copy button in the bot's Identity settings) — a
+    # plain shared secret, no rotation/exchange flow, same as every other
+    # credential in this file. Distinct from SANNEX_API_KEY below, which is
+    # the OPPOSITE direction (aicb authenticating itself TO agentOS for sync).
+    AICB_API_KEY: Optional[str] = None
+
     # Sannex Agent Telemetry & AgentOS Sync
     SANNEX_API_KEY: Optional[str] = None
     SANNEX_HOST: str = "https://agentos.aicb.sannex.ng"

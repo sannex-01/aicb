@@ -19,6 +19,7 @@ from app.commerce.customer_profile import (
     is_valid_phone,
 )
 from app.commerce.payments.unified import UnifiedPaymentManager
+from app.commerce.storage.manager import StorageManager
 from app.channels.slack.fallback import get_support_contact_message
 from app.flows.definitions import (
     MAIN_MENU_BUTTONS,
@@ -104,13 +105,14 @@ class FlowEngine:
 
         # 2. Browse Products Flow
         elif action == "flow_browse_catalog":
-            products = await CatalogManager.search_products(db, limit=6)
+            products = await CatalogManager.get_featured_products(db, limit=6)
             if not products:
                 return BotResponse(
                     text="🛍️ Our catalog is currently being updated. Please check back shortly!",
                     buttons=_buttons(MAIN_MENU_BUTTONS),
                 )
 
+            storage_ok = StorageManager.is_configured()
             product_lines = []
             buttons = []
             product_cards = []
@@ -124,7 +126,7 @@ class FlowEngine:
                         description=p.description,
                         price=p.price,
                         currency=p.currency,
-                        image_url=p.image_url,
+                        image_url=p.image_url if storage_ok else None,
                         buy_action_id=f"cart_add_{p.id}",
                     )
                 )

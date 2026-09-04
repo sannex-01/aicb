@@ -1,4 +1,7 @@
+import hashlib
+import hmac
 import httpx
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from app.core.config import settings
 from app.core.logger import logger
@@ -6,6 +9,19 @@ from app.core.logger import logger
 
 class StorageManager:
     """Unified cloud asset storage manager for AICB product images, logos, and receipts."""
+
+    @classmethod
+    def is_configured(cls) -> bool:
+        """True if a real (non-mock) storage provider is configured. Single
+        source of truth — mirrors the exact per-provider checks used in
+        upload_image, so callers deciding whether to accept/send image URLs
+        agree with what upload_image would actually do."""
+        provider = settings.STORAGE_PROVIDER
+        if provider == "cloudinary":
+            return bool(settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY)
+        if provider == "cloudflare_r2":
+            return bool(settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID)
+        return False
 
     @classmethod
     async def upload_image(
@@ -70,11 +86,68 @@ class StorageManager:
         filename: str,
         content_type: str = "image/jpeg",
     ) -> Dict[str, Any]:
-        base_domain = (settings.R2_PUBLIC_URL or "https://r2.aicb.sannex.ng").rstrip("/")
-        public_url = f"{base_domain}/{filename}"
-        logger.info(f"Cloudflare R2 stored asset at: {public_url}")
-        return {
-            "url": public_url,
-            "bucket": settings.R2_BUCKET_NAME,
-            "provider": "cloudflare_r2",
+        """Uploads to Cloudflare R2 via its S3-compatible API using a hand-
+        rolled AWS SigV4-signed PUT (httpx + hashlib/hmac only — no boto3;
+        this codebase deliberately carries no AWS SDK dependency, and a
+        single-object PUT doesn't need one)."""
+        region = "auto"
+        service = "s3"
+        host = f"{settings.R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        object_key = filename.lstrip("/")
+        url = f"https://{host}/{settings.R2_BUCKET_NAME}/{object_key}"
+
+        now = datetime.now(timezone.utc)
+        amz_date = now.strftime("%Y%m%dT%H%M%SZ")
+        date_stamp = now.strftime("%Y%m%d")
+        payload_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        canonical_headers = (
+            f"content-type:{content_type}\n"
+            f"host:{host}\n"
+            f"x-amz-content-sha256:{payload_hash}\n"
+            f"x-amz-date:{amz_date}\n"
+        )
+        signed_headers = "content-type;host;x-amz-content-sha256;x-amz-date"
+        canonical_request = "\n".join([
+            "PUT", f"/{settings.R2_BUCKET_NAME}/{object_key}", "",
+            canonical_headers, signed_headers, payload_hash,
+        ])
+
+        credential_scope = f"{date_stamp}/{region}/{service}/aws4_request"
+        string_to_sign = "\n".join([
+            "AWS4-HMAC-SHA256", amz_date, credential_scope,
+            hashlib.sha256(canonical_request.encode("utf-8")).hexdigest(),
+        ])
+
+        def _sign(key: bytes, msg: str) -> bytes:
+            return hmac.new(key, msg.encode("utf-8"), hashlib.sha256).digest()
+
+        k_date = _sign(f"AWS4{settings.R2_SECRET_ACCESS_KEY}".encode("utf-8"), date_stamp)
+        k_region = _sign(k_date, region)
+        k_service = _sign(k_region, service)
+        k_signing = _sign(k_service, "aws4_request")
+        signature = hmac.new(k_signing, string_to_sign.encode("utf-8"), hashlib.sha256).hexdigest()
+
+        authorization = (
+            f"AWS4-HMAC-SHA256 Credential={settings.R2_ACCESS_KEY_ID}/{credential_scope}, "
+            f"SignedHeaders={signed_headers}, Signature={signature}"
+        )
+
+        headers = {
+            "Content-Type": content_type,
+            "x-amz-content-sha256": payload_hash,
+            "x-amz-date": amz_date,
+            "Authorization": authorization,
         }
+
+        base_domain = (settings.R2_PUBLIC_URL or f"https://{host}/{settings.R2_BUCKET_NAME}").rstrip("/")
+        public_url = f"{base_domain}/{object_key}"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            res = await client.put(url, content=file_bytes, headers=headers)
+            if res.status_code in (200, 201):
+                logger.info(f"Cloudflare R2 stored asset at: {public_url}")
+                return {"url": public_url, "bucket": settings.R2_BUCKET_NAME, "provider": "cloudflare_r2"}
+            else:
+                logger.error(f"Cloudflare R2 upload failed ({res.status_code}): {res.text[:500]}")
+                raise RuntimeError(f"Cloudflare R2 upload failed with status {res.status_code}")
