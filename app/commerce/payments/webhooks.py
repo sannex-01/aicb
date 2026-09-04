@@ -153,6 +153,7 @@ async def handle_paystack_callback(
                 "✅ Payment Already Confirmed",
                 f"Your payment of {order.total_amount:,.2f} {order.currency} for Order {order.order_reference} was already confirmed!",
                 redirect_url=redirect_url,
+                channel=order.channel,
             ),
         )
 
@@ -193,6 +194,7 @@ async def handle_paystack_callback(
                     "🎉 Payment Successful!",
                     f"Your payment of {order.total_amount:,.2f} {order.currency} for Order {order.order_reference} has been confirmed.",
                     redirect_url=redirect_url,
+                    channel=order.channel,
                 ),
             )
         else:
@@ -215,19 +217,38 @@ async def handle_paystack_callback(
 
 
 def _get_bot_redirect_url(order: Order) -> str:
-    """Returns a redirect URL to send the customer back to the bot chat."""
+    """Returns a redirect URL to send the customer back to the bot chat.
+    Telegram and WhatsApp both support a real deep link back into the chat
+    (once the corresponding username/number is configured). Widget has no
+    equivalent — it's an embed on an arbitrary third-party page with no
+    server-known URL to return to — so it always gets "" (see
+    _callback_html's widget-specific messaging for that case instead)."""
     if order.channel == "telegram" and settings.TELEGRAM_BOT_USERNAME:
         return f"https://t.me/{settings.TELEGRAM_BOT_USERNAME.lstrip('@')}"
+    if order.channel == "whatsapp" and settings.WHATSAPP_BUSINESS_PHONE_NUMBER:
+        number = settings.WHATSAPP_BUSINESS_PHONE_NUMBER.lstrip("+")
+        return f"https://wa.me/{number}"
     return ""
 
 
-def _callback_html(title: str, message: str, redirect_url: str | None) -> str:
-    """Generates a minimal, branded HTML page for the payment callback."""
+def _callback_html(title: str, message: str, redirect_url: str | None, channel: str | None = None) -> str:
+    """Generates a minimal, branded HTML page for the payment callback.
+
+    Telegram/WhatsApp get a real "Return to Chat" deep link (once the bot
+    username / business number is configured) plus an auto-redirect. Widget
+    has no such link — it's embedded on an arbitrary third-party page with
+    no server-known return URL — so a widget order instead gets a plain
+    "you can close this tab" note rather than a silent dead end.
+    """
     redirect_meta = ""
     redirect_link = ""
+    footer_note = ""
     if redirect_url:
         redirect_meta = f'<meta http-equiv="refresh" content="4;url={redirect_url}">'
         redirect_link = f'<a href="{redirect_url}" style="display:inline-block;margin-top:20px;padding:12px 28px;background:#008060;color:#fff;text-decoration:none;border-radius:8px;font-weight:600;">Return to Chat →</a>'
+        footer_note = '<p class="redirect-note">Redirecting you back to the chat in a few seconds...</p>'
+    elif channel == "widget":
+        footer_note = '<p class="redirect-note">You can close this tab and return to the website to continue chatting.</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
@@ -250,7 +271,7 @@ def _callback_html(title: str, message: str, redirect_url: str | None) -> str:
         <h1>{title}</h1>
         <p>{message}</p>
         {redirect_link}
-        {f'<p class="redirect-note">Redirecting you back to the chat in a few seconds...</p>' if redirect_url else ''}
+        {footer_note}
     </div>
 </body>
 </html>"""

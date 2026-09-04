@@ -59,6 +59,11 @@ class Settings(BaseSettings):
     META_VERIFY_TOKEN: str = "aicb_webhook_verification_token_secret"
     WHATSAPP_FLOW_PRIVATE_KEY: Optional[str] = None
     WHATSAPP_FLOW_PRIVATE_KEY_PASSPHRASE: Optional[str] = None
+    # The business's human-dialable WhatsApp number in E.164, e.g. "2348012345678"
+    # (no "+", no leading 0) — used to build wa.me/<number> deep links. Distinct
+    # from META_PHONE_NUMBER_ID, which is Cloud API's internal numeric ID and
+    # cannot be used to build a wa.me link.
+    WHATSAPP_BUSINESS_PHONE_NUMBER: Optional[str] = None
 
     # Telegram
     TELEGRAM_BOT_TOKEN: Optional[str] = None
