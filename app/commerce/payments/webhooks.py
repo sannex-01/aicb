@@ -249,6 +249,8 @@ def _callback_html(title: str, message: str, redirect_url: str | None, channel: 
         footer_note = '<p class="redirect-note">Redirecting you back to the chat in a few seconds...</p>'
     elif channel == "widget":
         footer_note = '<p class="redirect-note">You can close this tab and return to the website to continue chatting.</p>'
+    elif channel == "whatsapp":
+        footer_note = '<p class="redirect-note">You can close this tab — we\'ve also sent a confirmation message to your WhatsApp chat.</p>'
 
     return f"""<!DOCTYPE html>
 <html lang="en">
