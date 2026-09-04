@@ -133,11 +133,20 @@ class CatalogManager:
         item_result = await db.execute(item_stmt)
         all_items = list(item_result.scalars().all())
 
+        def _created_at_key(item: CatalogItem) -> datetime:
+            # SQLite doesn't actually enforce DateTime(timezone=True) — rows
+            # written by different paths (sync payloads, older data) can come
+            # back as naive datetimes, which can't be compared against an
+            # aware fallback without normalizing first.
+            dt = item.created_at
+            if dt is None:
+                return datetime.min.replace(tzinfo=timezone.utc)
+            if dt.tzinfo is None:
+                return dt.replace(tzinfo=timezone.utc)
+            return dt
+
         all_items.sort(
-            key=lambda item: (
-                popularity.get(item.id, 0),
-                item.created_at or datetime.min.replace(tzinfo=timezone.utc),
-            ),
+            key=lambda item: (popularity.get(item.id, 0), _created_at_key(item)),
             reverse=True,
         )
         return all_items[:limit]
