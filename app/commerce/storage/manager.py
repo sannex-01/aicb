@@ -18,9 +18,9 @@ class StorageManager:
         agree with what upload_image would actually do."""
         provider = settings.STORAGE_PROVIDER
         if provider == "cloudinary":
-            return bool(settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY)
+            return bool(settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY and settings.CLOUDINARY_API_SECRET)
         if provider == "cloudflare_r2":
-            return bool(settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID)
+            return bool(settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID and settings.R2_SECRET_ACCESS_KEY)
         return False
 
     @classmethod
@@ -34,9 +34,9 @@ class StorageManager:
         """Uploads an asset to active storage provider (Cloudinary or Cloudflare R2)."""
         provider = settings.STORAGE_PROVIDER
 
-        if provider == "cloudinary" and settings.CLOUDINARY_CLOUD_NAME and settings.CLOUDINARY_API_KEY:
+        if provider == "cloudinary" and cls.is_configured():
             return await cls._upload_cloudinary(file_bytes, filename, folder)
-        elif provider == "cloudflare_r2" and settings.R2_ACCOUNT_ID and settings.R2_ACCESS_KEY_ID:
+        elif provider == "cloudflare_r2" and cls.is_configured():
             return await cls._upload_r2(file_bytes, filename, content_type)
         else:
             logger.info(f"Storage driver '{provider}' fallback: returning mock URL for {filename}")
@@ -53,16 +53,32 @@ class StorageManager:
         filename: str,
         folder: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Uploads via a signed Cloudinary request (SHA-1 of sorted params +
+        api_secret, per Cloudinary's documented signing algorithm). Cloudinary
+        rejects any request without either a signature or a pre-configured
+        upload preset as an "unsigned upload" error — since we hold the
+        account's own api_secret, signing directly means a business doesn't
+        need to separately create an upload preset in the Cloudinary
+        dashboard just to make this work."""
+        if not settings.CLOUDINARY_API_SECRET:
+            raise RuntimeError("CLOUDINARY_API_SECRET is not configured — required to sign uploads.")
+
         target_folder = folder or settings.CLOUDINARY_FOLDER
         url = f"https://api.cloudinary.com/v1_1/{settings.CLOUDINARY_CLOUD_NAME}/image/upload"
-        
-        # Cloudinary upload endpoint
+
+        timestamp = str(int(datetime.now(timezone.utc).timestamp()))
+        params_to_sign = {"folder": target_folder, "timestamp": timestamp}
+        signable = "&".join(f"{k}={v}" for k, v in sorted(params_to_sign.items()))
+        signature = hashlib.sha1((signable + settings.CLOUDINARY_API_SECRET).encode("utf-8")).hexdigest()
+
         data = {
             "api_key": settings.CLOUDINARY_API_KEY,
+            "timestamp": timestamp,
             "folder": target_folder,
+            "signature": signature,
         }
         files = {"file": (filename, file_bytes)}
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             res = await client.post(url, data=data, files=files)
             res_data = res.json()
@@ -74,10 +90,7 @@ class StorageManager:
                 }
             else:
                 logger.error(f"Cloudinary upload failed: {res_data}")
-                return {
-                    "url": f"https://res.cloudinary.com/{settings.CLOUDINARY_CLOUD_NAME}/image/upload/{target_folder}/{filename}",
-                    "provider": "cloudinary",
-                }
+                raise RuntimeError(res_data.get("error", {}).get("message", "Cloudinary upload failed"))
 
     @classmethod
     async def _upload_r2(
