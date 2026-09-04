@@ -707,6 +707,20 @@ class FlowEngine:
                 db, session.channel, session.customer_identifier,
                 name=draft.get("name"), email=draft.get("email"), phone=draft.get("phone"),
             )
+            try:
+                from app.telemetry.client import telemetry_client
+                telemetry_client.track(
+                    channel=session.channel,
+                    customer_id=session.customer_identifier,
+                    event="profile_saved",
+                    metadata={
+                        "customer_name": draft.get("name") or (customer.name if customer else None),
+                        "customer_email": draft.get("email") or (customer.email if customer else None),
+                        "customer_phone": draft.get("phone") or (customer.phone_number if customer else None),
+                    },
+                )
+            except Exception as e:
+                logger.warning(f"Failed to track profile_saved telemetry: {e}")
 
         state = MemoryManager.get_flow_state_data(session)
         state.pop("profile_draft", None)

@@ -68,7 +68,12 @@ async def handle_paystack_webhook(
         res = await db.execute(stmt)
         order = res.scalars().first()
 
-        if order:
+        # Idempotency guard: Paystack retries webhooks on timeout/non-2xx, and
+        # this event can also race the browser callback (handle_paystack_callback
+        # below) confirming the same payment independently — without this check,
+        # a retried or duplicate delivery double-counts the order into
+        # total_revenue/total_orders and sends a duplicate receipt.
+        if order and order.status != "paid":
             order.status = "paid"
             order.payment_reference = reference
             order.payment_gateway = "paystack"
@@ -161,6 +166,25 @@ async def handle_paystack_callback(
     try:
         result = await PaystackClient().verify_payment(reference)
         if result.get("status") == "success":
+            # Re-check status right before writing: the server-to-server
+            # webhook (handle_paystack_webhook above) may have already marked
+            # this order paid and fired telemetry between our first status
+            # check and this point (both this callback and the webhook race
+            # to confirm the same payment) — without this, a customer whose
+            # browser reaches this callback shortly after the webhook already
+            # landed would get double-counted into total_revenue/total_orders.
+            await db.refresh(order)
+            if order.status == "paid":
+                redirect_url = _get_bot_redirect_url(order)
+                return HTMLResponse(
+                    content=_callback_html(
+                        "🎉 Payment Successful!",
+                        f"Your payment of {order.total_amount:,.2f} {order.currency} for Order {order.order_reference} has been confirmed.",
+                        redirect_url=redirect_url,
+                        channel=order.channel,
+                    ),
+                )
+
             order.status = "paid"
             order.payment_reference = reference
             order.payment_gateway = "paystack"
