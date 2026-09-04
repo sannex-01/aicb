@@ -1,7 +1,7 @@
 import json
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,6 +38,18 @@ def _buttons(raw: List[Dict[str, Any]]) -> List[ResponseButton]:
     return [ResponseButton(**b) for b in raw]
 
 
+# How long a customer can go without replying mid profile_collect before the
+# flow is auto-abandoned and their next message is treated as a fresh normal
+# message instead of a (likely nonsensical) answer to a stale question —
+# e.g. someone who types /start after walking away shouldn't get stuck being
+# told "/start" isn't a valid email.
+PROFILE_COLLECT_TIMEOUT_MINUTES = 10
+
+# Words that explicitly cancel profile_collect and return to the main menu,
+# checked before treating the message as an answer to the current step.
+_PROFILE_COLLECT_CANCEL_WORDS = {"/start", "start", "menu", "/menu", "cancel", "/cancel", "stop"}
+
+
 class FlowEngine:
     """State machine for deterministic interactive buttons and step-by-step flows (0 LLM Tokens)."""
 
@@ -55,7 +67,31 @@ class FlowEngine:
 
         # 0. Profile Collection Flow (interrupts any other action while active)
         if session.active_flow == "profile_collect":
-            return await FlowEngine._handle_profile_collect_step(db, session, user_input or action_id)
+            timed_out = False
+            if session.last_active_at:
+                last_active = session.last_active_at
+                if last_active.tzinfo is None:
+                    last_active = last_active.replace(tzinfo=timezone.utc)
+                timed_out = datetime.now(timezone.utc) - last_active > timedelta(minutes=PROFILE_COLLECT_TIMEOUT_MINUTES)
+
+            cancelled = action in _PROFILE_COLLECT_CANCEL_WORDS
+
+            if timed_out or cancelled:
+                # Abandon the flow — drop the draft (but never the cart, a
+                # sibling key) — and let this same message fall through to be
+                # processed normally below instead of being rejected as a
+                # bad answer to a stale question (e.g. "/start" mid-collect
+                # was previously scored as an invalid email and the user got
+                # stuck with no way out).
+                state = MemoryManager.get_flow_state_data(session)
+                state.pop("profile_draft", None)
+                await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None, state_data=state)
+                if cancelled:
+                    logger.info("profile_collect cancelled by user command")
+                else:
+                    logger.info(f"profile_collect abandoned after {PROFILE_COLLECT_TIMEOUT_MINUTES}min inactivity")
+            else:
+                return await FlowEngine._handle_profile_collect_step(db, session, user_input or action_id)
 
         # 0b. Quantity Selection Flow (intercept custom numbers sent in chat)
         if session.active_flow == "quantity_select" and not action.startswith("flow_") and not action.startswith("cart_") and not action.startswith("qty_set_"):
