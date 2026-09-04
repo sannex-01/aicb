@@ -36,9 +36,52 @@ class WidgetChatRequest(BaseModel):
     session_id: str
 
 
+class WidgetProfileRequest(BaseModel):
+    session_id: str
+    name: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
+    skipped: bool = False
+
+
+@router.post("/profile")
+async def widget_submit_profile(req: WidgetProfileRequest, db: AsyncSession = Depends(get_db)) -> dict:
+    """One-shot submission of the autofill-friendly form shown immediately on
+    panel open (see widget/src/profile-form.ts) — collected fresh every
+    session, never persisted as a Customer row (widget has no durable
+    identity). 'skipped' stores an empty profile so checkout falls back to
+    the same turn-by-turn chat collection WhatsApp/Telegram use."""
+    session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
+    await FlowEngine.set_widget_profile(
+        db, session,
+        name=None if req.skipped else req.name,
+        email=None if req.skipped else req.email,
+        phone=None if req.skipped else req.phone,
+    )
+    return {"status": "ok"}
+
+
 @router.post("/chat/stream")
 async def widget_chat_stream(req: WidgetChatRequest, db: AsyncSession = Depends(get_db)):
     """Streams the LLM response to the website widget using SSE."""
+
+    session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
+
+    # If an AI-triggered checkout previously hijacked this session into the
+    # profile_collect flow (see FlowEngine._handle_profile_collect_step),
+    # this next free-text turn must be intercepted the same way Telegram/
+    # WhatsApp already do, instead of going straight to the AI orchestrator.
+    if session.active_flow == "profile_collect":
+        resp = await FlowEngine.handle_action(
+            db=db, session=session, action_id=req.message, user_input=req.message,
+        )
+
+        async def profile_event_generator():
+            yield f"data: {json.dumps({'content': resp.text})}\n\n"
+            yield f"data: {json.dumps({'final': resp.model_dump()})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        return StreamingResponse(profile_event_generator(), media_type="text/event-stream")
 
     async def event_generator():
         stream = AIOrchestrator.process_message_stream(
@@ -75,13 +118,21 @@ async def widget_action(req: WidgetActionRequest, db: AsyncSession = Depends(get
 
 @router.get("/config")
 async def widget_config(db: AsyncSession = Depends(get_db)) -> dict:
-    """Minimal launcher metadata for the floating widget (business name, welcome message)."""
+    """Minimal launcher metadata for the floating widget (business name, welcome
+    message, and whether to show the profile form immediately on open vs. defer
+    it to the same chat-based collection WhatsApp/Telegram use at checkout)."""
     stmt = select(ConfigOverride).where(ConfigOverride.key == "business_name")
     res = await db.execute(stmt)
     override = res.scalars().first()
     business_name = override.value if override else settings.APP_NAME
 
+    stmt = select(ConfigOverride).where(ConfigOverride.key == "widget_profile_collection")
+    res = await db.execute(stmt)
+    mode_override = res.scalars().first()
+    profile_collection_mode = mode_override.value if mode_override and mode_override.value in ("upfront", "checkout") else "upfront"
+
     return {
         "business_name": business_name,
         "welcome_message": f"👋 Hi! How can {business_name} help you today?",
+        "profile_collection_mode": profile_collection_mode,
     }

@@ -185,6 +185,68 @@ export function injectStyles(): void {
   font-size: 13px;
 }
 .${PREFIX}-input-row button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.${PREFIX}-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  background: #fff;
+  flex: 1;
+  overflow-y: auto;
+}
+.${PREFIX}-profile-form h3 {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.${PREFIX}-profile-form p {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: #6b7280;
+}
+.${PREFIX}-profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.${PREFIX}-profile-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+}
+.${PREFIX}-profile-field input {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+}
+.${PREFIX}-profile-field input:focus { border-color: #008060; }
+.${PREFIX}-profile-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.${PREFIX}-profile-actions button {
+  flex: 1;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+  border: none;
+}
+.${PREFIX}-profile-submit {
+  background: #008060;
+  color: #fff;
+}
+.${PREFIX}-profile-submit:disabled { opacity: 0.5; cursor: not-allowed; }
+.${PREFIX}-profile-skip {
+  background: #fff;
+  color: #6b7280;
+  border: 1px solid #d1d5db !important;
+}
 `;
   document.head.appendChild(style);
 }

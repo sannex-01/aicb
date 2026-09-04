@@ -17,6 +17,24 @@ export class WidgetAPI {
     return res.json();
   }
 
+  /** One-shot submission of the upfront profile form (or a skip). */
+  async submitProfile(
+    sessionId: string,
+    profile: { name?: string; email?: string; phone?: string } | null
+  ): Promise<void> {
+    await fetch(`${this.baseUrl}/api/v1/widget/profile`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        session_id: sessionId,
+        skipped: !profile,
+        name: profile?.name,
+        email: profile?.email,
+        phone: profile?.phone,
+      }),
+    });
+  }
+
   /**
    * Streams a free-text chat message via SSE-over-POST. Native EventSource
    * doesn't support POST bodies, so this hand-rolls SSE parsing over

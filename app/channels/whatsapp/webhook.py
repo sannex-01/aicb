@@ -114,9 +114,10 @@ async def handle_whatsapp_message(
                 session = await MemoryManager.get_or_create_session(db, channel="whatsapp", customer_identifier=wa_id)
 
                 # Determine Routing: Fast-Path System Handlers (0 LLM Tokens) vs AI Orchestration
-                fast_path_triggers = ["menu", "start", "/start", "help", "cart", "/cart", "checkout", "clear cart"]
+                fast_path_triggers = ["menu", "start", "/start", "help", "cart", "/cart", "checkout", "clear cart", "profile", "my profile"]
                 is_fast_path = (
                     action_id
+                    or session.active_flow
                     or user_text.lower().strip() in fast_path_triggers
                     or user_text.lower().startswith("cart_")
                     or user_text.lower().startswith("flow_")
@@ -128,6 +129,7 @@ async def handle_whatsapp_message(
                         session=session,
                         action_id=action_id or user_text,
                         user_input=user_text,
+                        prefill_name=customer_name,
                     )
                     await _deliver(wa_client, wa_id, flow_res)
                 else:

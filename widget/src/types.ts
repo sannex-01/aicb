@@ -27,6 +27,7 @@ export interface BotResponse {
 export interface WidgetConfig {
   business_name: string;
   welcome_message: string;
+  profile_collection_mode: "upfront" | "checkout";
 }
 
 export type ChatMessage =

@@ -127,6 +127,7 @@ async def handle_telegram_webhook(
         from_user = msg.get("from", {})
         user_id = str(from_user.get("id"))
         customer_name = from_user.get("first_name", "Telegram User")
+        full_name = " ".join(filter(None, [from_user.get("first_name"), from_user.get("last_name")])) or None
         text = msg.get("text", "").strip()
 
         # Handle native Telegram successful payment notification
@@ -161,7 +162,7 @@ async def handle_telegram_webhook(
         session = await MemoryManager.get_or_create_session(db, channel="telegram", customer_identifier=user_id)
 
         # Handle Fast-Path System Handlers (0 LLM Tokens)
-        fast_path_triggers = ["/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout", "clear cart"]
+        fast_path_triggers = ["/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout", "clear cart", "profile", "my profile"]
         is_fast_path = (
             text.lower().strip() in fast_path_triggers
             or text.lower().startswith("cart_")
@@ -175,6 +176,7 @@ async def handle_telegram_webhook(
                 session=session,
                 action_id=text,
                 user_input=text,
+                prefill_name=full_name,
             )
             sent_reply_text = flow_res.text
             await _deliver(tg_client, chat_id, flow_res)
@@ -185,6 +187,7 @@ async def handle_telegram_webhook(
                 session=session,
                 action_id=text,
                 user_input=text,
+                prefill_name=full_name,
             )
             sent_reply_text = flow_res.text
             await _deliver(tg_client, chat_id, flow_res)

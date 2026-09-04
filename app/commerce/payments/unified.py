@@ -65,6 +65,8 @@ class UnifiedPaymentManager:
                 customer_email=customer_email,
                 reference=reference,
                 product_name=f"Order #{reference}",
+                customer_name=customer_name,
+                customer_phone=customer_phone,
             )
 
         else:

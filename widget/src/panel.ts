@@ -1,6 +1,7 @@
 import { PREFIX } from "./styles";
 import { WidgetAPI } from "./api";
 import { renderBotResponse, renderUserMessage, type RenderHandlers } from "./render";
+import { renderProfileForm } from "./profile-form";
 import type { BotResponse } from "./types";
 
 function getOrCreateSessionId(): string {
@@ -62,40 +63,73 @@ export class WidgetPanel {
     inputRow.appendChild(this.inputEl);
     inputRow.appendChild(this.sendBtn);
 
+    this.inputRowEl = inputRow;
     this.el.appendChild(header);
     this.el.appendChild(this.messagesEl);
     this.el.appendChild(inputRow);
   }
 
   private headerTitleEl: HTMLSpanElement;
+  private inputRowEl: HTMLDivElement;
   private initialized = false;
 
   async show(): Promise<void> {
     this.el.hidden = false;
     if (!this.initialized) {
       this.initialized = true;
+      let businessName = "us";
+      let welcomeMessage = "Hi! How can we help you today?";
+      let profileCollectionMode: "upfront" | "checkout" = "upfront";
       try {
         const config = await this.api.getConfig();
+        businessName = config.business_name;
+        welcomeMessage = config.welcome_message;
+        profileCollectionMode = config.profile_collection_mode;
         this.headerTitleEl.textContent = config.business_name;
-        this.appendBotResponse({
-          text: config.welcome_message,
-          buttons: [],
-          product_cards: [],
-          quick_replies: [],
-          checkout_url: null,
-          end_session: false,
-        });
       } catch {
+        // fall through with defaults — still show the form/welcome below
+      }
+
+      const startChat = () => {
         this.appendBotResponse({
-          text: "Hi! How can we help you today?",
+          text: welcomeMessage,
           buttons: [],
           product_cards: [],
           quick_replies: [],
           checkout_url: null,
           end_session: false,
         });
+      };
+
+      if (profileCollectionMode === "upfront") {
+        this.showProfileForm(businessName, startChat);
+      } else {
+        startChat();
       }
     }
+  }
+
+  /**
+   * Blocks the chat UI behind a native autofill-friendly form until the
+   * visitor submits their details or explicitly skips. Configurable via the
+   * `widget_profile_collection` override (see GET /api/v1/widget/config) —
+   * "checkout" mode instead defers to the same turn-by-turn chat collection
+   * WhatsApp/Telegram use, right before the visitor actually checks out.
+   */
+  private showProfileForm(businessName: string, onResolved: () => void): void {
+    this.setChatBlocked(true);
+    const formEl = renderProfileForm(businessName, async (result) => {
+      await this.api.submitProfile(this.sessionId, result);
+      formEl.remove();
+      this.setChatBlocked(false);
+      onResolved();
+    });
+    this.el.insertBefore(formEl, this.messagesEl);
+  }
+
+  private setChatBlocked(blocked: boolean): void {
+    this.messagesEl.hidden = blocked;
+    this.inputRowEl.hidden = blocked;
   }
 
   hide(): void {

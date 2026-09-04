@@ -29,6 +29,8 @@ class StripeClient:
         product_name: Optional[str] = None,
         success_url: Optional[str] = None,
         cancel_url: Optional[str] = None,
+        customer_name: Optional[str] = None,
+        customer_phone: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Creates a Stripe Checkout Session."""
         url = f"{STRIPE_BASE_URL}/checkout/sessions"
@@ -47,6 +49,12 @@ class StripeClient:
             "line_items[0][quantity]": 1,
             "metadata[order_reference]": reference,
         }
+        # Stripe Checkout has no first-class name/phone fields — surface them
+        # via metadata so they're visible in the dashboard, webhooks, and API.
+        if customer_name:
+            data["metadata[customer_name]"] = customer_name
+        if customer_phone:
+            data["metadata[customer_phone]"] = customer_phone
 
         async with httpx.AsyncClient(timeout=10.0) as client:
             res = await client.post(url, data=data, headers=self._headers())

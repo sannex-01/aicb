@@ -7,7 +7,7 @@ from app.ai.providers.base import LLMResponse, ToolCall
 from app.ai.prompts import get_system_prompt
 from app.ai.rag import RAGEngine
 from app.ai.memory import MemoryManager
-from app.ai.tools import TOOL_DEFINITIONS, ToolExecutor
+from app.ai.tools import TOOL_DEFINITIONS, ToolExecutor, PROFILE_COLLECT_SENTINEL
 from app.models.session import ConversationSession
 from app.models.config_override import ConfigOverride
 from app.core.config import settings
@@ -92,6 +92,7 @@ class AIOrchestrator:
                 }
                 messages.append(assistant_tool_msg)
 
+                profile_collect_prompt: Optional[str] = None
                 for tc in llm_response.tool_calls:
                     tool_result = await ToolExecutor.execute(
                         db=db,
@@ -100,6 +101,14 @@ class AIOrchestrator:
                         customer_identifier=customer_identifier,
                         channel=channel,
                     )
+
+                    if isinstance(tool_result, dict) and PROFILE_COLLECT_SENTINEL in tool_result:
+                        # A required customer profile is missing — stop the tool loop
+                        # immediately and surface the collection prompt verbatim,
+                        # rather than letting the LLM see/paraphrase it.
+                        profile_collect_prompt = tool_result[PROFILE_COLLECT_SENTINEL]
+                        break
+
                     tool_execution_logs.append({
                         "name": tc.name,
                         "args": tc.arguments,
@@ -118,6 +127,10 @@ class AIOrchestrator:
                         "name": tc.name,
                         "content": json.dumps(tool_result),
                     })
+
+                if profile_collect_prompt is not None:
+                    final_reply = profile_collect_prompt
+                    break
 
                 # Loop to let LLM formulate final answer with tool output
                 continue
@@ -220,6 +233,7 @@ class AIOrchestrator:
                 }
                 messages.append(assistant_tool_msg)
 
+                stream_profile_collect_prompt: Optional[str] = None
                 for tc in tool_calls:
                     tool_result = await ToolExecutor.execute(
                         db=db,
@@ -228,6 +242,11 @@ class AIOrchestrator:
                         customer_identifier=customer_identifier,
                         channel=channel,
                     )
+
+                    if isinstance(tool_result, dict) and PROFILE_COLLECT_SENTINEL in tool_result:
+                        stream_profile_collect_prompt = tool_result[PROFILE_COLLECT_SENTINEL]
+                        break
+
                     tool_execution_logs.append({
                         "name": tc.name,
                         "args": tc.arguments,
@@ -245,6 +264,12 @@ class AIOrchestrator:
                         "name": tc.name,
                         "content": json.dumps(tool_result),
                     })
+
+                if stream_profile_collect_prompt is not None:
+                    final_reply += stream_profile_collect_prompt
+                    yield stream_profile_collect_prompt
+                    break
+
                 continue
 
             break

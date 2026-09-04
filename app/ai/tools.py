@@ -5,12 +5,15 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.commerce.catalog_provider import CatalogManager
 from app.commerce.cart import CartManager
+from app.commerce.customer_profile import get_customer, is_profile_complete
 from app.commerce.payments.unified import UnifiedPaymentManager
 from app.channels.slack.client import SlackDispatcher
 from app.channels.slack.fallback import get_support_contact_message
 from app.models.order import Order
 from app.ai.memory import MemoryManager
 from app.core.logger import logger
+
+PROFILE_COLLECT_SENTINEL = "__profile_collect_prompt__"
 
 
 TOOL_DEFINITIONS = [
@@ -244,32 +247,31 @@ class ToolExecutor:
             if not items:
                 return {"error": "Order items list cannot be empty."}
 
-            total_amount = sum(float(item.get("price", 0)) * int(item.get("quantity", 1)) for item in items)
-            order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+            profile = await ToolExecutor._resolve_profile(db, channel, customer_identifier, arguments)
+            if profile is None:
+                session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+                prompt = await ToolExecutor._trigger_profile_collect(
+                    db, session,
+                    resume_intent={
+                        "path": "ai_tool",
+                        "tool": "create_order",
+                        "items": items,
+                        "shipping_address": arguments.get("shipping_address"),
+                    },
+                )
+                return {PROFILE_COLLECT_SENTINEL: prompt}
 
-            order = Order(
-                order_reference=order_ref,
-                customer_identifier=customer_identifier,
-                channel=channel,
-                items_json=json.dumps(items),
-                total_amount=total_amount,
-                currency="NGN",
-                customer_name=arguments.get("customer_name"),
-                customer_phone=arguments.get("customer_phone"),
-                customer_email=arguments.get("customer_email") or f"{customer_identifier.replace('+', '')}@example.com",
-                shipping_address=arguments.get("shipping_address"),
-                status="pending",
+            result = await ToolExecutor._create_order_with_profile(
+                db, None, items=items, shipping_address=arguments.get("shipping_address"),
+                customer_name=profile["name"], customer_email=profile["email"], customer_phone=profile["phone"],
+                customer_identifier=customer_identifier, channel=channel,
             )
-            db.add(order)
-            await db.commit()
-            await db.refresh(order)
-
             return {
-                "order_reference": order_ref,
-                "total_amount": total_amount,
-                "currency": order.currency,
+                "order_reference": result["order_reference"],
+                "total_amount": result["total_amount"],
+                "currency": result["currency"],
                 "status": "pending",
-                "message": f"Order {order_ref} created successfully. Total: {total_amount:,.2f} {order.currency}.",
+                "message": f"Order {result['order_reference']} created successfully. Total: {result['total_amount']:,.2f} {result['currency']}.",
             }
 
         elif name == "generate_payment_link":
@@ -283,35 +285,38 @@ class ToolExecutor:
             if not order:
                 return {"error": f"Order {order_ref} not found."}
 
-            email = order.customer_email or f"customer_{customer_identifier.replace('+', '')}@example.com"
-
-            try:
-                metadata = {
-                    "channel": channel,
-                    "customer_id": customer_identifier,
-                    "order_reference": order.order_reference,
-                }
-                payment_res = await UnifiedPaymentManager.create_payment_link(
-                    amount=order.total_amount,
-                    currency=order.currency,
-                    customer_email=email,
-                    reference=order.order_reference,
-                    gateway=gateway,
-                    customer_name=order.customer_name,
-                    customer_phone=order.customer_phone,
-                    metadata=metadata,
-                )
-                checkout_url = payment_res.get("checkout_url")
-                order.checkout_url = checkout_url
-                order.payment_gateway = gateway or "default"
+            if not order.customer_email:
+                profile = await ToolExecutor._resolve_profile(db, channel, customer_identifier, {})
+                if profile is None:
+                    session = await MemoryManager.get_or_create_session(db, channel=channel, customer_identifier=customer_identifier)
+                    prompt = await ToolExecutor._trigger_profile_collect(
+                        db, session,
+                        resume_intent={"path": "ai_tool", "tool": "generate_payment_link", "order_reference": order_ref},
+                    )
+                    return {PROFILE_COLLECT_SENTINEL: prompt}
+                order.customer_name = order.customer_name or profile["name"]
+                order.customer_email = profile["email"]
+                order.customer_phone = order.customer_phone or profile["phone"]
                 await db.commit()
 
+            try:
+                result = await ToolExecutor._generate_payment_link_with_profile(
+                    db, None,
+                    order_reference=order_ref,
+                    customer_name=order.customer_name,
+                    customer_email=order.customer_email,
+                    customer_phone=order.customer_phone,
+                    gateway=gateway,
+                    channel=channel,
+                    customer_identifier=customer_identifier,
+                )
+                checkout_url = result["checkout_url"]
                 return {
                     "order_reference": order_ref,
-                    "amount": order.total_amount,
-                    "currency": order.currency,
+                    "amount": result["total_amount"],
+                    "currency": result["currency"],
                     "checkout_url": checkout_url,
-                    "message": f"Please complete your payment of {order.total_amount:,.2f} {order.currency} via this secure link: {checkout_url}",
+                    "message": f"Please complete your payment of {result['total_amount']:,.2f} {result['currency']} via this secure link: {checkout_url}",
                     "presentation": {"checkout_url": checkout_url},
                 }
             except Exception as e:
@@ -356,3 +361,140 @@ class ToolExecutor:
 
         else:
             return {"error": f"Unknown tool: {name}"}
+
+    @staticmethod
+    async def _resolve_profile(
+        db: AsyncSession, channel: str, customer_identifier: str, arguments: Dict[str, Any]
+    ) -> Optional[Dict[str, Optional[str]]]:
+        """Resolves a complete {name, email, phone} profile for checkout, preferring
+        explicit tool-call arguments, falling back to a stored Customer profile
+        (WhatsApp/Telegram only). Returns None if no complete profile is available —
+        callers must then interrupt with the profile_collect flow rather than
+        proceeding with placeholder data."""
+        name = arguments.get("customer_name")
+        email = arguments.get("customer_email")
+        phone = arguments.get("customer_phone")
+
+        if channel in ("whatsapp", "telegram"):
+            stored = await get_customer(db, channel, customer_identifier)
+            if stored:
+                name = name or stored.name
+                email = email or stored.email
+                phone = phone or stored.phone_number
+            if channel == "whatsapp":
+                phone = phone or customer_identifier
+
+        if name and email and phone:
+            return {"name": name, "email": email, "phone": phone}
+        return None
+
+    @staticmethod
+    async def _trigger_profile_collect(db: AsyncSession, session, resume_intent: Dict[str, Any]) -> str:
+        """Hijacks the session into the same profile_collect state machine
+        FlowEngine uses for the button path, and returns the first prompt's
+        text so the orchestrator can short-circuit the LLM loop with it."""
+        from app.flows.engine import FlowEngine
+
+        customer = None
+        if session.channel != "widget":
+            customer = await get_customer(db, session.channel, session.customer_identifier)
+        resp = await FlowEngine._start_profile_collect(db, session, customer, resume_intent=resume_intent)
+        return resp.text
+
+    @staticmethod
+    async def _create_order_with_profile(
+        db: AsyncSession,
+        session,
+        items: List[Dict[str, Any]],
+        shipping_address: Optional[str],
+        customer_name: Optional[str],
+        customer_email: Optional[str],
+        customer_phone: Optional[str],
+        customer_identifier: Optional[str] = None,
+        channel: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Shared order-creation logic used by both the normal create_order tool
+        call and the profile_collect resume path (FlowEngine._resume_ai_checkout_intent)."""
+        customer_identifier = customer_identifier or (session.customer_identifier if session else None)
+        channel = channel or (session.channel if session else None)
+
+        total_amount = sum(float(item.get("price", 0)) * int(item.get("quantity", 1)) for item in items)
+        order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+
+        order = Order(
+            order_reference=order_ref,
+            customer_identifier=customer_identifier,
+            channel=channel,
+            items_json=json.dumps(items),
+            total_amount=total_amount,
+            currency="NGN",
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            customer_email=customer_email,
+            shipping_address=shipping_address,
+            status="pending",
+        )
+        db.add(order)
+        await db.commit()
+        await db.refresh(order)
+
+        return {
+            "order_reference": order_ref,
+            "total_amount": total_amount,
+            "currency": order.currency,
+        }
+
+    @staticmethod
+    async def _generate_payment_link_with_profile(
+        db: AsyncSession,
+        session,
+        order_reference: str,
+        customer_name: Optional[str],
+        customer_email: Optional[str],
+        customer_phone: Optional[str],
+        gateway: Optional[str] = None,
+        channel: Optional[str] = None,
+        customer_identifier: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Shared payment-link logic used by both the normal generate_payment_link
+        tool call and the profile_collect resume path."""
+        channel = channel or (session.channel if session else None)
+        customer_identifier = customer_identifier or (session.customer_identifier if session else None)
+
+        stmt = select(Order).where(Order.order_reference == order_reference)
+        result = await db.execute(stmt)
+        order = result.scalars().first()
+        if not order:
+            raise ValueError(f"Order {order_reference} not found.")
+
+        metadata = {
+            "channel": channel,
+            "customer_id": customer_identifier,
+            "order_reference": order.order_reference,
+            "customer_name": customer_name,
+            "customer_phone": customer_phone,
+        }
+        payment_res = await UnifiedPaymentManager.create_payment_link(
+            amount=order.total_amount,
+            currency=order.currency,
+            customer_email=customer_email,
+            reference=order.order_reference,
+            gateway=gateway,
+            customer_name=customer_name,
+            customer_phone=customer_phone,
+            metadata=metadata,
+        )
+        checkout_url = payment_res.get("checkout_url")
+        order.checkout_url = checkout_url
+        order.payment_gateway = gateway or "default"
+        order.customer_name = order.customer_name or customer_name
+        order.customer_email = order.customer_email or customer_email
+        order.customer_phone = order.customer_phone or customer_phone
+        await db.commit()
+
+        return {
+            "order_reference": order_reference,
+            "checkout_url": checkout_url,
+            "total_amount": order.total_amount,
+            "currency": order.currency,
+        }

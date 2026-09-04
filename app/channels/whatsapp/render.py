@@ -44,6 +44,17 @@ class WhatsAppRenderer:
                 "list_sections": [{"title": "Available Products", "rows": rows}],
             }
 
+        action_button_list = [b for b in resp.buttons if b.kind == "action"]
+        if len(action_button_list) > 3:
+            # WhatsApp's quick-reply buttons hard-cap at 3 — render as a list
+            # message instead of silently truncating (_wa_buttons does [:3]).
+            rows = [{"id": b.id, "title": b.title[:24]} for b in action_button_list[:10]]
+            return {
+                "text": text,
+                "buttons": None,
+                "list_sections": [{"title": "Options", "rows": rows}],
+            }
+
         action_buttons = _wa_buttons(resp.buttons)
         return {
             "text": text,
