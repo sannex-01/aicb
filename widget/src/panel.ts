@@ -90,15 +90,24 @@ export class WidgetPanel {
         // fall through with defaults — still show the form/welcome below
       }
 
-      const startChat = () => {
-        this.appendBotResponse({
-          text: welcomeMessage,
-          buttons: [],
-          product_cards: [],
-          quick_replies: [],
-          checkout_url: null,
-          end_session: false,
-        });
+      const startChat = async () => {
+        // Dispatch the same flow_main_menu action Telegram/WhatsApp send on
+        // /start, so the welcome message comes with real menu buttons
+        // (Browse Products / View Cart / Track Order) instead of bare text.
+        // The backend already omits "My Profile" for the widget channel.
+        try {
+          const resp = await this.api.dispatchAction("flow_main_menu", this.sessionId);
+          this.appendBotResponse({ ...resp, text: welcomeMessage || resp.text });
+        } catch {
+          this.appendBotResponse({
+            text: welcomeMessage,
+            buttons: [],
+            product_cards: [],
+            quick_replies: [],
+            checkout_url: null,
+            end_session: false,
+          });
+        }
       };
 
       if (profileCollectionMode === "upfront") {
