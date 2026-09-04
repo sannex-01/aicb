@@ -7,6 +7,18 @@ MAIN_MENU_BUTTONS = [
     {"id": "flow_my_profile", "title": "👤 My Profile"},
 ]
 
+WIDGET_MAIN_MENU_BUTTONS = [
+    {"id": "flow_browse_catalog", "title": "🛍️ Browse Products"},
+    {"id": "flow_view_cart", "title": "🛒 View Cart"},
+    {"id": "flow_track_order", "title": "📦 Track Order"},
+]
+
+def get_main_menu_buttons(channel: str = "telegram") -> List[Dict[str, str]]:
+    """Returns main menu buttons tailored for the channel (Widget omits profile viewing)."""
+    if channel == "widget":
+        return WIDGET_MAIN_MENU_BUTTONS
+    return MAIN_MENU_BUTTONS
+
 CART_BUTTONS = [
     {"id": "flow_checkout", "title": "💳 Checkout Now"},
     {"id": "flow_browse_catalog", "title": "🛍️ Add More Products"},

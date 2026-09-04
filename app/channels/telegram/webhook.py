@@ -162,11 +162,15 @@ async def handle_telegram_webhook(
         session = await MemoryManager.get_or_create_session(db, channel="telegram", customer_identifier=user_id)
 
         # Handle Fast-Path System Handlers (0 LLM Tokens)
-        fast_path_triggers = ["/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout", "clear cart", "profile", "my profile"]
+        fast_path_triggers = [
+            "/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout",
+            "clear cart", "profile", "my profile", "create profile", "update profile", "edit profile"
+        ]
         is_fast_path = (
             text.lower().strip() in fast_path_triggers
             or text.lower().startswith("cart_")
             or text.lower().startswith("flow_")
+            or text.lower().startswith("qty_")
         )
 
         sent_reply_text = ""

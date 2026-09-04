@@ -22,6 +22,8 @@ from app.commerce.payments.unified import UnifiedPaymentManager
 from app.channels.slack.fallback import get_support_contact_message
 from app.flows.definitions import (
     MAIN_MENU_BUTTONS,
+    WIDGET_MAIN_MENU_BUTTONS,
+    get_main_menu_buttons,
     CART_BUTTONS,
     CART_EMPTY_BUTTONS,
     get_main_menu_text,
@@ -94,9 +96,10 @@ class FlowEngine:
         # 1. Main Menu Trigger
         if action in ["flow_main_menu", "/start", "menu", "start"]:
             await MemoryManager.update_flow_state(db, session, active_flow="main_menu", current_step="root")
+            menu_buttons = get_main_menu_buttons(session.channel)
             return BotResponse(
                 text=get_main_menu_text(),
-                buttons=_buttons(MAIN_MENU_BUTTONS),
+                buttons=_buttons(menu_buttons),
             )
 
         # 2. Browse Products Flow
@@ -433,13 +436,56 @@ class FlowEngine:
             await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
             return BotResponse(text=support_msg)
 
-        # 10. My Profile — view/update saved name, email, phone
+        # 10. My Profile — view saved profile details with Create/Update actions
         elif action in ["flow_my_profile", "profile", "my profile", "my_profile"]:
-            customer = None
-            if session.channel != "widget":
-                customer = await get_customer(db, session.channel, session.customer_identifier)
+            if session.channel == "widget":
+                await MemoryManager.update_flow_state(db, session, active_flow="main_menu", current_step="root")
+                return BotResponse(
+                    text=get_main_menu_text(),
+                    buttons=_buttons(WIDGET_MAIN_MENU_BUTTONS),
+                )
+
+            customer = await get_customer(db, session.channel, session.customer_identifier)
+            name_val = (customer.name if customer and customer.name else "").strip() or "[Not Set]"
+            email_val = (customer.email if customer and customer.email else "").strip() or "[Not Set]"
+
+            raw_phone = customer.phone_number if customer and customer.phone_number else (
+                session.customer_identifier if session.channel == "whatsapp" else None
+            )
+            phone_val = (raw_phone or "").strip() or "[Not Set]"
+
+            has_profile = bool(customer and (customer.name or customer.email or customer.phone_number))
+            btn_title = "✏️ Update Profile" if has_profile else "➕ Create Profile"
+
+            buttons = [
+                {"id": "flow_start_profile_edit", "title": btn_title},
+                {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+            ]
+
+            await MemoryManager.update_flow_state(db, session, active_flow="profile_view", current_step="overview")
+            return BotResponse(
+                text=(
+                    "👤 *Your Profile Details*\n\n"
+                    f"• *Full Name:* {name_val}\n"
+                    f"• *Email Address:* {email_val}\n"
+                    f"• *Phone Number:* {phone_val}\n\n"
+                    "Please select an option below:"
+                ),
+                buttons=_buttons(buttons),
+            )
+
+        # 11. Start Profile Create / Update Flow
+        elif action in ["flow_start_profile_edit", "create profile", "update profile", "edit profile", "flow_edit_profile"]:
+            if session.channel == "widget":
+                await MemoryManager.update_flow_state(db, session, active_flow="main_menu", current_step="root")
+                return BotResponse(
+                    text=get_main_menu_text(),
+                    buttons=_buttons(WIDGET_MAIN_MENU_BUTTONS),
+                )
+
+            customer = await get_customer(db, session.channel, session.customer_identifier)
             return await FlowEngine._start_profile_collect(
-                db, session, customer, resume_intent={"path": "none"}, prefill_name=prefill_name, force_full=True,
+                db, session, customer, resume_intent={"path": "profile_view"}, prefill_name=prefill_name, force_full=True,
             )
 
         return BotResponse(text="How else can we assist you today?")
@@ -505,13 +551,25 @@ class FlowEngine:
             # can genuinely change any of them) — the draft starts empty and each
             # step's prompt shows the saved value as a hint; "skip" falls back to
             # `saved` (see _handle_profile_collect_step), not a pre-filled draft.
-            draft: Dict[str, Any] = {"resume_intent": resume_intent, "name": None, "email": None, "phone": None, "saved": saved}
+            if session.channel == "whatsapp" and not saved.get("phone"):
+                saved["phone"] = session.customer_identifier
+
+            draft: Dict[str, Any] = {
+                "resume_intent": resume_intent,
+                "name": None,
+                "email": None,
+                "phone": session.customer_identifier if session.channel == "whatsapp" else None,
+                "saved": saved,
+            }
             state["profile_draft"] = draft
             await MemoryManager.update_flow_state(
                 db, session, active_flow="profile_collect", current_step="ask_name", state_data=state,
             )
-            current = f" (currently: *{saved['name']}*)" if saved["name"] else ""
-            return BotResponse(text=f"👤 Let's update your profile.\n\nWhat's your full name?{current}\nReply 'skip' to keep it as-is.")
+            has_existing = bool(saved.get("name") or saved.get("email") or saved.get("phone"))
+            action_word = "update" if has_existing else "create"
+            current = f" (currently: *{saved['name']}*)" if saved.get("name") else ""
+            skip_hint = "\nReply 'skip' to keep it as-is." if saved.get("name") else ""
+            return BotResponse(text=f"👤 Let's {action_word} your profile.\n\nWhat's your full name?{current}{skip_hint}")
 
         draft = {"resume_intent": resume_intent, **saved}
         # WhatsApp's own identifier IS the phone number — never ask for it separately.
@@ -662,15 +720,28 @@ class FlowEngine:
         if path == "ai_tool":
             return await FlowEngine._resume_ai_checkout_intent(db, session, customer, resume_intent, draft)
 
+        name_display = draft.get("name") or (customer.name if customer else None) or "[Not Set]"
+        email_display = draft.get("email") or (customer.email if customer else None) or "[Not Set]"
+        phone_display = (
+            draft.get("phone")
+            or (customer.phone_number if customer else None)
+            or (session.customer_identifier if session.channel == "whatsapp" else None)
+            or "[Not Set]"
+        )
+
         return BotResponse(
             text=(
-                f"✅ *Profile updated!*\n\n"
-                f"• Name: {draft.get('name') or '—'}\n"
-                f"• Email: {draft.get('email') or '—'}\n"
-                f"• Phone: {draft.get('phone') or '—'}\n\n"
-                f"{get_main_menu_text()}"
+                "✅ *Profile saved successfully!*\n\n"
+                f"• *Full Name:* {name_display}\n"
+                f"• *Email Address:* {email_display}\n"
+                f"• *Phone Number:* {phone_display}\n\n"
+                "What would you like to do next?"
             ),
-            buttons=_buttons(MAIN_MENU_BUTTONS),
+            buttons=_buttons([
+                {"id": "flow_start_profile_edit", "title": "✏️ Update Profile"},
+                {"id": "flow_browse_catalog", "title": "🛍️ Browse Products"},
+                {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+            ]),
         )
 
     @staticmethod
