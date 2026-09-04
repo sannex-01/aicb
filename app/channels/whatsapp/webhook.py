@@ -7,13 +7,32 @@ from app.core.database import get_db
 from app.core.security import verify_whatsapp_signature
 from app.core.logger import logger
 from app.channels.whatsapp.client import WhatsAppClient
+from app.channels.whatsapp.render import WhatsAppRenderer
 from app.ai.orchestrator import AIOrchestrator
 from app.ai.memory import MemoryManager
 from app.flows.engine import FlowEngine
 from app.flows.definitions import MAIN_MENU_BUTTONS
+from app.schemas.bot_response import BotResponse
 from app.telemetry.client import telemetry_client
 
 router = APIRouter(prefix="/webhooks/whatsapp", tags=["WhatsApp Webhook"])
+
+
+async def _deliver(wa_client: WhatsAppClient, to: str, resp: BotResponse) -> None:
+    """Sends a BotResponse to WhatsApp: an interactive list message when there
+    are product cards, otherwise quick-reply buttons, otherwise plain text."""
+    rendered = WhatsAppRenderer.render(resp)
+    if rendered["list_sections"]:
+        await wa_client.send_list_message(
+            to=to,
+            body=rendered["text"],
+            button_text="View Products",
+            sections=rendered["list_sections"],
+        )
+    elif rendered["buttons"]:
+        await wa_client.send_button_message(to=to, body=rendered["text"], buttons=rendered["buttons"])
+    else:
+        await wa_client.send_text_message(to=to, body=rendered["text"])
 
 
 @router.get("")
@@ -110,14 +129,8 @@ async def handle_whatsapp_message(
                         action_id=action_id or user_text,
                         user_input=user_text,
                     )
-                    if flow_res.buttons:
-                        await wa_client.send_button_message(
-                            to=wa_id,
-                            body=flow_res.text,
-                            buttons=[{"id": b.id, "title": b.title} for b in flow_res.buttons],
-                        )
-                    else:
-                        await wa_client.send_text_message(to=wa_id, body=flow_res.text)
+                    await _deliver(wa_client, wa_id, flow_res)
+                else:
                     # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured
                     try:
                         ai_resp = await AIOrchestrator.process_message(
@@ -127,15 +140,7 @@ async def handle_whatsapp_message(
                             user_message=user_text,
                             customer_name=customer_name,
                         )
-                        ai_reply = ai_resp.text
-
-                        # WhatsApp doesn't support free-form URL buttons, so we convert markdown links to text
-                        import re
-                        def format_wa_links(match):
-                            return f"*{match.group(1)}*: {match.group(2)}"
-
-                        formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", format_wa_links, ai_reply)
-                        await wa_client.send_text_message(to=wa_id, body=formatted_reply)
+                        await _deliver(wa_client, wa_id, ai_resp)
                     except Exception as e:
                         logger.warning(f"AI Orchestrator unavailable ({e}). Falling back to interactive menu buttons.")
                         await wa_client.send_quick_reply_buttons(

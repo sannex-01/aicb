@@ -48,6 +48,33 @@ class TelegramClient:
             res = await self._post("sendMessage", payload)
         return res
 
+    async def send_photo(
+        self,
+        chat_id: int | str,
+        photo_url: str,
+        caption: Optional[str] = None,
+        parse_mode: Optional[str] = "Markdown",
+        reply_markup: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """Sends a photo (e.g. a product card image) with an optional caption and inline keyboard."""
+        payload: Dict[str, Any] = {
+            "chat_id": chat_id,
+            "photo": photo_url,
+        }
+        if caption:
+            payload["caption"] = caption
+        if parse_mode:
+            payload["parse_mode"] = parse_mode
+        if reply_markup:
+            payload["reply_markup"] = reply_markup
+
+        res = await self._post("sendPhoto", payload)
+        if not res.get("ok") and parse_mode:
+            logger.info("Retrying sendPhoto without parse_mode markdown formatting...")
+            payload.pop("parse_mode", None)
+            res = await self._post("sendPhoto", payload)
+        return res
+
     async def send_inline_buttons(
         self,
         chat_id: int | str,

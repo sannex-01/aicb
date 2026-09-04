@@ -7,13 +7,34 @@ from app.core.database import get_db
 from app.core.security import verify_telegram_secret
 from app.core.logger import logger
 from app.channels.telegram.client import TelegramClient
+from app.channels.telegram.render import TelegramRenderer
 from app.ai.orchestrator import AIOrchestrator
 from app.ai.memory import MemoryManager
 from app.flows.engine import FlowEngine
 from app.flows.definitions import MAIN_MENU_BUTTONS
+from app.schemas.bot_response import BotResponse
 from app.telemetry.client import telemetry_client
 
 router = APIRouter(prefix="/webhooks/telegram", tags=["Telegram Webhook"])
+
+
+async def _deliver(tg_client: TelegramClient, chat_id: int | str, resp: BotResponse) -> None:
+    """Sends a BotResponse to Telegram: one photo per product card (if any),
+    then the text reply with its inline keyboard."""
+    rendered = TelegramRenderer.render(resp)
+    for card in rendered["photo_items"]:
+        card_msg = TelegramRenderer.product_card_message(card)
+        if card_msg["photo_url"]:
+            await tg_client.send_photo(
+                chat_id=chat_id,
+                photo_url=card_msg["photo_url"],
+                caption=card_msg["caption"],
+                reply_markup=card_msg["reply_markup"],
+            )
+    if rendered["inline_keyboard"]:
+        await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+    else:
+        await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
 
 
 @router.post("")
@@ -54,13 +75,19 @@ async def handle_telegram_webhook(
             action_id=action_data,
             user_input=action_data,
         )
+        rendered = TelegramRenderer.render(flow_res)
 
-        inline_kb = None
-        if flow_res.buttons:
-            inline_kb = [
-                [{"text": b.title, "callback_data": b.id}]
-                for b in flow_res.buttons
-            ]
+        # Product cards can't be edited in-place onto an existing text message —
+        # send them fresh, then fall through to the normal edit-or-send text path.
+        for card in rendered["photo_items"]:
+            card_msg = TelegramRenderer.product_card_message(card)
+            if card_msg["photo_url"]:
+                await tg_client.send_photo(
+                    chat_id=chat_id,
+                    photo_url=card_msg["photo_url"],
+                    caption=card_msg["caption"],
+                    reply_markup=card_msg["reply_markup"],
+                )
 
         # Edit the existing message in-place for a clean, app-like experience
         edit_success = False
@@ -69,8 +96,8 @@ async def handle_telegram_webhook(
                 res = await tg_client.edit_inline_buttons(
                     chat_id=chat_id,
                     message_id=message_id,
-                    text=flow_res.text,
-                    buttons=inline_kb,
+                    text=rendered["text"],
+                    buttons=rendered["inline_keyboard"],
                 )
                 if res.get("ok"):
                     edit_success = True
@@ -78,10 +105,10 @@ async def handle_telegram_webhook(
                 logger.warning(f"In-place message edit failed, will send fresh message: {e}")
 
         if not edit_success and chat_id:
-            if inline_kb:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
+            if rendered["inline_keyboard"]:
+                await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
             else:
-                await tg_client.send_message(chat_id=chat_id, text=flow_res.text)
+                await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
 
         # Track interactive button action telemetry
         telemetry_client.track(
@@ -150,11 +177,7 @@ async def handle_telegram_webhook(
                 user_input=text,
             )
             sent_reply_text = flow_res.text
-            inline_kb = [
-                [{"text": b.title, "callback_data": b.id}]
-                for b in flow_res.buttons
-            ]
-            await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
+            await _deliver(tg_client, chat_id, flow_res)
         elif session.active_flow or text.upper().startswith("ORD-"):
             # Active flow state processing (e.g. order tracking or cart input)
             flow_res = await FlowEngine.handle_action(
@@ -164,14 +187,7 @@ async def handle_telegram_webhook(
                 user_input=text,
             )
             sent_reply_text = flow_res.text
-            inline_kb = [
-                [{"text": b.title, "callback_data": b.id}]
-                for b in flow_res.buttons
-            ]
-            if inline_kb:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=flow_res.text, buttons=inline_kb)
-            else:
-                await tg_client.send_message(chat_id=chat_id, text=flow_res.text)
+            await _deliver(tg_client, chat_id, flow_res)
         else:
             # Route to AI Orchestrator with graceful button fallback if LLM is unconfigured or errors
             try:
@@ -182,26 +198,8 @@ async def handle_telegram_webhook(
                     user_message=text,
                     customer_name=customer_name,
                 )
-                ai_reply = ai_resp.text
-
-                import re
-                inline_kb = []
-
-                def extract_tg_links(match):
-                    title = match.group(1)
-                    url = match.group(2)
-                    inline_kb.append([{"text": title, "url": url}])
-                    return ""
-
-                formatted_reply = re.sub(r"\[(.*?)\]\((.*?)\)", extract_tg_links, ai_reply).strip()
-                if not formatted_reply and inline_kb:
-                    formatted_reply = "Please see the link below:"
-                sent_reply_text = formatted_reply
-
-                if inline_kb:
-                    await tg_client.send_inline_buttons(chat_id=chat_id, text=formatted_reply, buttons=inline_kb)
-                else:
-                    await tg_client.send_message(chat_id=chat_id, text=formatted_reply)
+                sent_reply_text = ai_resp.text
+                await _deliver(tg_client, chat_id, ai_resp)
             except Exception as e:
                 logger.warning(f"AI Orchestrator unavailable ({e}). Falling back to interactive menu buttons.")
                 fallback_kb = [
