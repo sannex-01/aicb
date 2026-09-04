@@ -62,6 +62,7 @@ class Settings(BaseSettings):
 
     # Telegram
     TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_BOT_USERNAME: Optional[str] = None  # e.g. "my_store_bot" (no @) — used to build t.me/<username> deep links
     TELEGRAM_WEBHOOK_SECRET: Optional[str] = None
     TELEGRAM_PAYMENT_PROVIDER_TOKEN: Optional[str] = None
 

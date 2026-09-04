@@ -482,12 +482,50 @@ class ToolExecutor:
         if not order:
             raise ValueError(f"Order {order_reference} not found.")
 
+        items_summary = ""
+        if order.items_json:
+            try:
+                items_data = json.loads(order.items_json)
+                if isinstance(items_data, list):
+                    items_summary = ", ".join(
+                        f"{item.get('quantity', 1)}x {item.get('title', 'Item')}"
+                        for item in items_data
+                    )
+            except Exception:
+                pass
+
+        custom_fields = []
+        if items_summary:
+            custom_fields.append({
+                "display_name": "Items Purchased",
+                "variable_name": "items_purchased",
+                "value": items_summary[:255],
+            })
+        custom_fields.append({
+            "display_name": "Order Reference",
+            "variable_name": "order_reference",
+            "value": order.order_reference,
+        })
+        if customer_name:
+            custom_fields.append({
+                "display_name": "Customer Name",
+                "variable_name": "customer_name",
+                "value": customer_name,
+            })
+        if customer_phone:
+            custom_fields.append({
+                "display_name": "Customer Phone",
+                "variable_name": "customer_phone",
+                "value": customer_phone,
+            })
+
         metadata = {
             "channel": channel,
             "customer_id": customer_identifier,
             "order_reference": order.order_reference,
             "customer_name": customer_name,
             "customer_phone": customer_phone,
+            "custom_fields": custom_fields,
         }
         payment_res = await UnifiedPaymentManager.create_payment_link(
             amount=order.total_amount,

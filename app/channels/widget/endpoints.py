@@ -70,21 +70,19 @@ async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: Async
 
     session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
 
-    # If an AI-triggered checkout previously hijacked this session into the
-    # profile_collect flow (see FlowEngine._handle_profile_collect_step),
-    # this next free-text turn must be intercepted the same way Telegram/
-    # WhatsApp already do, instead of going straight to the AI orchestrator.
-    if session.active_flow == "profile_collect":
+    # If session is in profile_collect or quantity_select,
+    # intercept free-text input and route to FlowEngine.
+    if session.active_flow in ["profile_collect", "quantity_select"]:
         resp = await FlowEngine.handle_action(
             db=db, session=session, action_id=req.message, user_input=req.message,
         )
 
-        async def profile_event_generator():
+        async def flow_event_generator():
             yield f"data: {json.dumps({'content': resp.text})}\n\n"
             yield f"data: {json.dumps({'final': resp.model_dump()})}\n\n"
             yield "data: [DONE]\n\n"
 
-        return StreamingResponse(profile_event_generator(), media_type="text/event-stream")
+        return StreamingResponse(flow_event_generator(), media_type="text/event-stream")
 
     async def event_generator():
         stream = AIOrchestrator.process_message_stream(

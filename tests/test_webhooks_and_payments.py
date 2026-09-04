@@ -4,6 +4,7 @@ import json
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.core.database import Base, get_db
+from app.core.config import settings
 from app.models.order import Order
 from app.models.catalog import CatalogItem
 from app.main import app
@@ -81,7 +82,15 @@ async def test_paystack_webhook_payment_success(client: AsyncClient, test_sessio
             "status": "success",
         }
     }
-    res = await client.post("/api/v1/webhooks/payments/paystack", json=payload)
+    raw_payload = json.dumps(payload).encode("utf-8")
+    headers = {"Content-Type": "application/json"}
+    if settings.PAYSTACK_SECRET_KEY:
+        import hmac
+        import hashlib
+        sig = hmac.new(settings.PAYSTACK_SECRET_KEY.encode("utf-8"), raw_payload, hashlib.sha512).hexdigest()
+        headers["x-paystack-signature"] = sig
+
+    res = await client.post("/api/v1/webhooks/payments/paystack", content=raw_payload, headers=headers)
     assert res.status_code == 200
 
     # Refresh order from DB to verify status updated to 'paid'

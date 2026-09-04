@@ -1,4 +1,5 @@
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, Tuple, List
@@ -24,6 +25,7 @@ from app.flows.definitions import (
     CART_BUTTONS,
     CART_EMPTY_BUTTONS,
     get_main_menu_text,
+    get_quantity_buttons,
 )
 from app.schemas.bot_response import BotResponse, ResponseButton, ProductCard
 from app.core.logger import logger
@@ -51,6 +53,43 @@ class FlowEngine:
         # 0. Profile Collection Flow (interrupts any other action while active)
         if session.active_flow == "profile_collect":
             return await FlowEngine._handle_profile_collect_step(db, session, user_input or action_id)
+
+        # 0b. Quantity Selection Flow (intercept custom numbers sent in chat)
+        if session.active_flow == "quantity_select" and not action.startswith("flow_") and not action.startswith("cart_") and not action.startswith("qty_set_"):
+            state = MemoryManager.get_flow_state_data(session)
+            selected_id = state.get("selected_product_id")
+            selected_title = state.get("selected_product_title")
+            raw_text = (user_input or action_id).strip()
+
+            # Match single integer or "qty 4" / "quantity 5" / "4 pcs"
+            qty_match = re.search(r'^(?:qty|quantity|buy|need|want)?\s*[:#]?\s*(\d{1,4})(?:\s*(?:pcs|pieces|items|units|x))?$', raw_text, re.IGNORECASE)
+            if not qty_match and raw_text.isdigit():
+                qty_match = re.search(r'(\d+)', raw_text)
+
+            if qty_match and selected_id is not None:
+                new_qty = int(qty_match.group(1))
+                if 1 <= new_qty <= 9999:
+                    cart = await CartManager.set_item_quantity(
+                        db=db,
+                        session=session,
+                        item_id=selected_id,
+                        quantity=new_qty,
+                        title=selected_title,
+                    )
+                    cart_msg = CartManager.format_cart_message(cart)
+                    qty_buttons = get_quantity_buttons(selected_id, current_qty=new_qty)
+                    item_name = selected_title or f"Item #{selected_id}"
+
+                    return BotResponse(
+                        text=(
+                            f"✅ *Updated quantity: {new_qty}x {item_name} in your cart!*\n\n"
+                            f"🔢 *Want to adjust quantity?*\n"
+                            f"• Tap an example number below\n"
+                            f"• Or type any number directly in chat\n\n"
+                            f"{cart_msg}"
+                        ),
+                        buttons=_buttons(qty_buttons),
+                    )
 
         # 1. Main Menu Trigger
         if action in ["flow_main_menu", "/start", "menu", "start"]:
@@ -116,15 +155,90 @@ class FlowEngine:
                     quantity=1,
                     currency=product.currency,
                 )
+
+                # Get current quantity of this item
+                item_qty = 1
+                for entry in cart:
+                    if entry.get("item_id") == product.id or entry.get("title", "").lower() == product.title.lower():
+                        item_qty = entry.get("quantity", 1)
+                        break
+
+                state = MemoryManager.get_flow_state_data(session)
+                state["selected_product_id"] = product.id
+                state["selected_product_title"] = product.title
+                await MemoryManager.update_flow_state(
+                    db,
+                    session,
+                    active_flow="quantity_select",
+                    current_step=f"qty_{product.id}",
+                    state_data=state,
+                )
+
                 cart_msg = CartManager.format_cart_message(cart)
+                qty_buttons = get_quantity_buttons(product.id, current_qty=item_qty)
+
                 return BotResponse(
-                    text=f"✅ *Added 1x {product.title} to your cart!*\n\n{cart_msg}",
-                    buttons=_buttons(CART_BUTTONS),
+                    text=(
+                        f"✅ *Added 1x {product.title} to your cart!* (Total in cart: {item_qty})\n\n"
+                        f"🔢 *Select how many you'd like to buy:*\n"
+                        f"• Tap an example number below (*1*, *2*, *3*, *5*, *10*)\n"
+                        f"• Or type any custom number directly in chat (e.g. `4` or `12`)\n\n"
+                        f"{cart_msg}"
+                    ),
+                    buttons=_buttons(qty_buttons),
                 )
             else:
                 return BotResponse(
                     text="Could not find that product. Please select from our catalog:",
                     buttons=_buttons(MAIN_MENU_BUTTONS),
+                )
+
+        # 3b. Quantity Preset Button Selection (e.g. "qty_set_1_3")
+        elif action.startswith("qty_set_"):
+            parts = action.split("_")
+            if len(parts) >= 4 and parts[2].isdigit() and parts[3].isdigit():
+                prod_id = int(parts[2])
+                qty = int(parts[3])
+                product = await CatalogManager.get_product_by_id(db, prod_id)
+                prod_title = product.title if product else None
+                prod_price = product.price if product else 0.0
+                prod_curr = product.currency if product else "NGN"
+
+                cart = await CartManager.set_item_quantity(
+                    db=db,
+                    session=session,
+                    item_id=prod_id,
+                    quantity=qty,
+                    title=prod_title,
+                    price=prod_price,
+                    currency=prod_curr,
+                )
+
+                state = MemoryManager.get_flow_state_data(session)
+                state["selected_product_id"] = prod_id
+                if prod_title:
+                    state["selected_product_title"] = prod_title
+                await MemoryManager.update_flow_state(
+                    db,
+                    session,
+                    active_flow="quantity_select",
+                    current_step=f"qty_{prod_id}",
+                    state_data=state,
+                )
+
+                cart_msg = CartManager.format_cart_message(cart)
+                qty_buttons = get_quantity_buttons(prod_id, current_qty=qty)
+                item_name = prod_title or f"Item #{prod_id}"
+
+                return BotResponse(
+                    text=(
+                        f"✅ *Selected {qty}x {item_name}!* (Updated in cart)\n\n"
+                        f"🔢 *Want to change quantity?*\n"
+                        f"• Tap another number below\n"
+                        f"• Or type any custom number directly in chat\n\n"
+                        f"{cart_msg}"
+                    ),
+                    buttons=_buttons(qty_buttons),
                 )
 
         # 4. View Cart
@@ -602,6 +716,35 @@ class FlowEngine:
         await db.commit()
         await db.refresh(order)
 
+        items_summary = ", ".join(
+            f"{item.get('quantity', 1)}x {item.get('title', 'Item')}" for item in cart
+        ) if cart else "Order Items"
+
+        custom_fields = [
+            {
+                "display_name": "Items Purchased",
+                "variable_name": "items_purchased",
+                "value": items_summary[:255],
+            },
+            {
+                "display_name": "Order Reference",
+                "variable_name": "order_reference",
+                "value": order_ref,
+            },
+        ]
+        if customer_name:
+            custom_fields.append({
+                "display_name": "Customer Name",
+                "variable_name": "customer_name",
+                "value": customer_name,
+            })
+        if customer_phone:
+            custom_fields.append({
+                "display_name": "Customer Phone",
+                "variable_name": "customer_phone",
+                "value": customer_phone,
+            })
+
         payment_res = await UnifiedPaymentManager.create_payment_link(
             amount=total_amount,
             currency=currency,
@@ -616,6 +759,7 @@ class FlowEngine:
                 "order_reference": order_ref,
                 "customer_name": customer_name,
                 "customer_phone": customer_phone,
+                "custom_fields": custom_fields,
             },
         )
         checkout_url = payment_res.get("checkout_url")

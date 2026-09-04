@@ -6,11 +6,21 @@ def _inline_keyboard(buttons) -> Optional[List[List[Dict[str, str]]]]:
     if not buttons:
         return None
     rows = []
+    qty_row = []
     for b in buttons:
-        if b.kind == "url" and b.url:
-            rows.append([{"text": b.title, "url": b.url}])
+        btn_dict = {"text": b.title, "url": b.url} if (b.kind == "url" and b.url) else {"text": b.title, "callback_data": b.id}
+        if b.id.startswith("qty_set_"):
+            qty_row.append(btn_dict)
+            if len(qty_row) >= 5:
+                rows.append(qty_row)
+                qty_row = []
         else:
-            rows.append([{"text": b.title, "callback_data": b.id}])
+            if qty_row:
+                rows.append(qty_row)
+                qty_row = []
+            rows.append([btn_dict])
+    if qty_row:
+        rows.append(qty_row)
     return rows
 
 
@@ -41,6 +51,11 @@ class TelegramRenderer:
             "caption": caption,
             "photo_url": card.image_url,
             "reply_markup": {
-                "inline_keyboard": [[{"text": "🛒 Buy", "callback_data": card.buy_action_id}]]
+                "inline_keyboard": [
+                    [
+                        {"text": "🛒 Buy Now", "callback_data": card.buy_action_id},
+                        {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
+                    ]
+                ]
             },
         }

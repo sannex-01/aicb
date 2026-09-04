@@ -60,6 +60,51 @@ class CartManager:
         return cart
 
     @staticmethod
+    async def set_item_quantity(
+        db: AsyncSession,
+        session: ConversationSession,
+        item_id: Optional[int],
+        quantity: int,
+        title: Optional[str] = None,
+        price: Optional[float] = None,
+        currency: str = "NGN",
+    ) -> List[Dict[str, Any]]:
+        state = MemoryManager.get_flow_state_data(session)
+        cart = state.get("cart", [])
+
+        found = False
+        new_cart = []
+        for entry in cart:
+            is_match = (item_id is not None and entry.get("item_id") == item_id) or (
+                title and entry.get("title", "").lower() == title.lower()
+            )
+            if is_match:
+                found = True
+                if quantity > 0:
+                    entry["quantity"] = int(quantity)
+                    new_cart.append(entry)
+            else:
+                new_cart.append(entry)
+
+        if not found and quantity > 0 and (title or item_id is not None):
+            new_cart.append({
+                "item_id": item_id,
+                "title": title or f"Item #{item_id}",
+                "price": float(price or 0.0),
+                "quantity": int(quantity),
+                "currency": currency,
+            })
+
+        state["cart"] = new_cart
+        await MemoryManager.update_flow_state(
+            db, session,
+            active_flow=session.active_flow,
+            current_step=session.current_step,
+            state_data=state,
+        )
+        return new_cart
+
+    @staticmethod
     async def remove_item(
         db: AsyncSession,
         session: ConversationSession,
