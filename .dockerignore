@@ -7,5 +7,5 @@ __pycache__
 .gitignore
 .pytest_cache
 aicb.db
-miniapp/node_modules
-miniapp/dist
+widget/node_modules
+widget/dist

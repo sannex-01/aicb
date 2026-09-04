@@ -1,6 +1,8 @@
+import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,13 +11,15 @@ from app.core.database import init_db, get_db
 from app.core.logger import logger
 from app.channels.whatsapp.webhook import router as whatsapp_router
 from app.channels.telegram.webhook import router as telegram_router
-from app.channels.miniapp.endpoints import router as miniapp_router
+from app.channels.widget.endpoints import router as widget_router
 from app.commerce.payments.webhooks import router as payments_router
 from app.commerce.bumpa.webhook import router as bumpa_router
 from app.telemetry.sync_worker import router as sync_router, start_sync_scheduler, shutdown_sync_scheduler
 from app.telemetry.client import telemetry_client
 from app.models.catalog import CatalogItem
 from app.models.order import Order
+
+WIDGET_BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "..", "widget", "dist", "widget.js")
 
 
 @asynccontextmanager
@@ -127,10 +131,19 @@ async def gateway_info():
 # Include Routers under /api/v1
 app.include_router(whatsapp_router, prefix="/api/v1")
 app.include_router(telegram_router, prefix="/api/v1")
-app.include_router(miniapp_router, prefix="/api/v1")
+app.include_router(widget_router, prefix="/api/v1")
 app.include_router(payments_router, prefix="/api/v1")
 app.include_router(bumpa_router, prefix="/api/v1")
 app.include_router(sync_router, prefix="/api/v1")
+
+
+@app.get("/widget.js", tags=["Website Widget"])
+async def widget_bundle():
+    """Serves the embeddable widget script. Businesses install it via
+    <script src="{instanceUrl}/widget.js" data-bot-id="..."></script>."""
+    if not os.path.isfile(WIDGET_BUNDLE_PATH):
+        raise HTTPException(status_code=404, detail="Widget bundle not built for this instance yet.")
+    return FileResponse(WIDGET_BUNDLE_PATH, media_type="application/javascript")
 
 
 # Helper Read Endpoints for Developer Verification

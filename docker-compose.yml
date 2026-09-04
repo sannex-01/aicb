@@ -17,12 +17,3 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-
-  miniapp:
-    build: ./miniapp
-    container_name: aicb-miniapp
-    restart: unless-stopped
-    ports:
-      - "${MINIAPP_PORT:-8423}:80"
-    depends_on:
-      - aicb

@@ -128,21 +128,6 @@ class TelegramClient:
         markup = {"inline_keyboard": buttons} if buttons is not None else None
         return await self.edit_message_text(chat_id, message_id, text, reply_markup=markup)
 
-    async def send_webapp_button(
-        self,
-        chat_id: int | str,
-        text: str,
-        button_text: str,
-        webapp_url: str,
-    ) -> Dict[str, Any]:
-        """Sends an inline button opening a Telegram MiniApp or Payment Webview."""
-        markup = {
-            "inline_keyboard": [
-                [{"text": button_text, "web_app": {"url": webapp_url}}]
-            ]
-        }
-        return await self.send_message(chat_id, text, reply_markup=markup)
-
     async def send_invoice(
         self,
         chat_id: int | str,
@@ -181,14 +166,3 @@ class TelegramClient:
         if not ok and error_message:
             payload["error_message"] = error_message
         return await self._post("answerPreCheckoutQuery", payload)
-
-    async def set_chat_menu_button(self, webapp_url: str, text: str = "Store") -> Dict[str, Any]:
-        """Configures Telegram Bot menu button to open Mini App webapp."""
-        payload = {
-            "menu_button": {
-                "type": "web_app",
-                "text": text,
-                "web_app": {"url": webapp_url},
-            }
-        }
-        return await self._post("setChatMenuButton", payload)

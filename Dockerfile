@@ -1,3 +1,13 @@
+# Stage 1: build the embeddable widget.js bundle
+FROM node:20-alpine AS widget-build
+
+WORKDIR /widget
+COPY widget/package.json widget/package-lock.json* ./
+RUN npm install
+COPY widget/ ./
+RUN npm run build
+
+# Stage 2: the Python app itself
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -15,6 +25,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+COPY --from=widget-build /widget/dist ./widget/dist
 
 EXPOSE 8000
 

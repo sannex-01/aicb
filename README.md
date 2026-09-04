@@ -8,7 +8,8 @@ A modular, lightweight, and production-ready AI & Interactive Step Chatbot engin
 
 1. **Multi-Channel Interaction**:
    - **WhatsApp Cloud API**: Text messages, Quick-Reply Interactive Buttons, List Pickers, Interactive Flows (`flow_crypto.py` with RSA/AES encryption).
-   - **Telegram**: Text messages, Inline Keyboards, Telegram MiniApp WebViews, and Native In-App Invoices.
+   - **Telegram**: Text messages, Inline Keyboards, and Native In-App Invoices.
+   - **Website Widget**: Embeddable `<script>` chat widget with product cards, buttons, and checkout handoff.
    - **Slack & Fallback**: Human escalation dispatch to Slack webhooks, and automated customer support contact cards.
 
 2. **Multi-LLM Provider Engine**:
@@ -83,16 +84,16 @@ aicb/
 ├── app/
 │   ├── main.py                     # FastAPI application & lifespan
 │   ├── core/                       # Config, database, security, logger
-│   ├── channels/                   # WhatsApp, Telegram, Slack, Mini App endpoints
+│   ├── channels/                   # WhatsApp, Telegram, Slack, Website Widget endpoints
 │   ├── commerce/                   # CartManager, Catalog & Payments (Paystack, Flutterwave, Stripe)
 │   ├── ai/                         # Multi-LLM providers, prompts, memory, RAG, tool calling
 │   ├── flows/                      # Deterministic 0-token fast-path button engine
 │   ├── telemetry/                  # Sannex telemetry dispatcher & 12h sync worker
 │   └── models/                     # SQLAlchemy models
-├── miniapp/                        # Standalone Telegram Mini App (React + Vite + Tailwind)
+├── widget/                         # Embeddable website chat widget (Vite, builds to widget.js)
 ├── doctor.py                       # Pre-flight diagnostic tool
 ├── Dockerfile                      # Production container image
-├── docker-compose.yml              # Local development compose (ports 8422, 8423)
+├── docker-compose.yml              # Local development compose (port 8422)
 ├── docker-compose.prod.yml         # Coolify production deployment stack
 ├── requirements.txt
 └── .env.example
