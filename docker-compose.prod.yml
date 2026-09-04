@@ -1,8 +1,25 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aicb-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aicb_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aicb_secure_pass_2026}
+      POSTGRES_DB: ${POSTGRES_DB:-aicb}
+    volumes:
+      - aicb_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aicb_user} -d ${POSTGRES_DB:-aicb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   aicb:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: aicb-engine
     restart: always
     ports:
       - "${AICB_PORT:-8422}:8000"
@@ -13,9 +30,10 @@ services:
       DEBUG: "false"
       PORT: 8000
       HOST: 0.0.0.0
-      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/aicb.db}
-    volumes:
-      - aicb_data:/app/data
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://${POSTGRES_USER:-aicb_user}:${POSTGRES_PASSWORD:-aicb_secure_pass_2026}@postgres:5432/${POSTGRES_DB:-aicb}}
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -24,4 +42,4 @@ services:
       start_period: 15s
 
 volumes:
-  aicb_data:
+  aicb_pgdata:

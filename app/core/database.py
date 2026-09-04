@@ -5,10 +5,14 @@ from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 from app.core.logger import logger
 
-# Check if SQLite and format correctly for async
+# Check dialect and format correctly for async driver
 db_url = settings.DATABASE_URL
 if db_url.startswith("sqlite:///"):
     db_url = db_url.replace("sqlite:///", "sqlite+aiosqlite:///")
+elif db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+asyncpg://")
+elif db_url.startswith("postgres://"):
+    db_url = db_url.replace("postgres://", "postgresql+asyncpg://")
 
 connect_args = {"check_same_thread": False} if "sqlite" in db_url else {}
 
