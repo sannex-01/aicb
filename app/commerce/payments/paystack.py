@@ -115,3 +115,29 @@ class PaystackClient:
             else:
                 logger.error(f"Paystack products fetch failed: {res.text}")
                 return []
+
+    async def get_available_currencies(self) -> List[str]:
+        """Queries the Paystack /balance endpoint to retrieve merchant-enabled currencies.
+        Falls back to standard supported currencies if unconfigured or unreachable."""
+        if not self.secret_key:
+            return ["NGN", "USD", "GHS", "KES", "ZAR", "EUR", "GBP"]
+
+        url = f"{PAYSTACK_BASE_URL}/balance"
+        try:
+            async with httpx.AsyncClient(timeout=6.0) as client:
+                res = await client.get(url, headers=self._headers())
+                if res.status_code == 200:
+                    data = res.json()
+                    if data.get("status") and isinstance(data.get("data"), list):
+                        currencies = []
+                        for item in data.get("data", []):
+                            curr = (item.get("currency") or "").upper().strip()
+                            if curr and curr not in currencies:
+                                currencies.append(curr)
+                        if currencies:
+                            return currencies
+        except Exception as e:
+            logger.warning(f"Paystack balance currency lookup notice: {e}")
+
+        return ["NGN", "USD", "GHS", "KES", "ZAR", "EUR", "GBP"]
+

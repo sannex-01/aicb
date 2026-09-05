@@ -29,6 +29,7 @@ class TelemetryWrapper:
         status: str = "success",
         amount: float = 0.0,
         metadata: Optional[Dict[str, Any]] = None,
+        agent_id: Optional[str] = None,
     ) -> None:
         """Enqueues an event using the official SannexAgent SDK."""
         if not self._client or not settings.ENABLE_TELEMETRY:
@@ -41,17 +42,29 @@ class TelemetryWrapper:
             event=event,
             status=status,
             amount=amount,
-            metadata=metadata
+            metadata=metadata,
+            agent_id=agent_id,
         )
 
-    def sync_conversation(self, channel: str, customer_id: str, messages: List[Dict[str, Any]]) -> None:
+    def sync_conversation(
+        self,
+        channel: str,
+        customer_id: str,
+        messages: List[Dict[str, Any]],
+        agent_id: Optional[str] = None,
+    ) -> None:
         """Push a batched conversation transcript up to AgentOS."""
         if not self._client or not settings.ENABLE_TELEMETRY:
             return
         
         # Will fail gracefully if the installed sannex_agent package is outdated
         if hasattr(self._client, "sync_conversation"):
-            self._client.sync_conversation(channel=channel, customer_id=customer_id, messages=messages)
+            self._client.sync_conversation(
+                channel=channel,
+                customer_id=customer_id,
+                messages=messages,
+                agent_id=agent_id,
+            )
         else:
             logger.warning("sannex_agent SDK is outdated, missing sync_conversation.")
 

@@ -1,6 +1,6 @@
 import json
 import uuid
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.commerce.catalog_provider import CatalogManager
@@ -169,6 +169,7 @@ class ToolExecutor:
         arguments: Dict[str, Any],
         customer_identifier: str,
         channel: str,
+        allowed_access_tags: Optional[Set[str]] = None,
     ) -> Dict[str, Any]:
         logger.info(f"Executing tool {name} with args: {arguments}")
 
@@ -178,7 +179,9 @@ class ToolExecutor:
             MIN_RESULTS = 3
             SEARCH_LIMIT = 8
 
-            items = await CatalogManager.search_products(db, query=query, category=category, limit=SEARCH_LIMIT)
+            items = await CatalogManager.search_products(
+                db, query=query, category=category, limit=SEARCH_LIMIT, allowed_access_tags=allowed_access_tags
+            )
             matched_count = len(items)
 
             # "Append possible ones too" — when a search comes back thin,
@@ -189,7 +192,9 @@ class ToolExecutor:
             # matched_count below) — no separate schema field needed.
             if matched_count < MIN_RESULTS:
                 seen_ids = {item.id for item in items}
-                featured = await CatalogManager.get_featured_products(db, limit=SEARCH_LIMIT)
+                featured = await CatalogManager.get_featured_products(
+                    db, limit=SEARCH_LIMIT, allowed_access_tags=allowed_access_tags
+                )
                 for extra in featured:
                     if len(items) >= SEARCH_LIMIT:
                         break

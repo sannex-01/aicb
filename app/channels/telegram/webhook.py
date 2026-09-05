@@ -1,6 +1,7 @@
 import json
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
@@ -19,15 +20,16 @@ router = APIRouter(prefix="/webhooks/telegram", tags=["Telegram Webhook"])
 
 
 async def _deliver(tg_client: TelegramClient, chat_id: int | str, resp: BotResponse) -> None:
-    """Sends a BotResponse to Telegram: one swipeable media-group album for
-    all product cards (if any) plus a buy-buttons follow-up, then the text
-    reply with its own inline keyboard."""
+    """Sends a BotResponse to Telegram:
+    1. If product cards have valid image URLs, send the swipeable media-group album FIRST.
+    2. Then send the main message text with its complete inline keyboard (buy buttons, search, view cart).
+    """
     rendered = TelegramRenderer.render(resp)
     if rendered["photo_items"]:
         album = TelegramRenderer.product_album(rendered["photo_items"])
         if album["media_items"]:
             await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
-        await tg_client.send_inline_buttons(chat_id=chat_id, text=album["actions_text"], buttons=album["actions_keyboard"])
+
     if rendered["inline_keyboard"]:
         await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
     else:
@@ -35,8 +37,10 @@ async def _deliver(tg_client: TelegramClient, chat_id: int | str, resp: BotRespo
 
 
 @router.post("")
+@router.post("/{agent_id}")
 async def handle_telegram_webhook(
     request: Request,
+    agent_id: Optional[str] = None,
     x_telegram_bot_api_secret_token: Optional[str] = Header(None),
     db: AsyncSession = Depends(get_db),
 ):
@@ -50,7 +54,27 @@ async def handle_telegram_webhook(
     except Exception:
         return {"ok": True}
 
-    tg_client = TelegramClient()
+    from app.models.agent import Agent
+    agent = None
+    if agent_id:
+        if agent_id.isdigit():
+            stmt = select(Agent).where(Agent.id == int(agent_id), Agent.is_active == True)
+        else:
+            stmt = select(Agent).where(Agent.slug == agent_id, Agent.is_active == True)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
+    if not agent:
+        stmt = select(Agent).where(Agent.telegram_bot_token.is_not(None), Agent.is_active == True).limit(1)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
+    if not agent:
+        stmt = select(Agent).where(Agent.is_active == True).limit(1)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
+    tg_client = TelegramClient(token=agent.telegram_bot_token if agent and agent.telegram_bot_token else None)
 
     # 0. Handle Inline Mode Search Queries (bots/inline) — "@botname <query>",
     # either from another chat or via a switch_inline_query_current_chat
@@ -62,29 +86,30 @@ async def handle_telegram_webhook(
         iq_id = iq.get("id")
         query_text = (iq.get("query") or "").strip()
 
-        if not query_text:
-            await tg_client.answer_inline_query(iq_id, results=[])
-        else:
-            from app.commerce.catalog_provider import CatalogManager
-            from app.commerce.storage.manager import StorageManager
-            from app.schemas.bot_response import ProductCard
+        from app.commerce.catalog_provider import CatalogManager
+        from app.commerce.storage.manager import StorageManager
+        from app.schemas.bot_response import ProductCard
 
+        if not query_text:
+            products = await CatalogManager.get_featured_products(db, limit=10)
+        else:
             products = await CatalogManager.search_products(db, query=query_text, limit=10)
-            storage_ok = StorageManager.is_configured()
-            cards = [
-                ProductCard(
-                    id=p.id,
-                    title=p.title,
-                    description=p.description,
-                    price=p.price,
-                    currency=p.currency,
-                    image_url=p.image_url if storage_ok else None,
-                    buy_action_id=f"cart_add_{p.id}",
-                )
-                for p in products
-            ]
-            results = TelegramRenderer.inline_query_results(cards)
-            await tg_client.answer_inline_query(iq_id, results=results)
+
+        storage_ok = StorageManager.is_configured()
+        cards = [
+            ProductCard(
+                id=p.id,
+                title=p.title,
+                description=p.description,
+                price=p.price,
+                currency=p.currency,
+                image_url=p.image_url if storage_ok else None,
+                buy_action_id=f"cart_add_{p.id}",
+            )
+            for p in products
+        ]
+        results = TelegramRenderer.inline_query_results(cards)
+        await tg_client.answer_inline_query(iq_id, results=results)
 
         return {"ok": True}
 
@@ -110,35 +135,39 @@ async def handle_telegram_webhook(
         )
         rendered = TelegramRenderer.render(flow_res)
 
-        # Product cards can't be edited in-place onto an existing text message —
-        # send a fresh media-group album + its own buy-buttons message, then
-        # fall through to the normal edit-or-send text path for the rest.
+        # If product cards with images are present, send the media album first,
+        # then send the main catalog text with buttons below the album.
         if rendered["photo_items"]:
             album = TelegramRenderer.product_album(rendered["photo_items"])
             if album["media_items"]:
                 await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
-            await tg_client.send_inline_buttons(chat_id=chat_id, text=album["actions_text"], buttons=album["actions_keyboard"])
 
-        # Edit the existing message in-place for a clean, app-like experience
-        edit_success = False
-        if message_id and chat_id:
-            try:
-                res = await tg_client.edit_inline_buttons(
-                    chat_id=chat_id,
-                    message_id=message_id,
-                    text=rendered["text"],
-                    buttons=rendered["inline_keyboard"],
-                )
-                if res.get("ok"):
-                    edit_success = True
-            except Exception as e:
-                logger.warning(f"In-place message edit failed, will send fresh message: {e}")
+            if chat_id:
+                if rendered["inline_keyboard"]:
+                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                else:
+                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+        else:
+            # When no photos are present, edit the existing message in-place for a clean single-message UI
+            edit_success = False
+            if message_id and chat_id:
+                try:
+                    res = await tg_client.edit_inline_buttons(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=rendered["text"],
+                        buttons=rendered["inline_keyboard"],
+                    )
+                    if res.get("ok"):
+                        edit_success = True
+                except Exception as e:
+                    logger.warning(f"In-place message edit failed, will send fresh message: {e}")
 
-        if not edit_success and chat_id:
-            if rendered["inline_keyboard"]:
-                await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
-            else:
-                await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+            if not edit_success and chat_id:
+                if rendered["inline_keyboard"]:
+                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                else:
+                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
 
         # Track interactive button action telemetry
         telemetry_client.track(
@@ -235,6 +264,7 @@ async def handle_telegram_webhook(
                     customer_identifier=user_id,
                     user_message=text,
                     customer_name=customer_name,
+                    agent=agent,
                 )
                 sent_reply_text = ai_resp.text
                 await _deliver(tg_client, chat_id, ai_resp)

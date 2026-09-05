@@ -12,11 +12,14 @@ class Settings(BaseSettings):
 
     # Application
     APP_NAME: str = "AICB Assistant"
+    APP_VERSION: str = "0.2.1"
+    APP_SECRET: Optional[str] = None
     ENVIRONMENT: Literal["development", "production"] = "development"
     DEBUG: bool = True
     PORT: int = 8422
     HOST: str = "0.0.0.0"
-    BOT_DOMAIN: Optional[str] = None  # e.g. https://aicb.sannex.ng — used for callback URLs
+    AICB_DOMAIN: Optional[str] = None  # e.g. https://aicb.sannex.ng — used for callback URLs & webhooks
+    BOT_DOMAIN: Optional[str] = None  # Alias for backward compatibility
 
     # Bot Operating Mode: 'conversational' | 'interactive_flow' | 'hybrid'
     BOT_MODE: Literal["conversational", "interactive_flow", "hybrid"] = "hybrid"
@@ -88,8 +91,7 @@ class Settings(BaseSettings):
     DEFAULT_PAYMENT_GATEWAY: Literal["paystack", "flutterwave", "monnify", "stripe"] = "paystack"
     PAYSTACK_SECRET_KEY: Optional[str] = None
     PAYSTACK_PUBLIC_KEY: Optional[str] = None
-    PAYSTACK_CALLBACK_URL: str = ""  # Auto-derived from BOT_DOMAIN if empty
-    BOT_DOMAIN: str = "https://aicb.sannex.ng"
+    PAYSTACK_CALLBACK_URL: str = ""  # Auto-derived from AICB_DOMAIN if empty
     FLUTTERWAVE_SECRET_KEY: Optional[str] = None
     FLUTTERWAVE_PUBLIC_KEY: Optional[str] = None
     FLUTTERWAVE_SECRET_HASH: Optional[str] = None
@@ -117,13 +119,6 @@ class Settings(BaseSettings):
     R2_BUCKET_NAME: Optional[str] = None
     R2_PUBLIC_URL: Optional[str] = None
 
-    # Dashboard-facing auth: verifies inbound calls FROM agentOS (catalog
-    # reads/writes, gateway-info, order lists, image uploads). Set this to
-    # the exact same value as this bot's `api_key` in agentOS's client_bots
-    # table (shown with a copy button in the bot's Identity settings) — a
-    # plain shared secret, no rotation/exchange flow, same as every other
-    # credential in this file. Distinct from SANNEX_API_KEY below, which is
-    # the OPPOSITE direction (aicb authenticating itself TO agentOS for sync).
     AICB_API_KEY: Optional[str] = None
 
     # Sannex Agent Telemetry & AgentOS Sync
@@ -132,6 +127,11 @@ class Settings(BaseSettings):
     SYNC_INTERVAL_MINUTES: int = 30
     SYNC_INTERVAL_HOURS: Optional[int] = None
     ENABLE_TELEMETRY: bool = True
+
+    def model_post_init(self, __context) -> None:
+        domain = self.AICB_DOMAIN or self.BOT_DOMAIN or "https://aicb.sannex.ng"
+        self.AICB_DOMAIN = domain
+        self.BOT_DOMAIN = domain
 
 
 settings = Settings()

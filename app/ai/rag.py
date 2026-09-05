@@ -1,11 +1,12 @@
 import json
 import math
 import re
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.knowledge import KnowledgeDoc
 from app.core.logger import logger
+from app.core.access import filter_items_by_access_tags
 
 
 def _tokenize(text: str) -> List[str]:
@@ -54,6 +55,7 @@ class RAGEngine:
         query: str,
         top_k: int = 3,
         query_embedding: Optional[List[float]] = None,
+        allowed_access_tags: Optional[Set[str]] = None,
     ) -> str:
         """Retrieves top relevant knowledge base chunks for a user query."""
         if not query.strip():
@@ -61,7 +63,10 @@ class RAGEngine:
 
         stmt = select(KnowledgeDoc)
         result = await db.execute(stmt)
-        docs = result.scalars().all()
+        docs = list(result.scalars().all())
+
+        if allowed_access_tags is not None:
+            docs = filter_items_by_access_tags(docs, allowed_access_tags, tag_attr="access_tags_json")
 
         if not docs:
             return ""

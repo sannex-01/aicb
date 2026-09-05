@@ -1,6 +1,7 @@
 import json
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Request, Response, Depends, Header, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
@@ -73,13 +74,30 @@ async def handle_whatsapp_message(
     except Exception:
         return {"status": "ok"}
 
-    wa_client = WhatsAppClient()
-
     # Iterate through WhatsApp payload structure
     for entry in data.get("entry", []):
         for change in entry.get("changes", []):
             value = change.get("value", {})
+            phone_number_id = value.get("metadata", {}).get("phone_number_id")
             messages = value.get("messages", [])
+
+            # Dynamic Agent Resolution
+            from app.models.agent import Agent
+            agent = None
+            if phone_number_id:
+                stmt = select(Agent).where(Agent.whatsapp_phone_id == phone_number_id, Agent.is_active == True)
+                res = await db.execute(stmt)
+                agent = res.scalar_one_or_none()
+
+            if not agent:
+                stmt = select(Agent).where(Agent.is_active == True).limit(1)
+                res = await db.execute(stmt)
+                agent = res.scalar_one_or_none()
+
+            wa_client = WhatsAppClient(
+                token=agent.whatsapp_token if agent and agent.whatsapp_token else None,
+                phone_number_id=phone_number_id or (agent.whatsapp_phone_id if agent and agent.whatsapp_phone_id else None),
+            )
 
             for msg in messages:
                 wa_id = msg.get("from")
@@ -154,15 +172,29 @@ async def handle_whatsapp_message(
                             customer_identifier=wa_id,
                             user_message=user_text,
                             customer_name=customer_name,
+                            agent=agent,
                         )
                         await _deliver(wa_client, wa_id, ai_resp)
                     except Exception as e:
                         logger.warning(f"AI Orchestrator unavailable ({e}). Falling back to interactive menu buttons.")
-                        await wa_client.send_quick_reply_buttons(
-                            to=wa_id,
-                            body="👋 I received your message! Please select an option from our menu below:",
-                            buttons=MAIN_MENU_BUTTONS,
-                        )
+                        fallback_body = "👋 I received your message! Please select an option from our menu below:"
+                        if len(MAIN_MENU_BUTTONS) > 3:
+                            # WhatsApp quick-reply buttons cap at 3 — MAIN_MENU_BUTTONS
+                            # has more, so render as a list message instead (matches
+                            # WhatsAppRenderer's own >3-buttons convention).
+                            rows = [{"id": b["id"], "title": b["title"][:24]} for b in MAIN_MENU_BUTTONS[:10]]
+                            await wa_client.send_list_message(
+                                to=wa_id,
+                                body=fallback_body,
+                                button_text="Menu",
+                                sections=[{"title": "Options", "rows": rows}],
+                            )
+                        else:
+                            await wa_client.send_button_message(
+                                to=wa_id,
+                                body=fallback_body,
+                                buttons=MAIN_MENU_BUTTONS,
+                            )
 
                 # Track outgoing message telemetry
                 telemetry_client.track(

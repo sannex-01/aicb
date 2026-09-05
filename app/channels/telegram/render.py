@@ -16,6 +16,7 @@ def _inline_keyboard(buttons) -> Optional[List[List[Dict[str, str]]]]:
         return None
     rows: List[List[Dict[str, str]]] = []
     qty_row: List[Dict[str, str]] = []
+    product_row: List[Dict[str, str]] = []
     pending_pair: Optional[Dict[str, str]] = None
     ids_present = {b.id for b in buttons}
 
@@ -31,6 +32,9 @@ def _inline_keyboard(buttons) -> Optional[List[List[Dict[str, str]]]]:
     for b in buttons:
         btn_dict = _make(b)
         if b.id.startswith("qty_set_"):
+            if product_row:
+                rows.append(product_row)
+                product_row = []
             qty_row.append(btn_dict)
             if len(qty_row) >= 5:
                 rows.append(qty_row)
@@ -39,6 +43,16 @@ def _inline_keyboard(buttons) -> Optional[List[List[Dict[str, str]]]]:
         if qty_row:
             rows.append(qty_row)
             qty_row = []
+
+        if b.id.startswith("cart_add_"):
+            product_row.append(btn_dict)
+            if len(product_row) >= 2:
+                rows.append(product_row)
+                product_row = []
+            continue
+        if product_row:
+            rows.append(product_row)
+            product_row = []
 
         # If this button's id is one half of a known pair, and its partner
         # is also present in this response, hold it until the partner shows
@@ -59,6 +73,8 @@ def _inline_keyboard(buttons) -> Optional[List[List[Dict[str, str]]]]:
         rows.append([pending_pair])
     if qty_row:
         rows.append(qty_row)
+    if product_row:
+        rows.append(product_row)
     return rows
 
 
@@ -69,27 +85,19 @@ class TelegramRenderer:
     def render(resp: BotResponse) -> Dict[str, Any]:
         """Returns {"text": str, "inline_keyboard": Optional[list], "photo_items": List[ProductCard]}.
 
-        When product_cards are present, the caller should send them as one
-        media-group album (via product_album below) instead of the flattened
-        text — callers still get resp.text as a fallback/intro line.
+        Only product cards with valid image_urls are included in photo_items so
+        callers never attempt to render empty/phantom media albums.
         """
+        valid_photos = [card for card in resp.product_cards if card.image_url]
         return {
             "text": resp.text,
             "inline_keyboard": _inline_keyboard(resp.buttons),
-            "photo_items": resp.product_cards,
+            "photo_items": valid_photos,
         }
 
     @staticmethod
     def product_album(cards: List[ProductCard]) -> Dict[str, Any]:
-        """Renders up to 10 ProductCards as one swipeable sendMediaGroup album,
-        plus a follow-up text+inline-keyboard message for the buy actions.
-
-        Telegram's media-group items can't carry per-item buttons, so the
-        album (images + captions only) and the action buttons are two
-        separate messages — the caller sends the album first, then this
-        "actions" message right after, so the buttons still read as "for the
-        album above" in the chat.
-        """
+        """Renders up to 10 ProductCards with images as one swipeable sendMediaGroup album."""
         media_items = [
             {
                 "photo_url": card.image_url,
@@ -99,52 +107,45 @@ class TelegramRenderer:
             for card in cards[:10]
             if card.image_url
         ]
-
-        # One "Buy" button per card, 2 per row, so a 10-product album still
-        # fits in a reasonably short keyboard instead of one button per row.
-        buy_buttons = [{"text": f"🛒 {card.title[:24]}", "callback_data": card.buy_action_id} for card in cards[:10]]
-        rows = [buy_buttons[i:i + 2] for i in range(0, len(buy_buttons), 2)]
-        rows.append([{"text": "🛒 View Cart", "callback_data": "flow_view_cart"}])
-
         return {
             "media_items": media_items,
-            "actions_text": "👆 Swipe through the photos above, then tap below to buy:",
-            "actions_keyboard": rows,
         }
 
     @staticmethod
     def inline_query_results(cards: List[ProductCard]) -> List[Dict[str, Any]]:
         """Renders ProductCards as Telegram inline-query results (bots/inline)
-        for @botname <search> product search. Each result posts a normal
-        photo+caption message into the chat carrying a real "Buy Now" inline
-        button — same buy_action_id used everywhere else — rather than a
-        bare action string, since inline-selected messages are sent as if
-        the user typed them and would otherwise look like raw text."""
+        for @botname <search> product search. Works reliably for all products
+        (whether images exist or not) using Telegram's article format with
+        rich inline Buy Now & View Cart buttons."""
         results = []
         for card in cards[:50]:
-            if not card.image_url:
-                continue
-            caption = f"*{card.title}* — {card.price:,.2f} {card.currency}"
+            caption = f"🛍️ *{card.title}* — {card.price:,.2f} {card.currency}"
             if card.description:
                 caption += f"\n_{card.description}_"
-            results.append(
-                {
-                    "type": "photo",
-                    "id": f"prod_{card.id}",
-                    "photo_url": card.image_url,
-                    "thumbnail_url": card.image_url,
-                    "title": card.title,
-                    "description": f"{card.price:,.2f} {card.currency}",
-                    "caption": caption,
+            caption += "\n\n👉 Tap below to buy or view your cart:"
+
+            item_dict: Dict[str, Any] = {
+                "type": "article",
+                "id": f"prod_{card.id}",
+                "title": f"{card.title} — {card.price:,.2f} {card.currency}",
+                "description": card.description or f"Price: {card.price:,.2f} {card.currency}",
+                "input_message_content": {
+                    "message_text": caption,
                     "parse_mode": "Markdown",
-                    "reply_markup": {
-                        "inline_keyboard": [
-                            [
-                                {"text": "🛒 Buy Now", "callback_data": card.buy_action_id},
-                                {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
-                            ]
+                },
+                "reply_markup": {
+                    "inline_keyboard": [
+                        [
+                            {"text": f"🛒 Buy {card.title[:20]}", "callback_data": card.buy_action_id},
+                            {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
                         ]
-                    },
-                }
-            )
+                    ]
+                },
+            }
+            if card.image_url:
+                item_dict["thumbnail_url"] = card.image_url
+                item_dict["thumb_width"] = 64
+                item_dict["thumb_height"] = 64
+
+            results.append(item_dict)
         return results

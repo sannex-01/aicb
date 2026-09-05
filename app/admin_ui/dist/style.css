@@ -1,0 +1,710 @@
+/* AICB Admin Design System — flat, structured, Shopify-Polaris-inspired.
+   Rule: no shadows or gradients anywhere except genuinely floating/overlay
+   elements (modals, toasts, the theme-toggle's active pill). Everything
+   else is flat color + a 1px border, matching the widget's own look. */
+
+:root {
+  --bg-app: #f6f6f7;
+  --bg-surface: #ffffff;
+  --bg-surface-elevated: #f4f4f5;
+  --bg-surface-hover: #f1f2f3;
+  --bg-sidebar: #fafafa;
+
+  --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+
+  --text-main: #202223;
+  --text-muted: #6d7175;
+  --text-subtle: #8c9196;
+
+  --shimmer-base: #eef0f1;
+  --shimmer-highlight: #f8f9fa;
+
+  /* Form & Input Tokens */
+  --input-bg: #ffffff;
+  --input-border: rgba(0, 0, 0, 0.12);
+  --input-border-hover: rgba(0, 0, 0, 0.24);
+  --input-border-focus: #1a1a1a;
+  --input-focus-ring: rgba(26, 26, 26, 0.08);
+  --input-placeholder: #8c9196;
+
+  /* Brand = near-black in light mode, near-white in dark mode, so it
+     always has enough contrast against the theme's own surfaces —
+     a flat hex here would go invisible on a dark background. */
+  --brand: #1a1a1a;
+  --brand-hover: #000000;
+  --brand-contrast: #ffffff;
+  --brand-tint: rgba(26, 26, 26, 0.08);
+}
+
+html.dark {
+  --bg-app: #0e1621;
+  --bg-surface: #17212b;
+  --bg-surface-elevated: #1e2937;
+  --bg-surface-hover: #242f3d;
+  --bg-sidebar: #131b24;
+
+  --shimmer-base: #1c2733;
+  --shimmer-highlight: #232f3d;
+
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.16);
+
+  --text-main: #f5f5f5;
+  --text-muted: #8393a3;
+  --text-subtle: #5a6d7f;
+
+  /* Form & Input Tokens (Telegram / Polaris Dark theme) */
+  --input-bg: #141f2d;
+  --input-border: rgba(255, 255, 255, 0.14);
+  --input-border-hover: rgba(255, 255, 255, 0.26);
+  --input-border-focus: #38bdf8;
+  --input-focus-ring: rgba(56, 189, 248, 0.18);
+  --input-placeholder: #5a6d7f;
+
+  --brand: #f5f5f5;
+  --brand-hover: #ffffff;
+  --brand-contrast: #14181f;
+  --brand-tint: rgba(245, 245, 245, 0.12);
+}
+
+/* Text selection highlight with high contrast across light & dark modes */
+::selection {
+  background-color: var(--brand);
+  color: var(--brand-contrast);
+}
+::-moz-selection {
+  background-color: var(--brand);
+  color: var(--brand-contrast);
+}
+
+/* Base resets handled by Tailwind, just some custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+}
+
+/* Card — flat surface, hairline border, no shadow, no hover elevation */
+.card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+/* Stat Card — same flat treatment, no lift-on-hover */
+.stat-card {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* Buttons — flat solid color, no gradient. Primary uses near-black
+   (no brand green — status colors like badge-emerald stay green since
+   those convey state, not identity) with a slightly darker border for
+   definition instead of a shadow. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  outline: none;
+  border: 1px solid transparent;
+}
+.btn-sm {
+  padding: 0.375rem 0.75rem;
+  font-size: 0.75rem;
+}
+.btn-icon {
+  padding: 0.5rem;
+}
+
+.btn-primary {
+  background: var(--brand);
+  color: var(--brand-contrast);
+  border-color: var(--brand);
+}
+.btn-primary:hover {
+  background: var(--brand-hover);
+  border-color: var(--brand-hover);
+}
+
+.btn-secondary {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+.btn-secondary:hover {
+  background-color: var(--bg-surface-hover);
+}
+
+.btn-danger {
+  background-color: transparent;
+  color: #d72c0d;
+  border-color: rgba(215, 44, 13, 0.35);
+}
+.btn-danger:hover {
+  background-color: #d72c0d;
+  color: white;
+  border-color: #d72c0d;
+}
+
+/* Forms & Controls */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+}
+.form-label {
+  font-size: 0.725rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.form-control {
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-main);
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+}
+.form-control::placeholder {
+  color: var(--input-placeholder);
+  opacity: 1;
+}
+.form-control:hover:not(:focus):not(:disabled) {
+  border-color: var(--input-border-hover);
+}
+.form-control:focus {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+  background-color: var(--input-bg);
+}
+.form-control:disabled,
+.form-control:read-only {
+  opacity: 0.65;
+  cursor: not-allowed;
+  background-color: var(--bg-surface-elevated);
+}
+
+/* Fallback / Native Select styling with clean custom SVG chevron */
+select.form-control {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  padding-right: 2.25rem;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238c9196' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.75rem center;
+  background-size: 14px 14px;
+  cursor: pointer;
+}
+html.dark select.form-control {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238393a3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+select.form-control option {
+  background-color: var(--bg-surface);
+  color: var(--text-main);
+  padding: 8px 12px;
+}
+
+/* ============================================================================
+   CUSTOM SELECT COMPONENT STYLING
+   ============================================================================ */
+.custom-select {
+  position: relative;
+  width: 100%;
+  user-select: none;
+}
+.custom-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-main);
+  padding: 0.55rem 0.75rem;
+  border-radius: 7px;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+.custom-select-trigger:hover:not(.disabled) {
+  border-color: var(--input-border-hover);
+}
+.custom-select.open .custom-select-trigger,
+.custom-select-trigger:focus {
+  outline: none;
+  border-color: var(--input-border-focus);
+  box-shadow: 0 0 0 3px var(--input-focus-ring);
+}
+.custom-select-trigger.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--bg-surface-elevated);
+}
+.custom-select-value {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+.custom-select-value .placeholder {
+  color: var(--input-placeholder);
+}
+.custom-select-icon {
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+.custom-select.open .custom-select-icon {
+  transform: rotate(180deg);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.15);
+  max-height: 250px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: selectDropdownIn 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.custom-select.drop-up .custom-select-dropdown {
+  top: auto;
+  bottom: calc(100% + 4px);
+  animation: selectDropdownInUp 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes selectDropdownIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes selectDropdownInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.custom-select-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--bg-surface-elevated);
+  flex-shrink: 0;
+}
+.custom-select-search-input {
+  width: 100%;
+  padding: 0.35rem 0.6rem;
+  font-size: 0.75rem;
+  background-color: var(--input-bg);
+  border: 1px solid var(--input-border);
+  color: var(--text-main);
+  border-radius: 5px;
+  outline: none;
+  box-sizing: border-box;
+}
+.custom-select-search-input:focus {
+  border-color: var(--input-border-focus);
+}
+
+.custom-select-options {
+  overflow-y: auto;
+  padding: 0.25rem;
+  flex: 1;
+}
+.custom-select-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.45rem 0.65rem;
+  font-size: 0.8125rem;
+  border-radius: 5px;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+.custom-select-option:hover,
+.custom-select-option.highlighted {
+  background-color: var(--bg-surface-hover);
+}
+.custom-select-option.selected {
+  background-color: var(--brand-tint);
+  font-weight: 600;
+}
+.custom-select-option .option-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+  flex: 1;
+}
+.custom-select-option .option-check {
+  color: var(--brand);
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  display: none;
+}
+.custom-select-option.selected .option-check {
+  display: block;
+}
+.custom-select-empty {
+  padding: 0.75rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Badges — flat tint, no border-radius-full pill exaggeration beyond
+   Shopify's own small pill shape */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.badge-emerald { background-color: rgba(0, 128, 96, 0.12); color: #008060; }
+.badge-amber { background-color: rgba(245, 158, 11, 0.12); color: #b45309; }
+.badge-rose { background-color: rgba(215, 44, 13, 0.12); color: #d72c0d; }
+.badge-sky { background-color: rgba(14, 165, 233, 0.12); color: #0369a1; }
+.badge-subtle { background-color: var(--bg-surface-elevated); color: var(--text-muted); border: 1px solid var(--border-subtle); }
+.badge-brand { background-color: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-subtle); }
+
+/* Modals & Toasts — the ONE place elevation/shadow is legitimate, since
+   these are genuinely floating above the page. */
+#modal-root {
+  position: relative;
+  z-index: 9999;
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9999;
+}
+.modal-dialog {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  bottom: 1rem;
+  z-index: 10000;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.18);
+  animation: slideInRightModal 0.2s ease-out;
+  overflow: hidden;
+}
+.modal-dialog > form,
+.modal-center-dialog > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  justify-content: space-between;
+}
+.modal-center-dialog {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 10000;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  width: calc(100% - 2rem);
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+  animation: scaleInModal 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow: hidden;
+}
+@keyframes scaleInModal {
+  from { opacity: 0; transform: translate(-50%, -48%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+.modal-header { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--border-subtle); display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; }
+.modal-footer { padding: 1.25rem 1.5rem; border-top: 1px solid var(--border-subtle); display: flex; justify-content: flex-end; gap: 0.75rem; background-color: var(--bg-surface-elevated); border-bottom-left-radius: 8px; border-bottom-right-radius: 8px; flex-shrink: 0; margin-top: auto; }
+
+.code-preview {
+  background-color: var(--bg-app);
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  color: var(--text-main);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  overflow-x: auto;
+}
+
+.toast {
+  padding: 0.875rem 1.125rem;
+  border-radius: 6px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.16);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  animation: slideInRight 0.2s ease-out;
+  min-width: 300px;
+}
+.toast-success i { color: #008060; }
+.toast-error i { color: #d72c0d; }
+
+@keyframes slideInRight { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+@keyframes slideInRightModal { from { opacity: 0; transform: translateX(24px); } to { opacity: 1; transform: translateX(0); } }
+
+/* Shimmer skeletons — used as the loading state on every page instead of
+   plain "Loading..." text. */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--shimmer-base) 25%, var(--shimmer-highlight) 50%, var(--shimmer-base) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+  border-radius: 4px;
+}
+.shimmer-line { height: 0.75rem; }
+.shimmer-block { border-radius: 8px; }
+
+/* Tables — denser padding, visible header row, hairline row dividers,
+   matching Shopify's resource-list density rather than a spacious
+   app-dashboard feel. */
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+.data-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.8125rem;
+}
+.data-table th {
+  text-align: left;
+  padding: 0.625rem 0.875rem;
+  font-weight: 600;
+  color: var(--text-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6875rem;
+  background-color: var(--bg-surface-elevated);
+}
+.data-table td {
+  padding: 0.75rem 0.875rem;
+  color: var(--text-main);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.data-table tbody tr:hover td {
+  background-color: var(--bg-surface-hover);
+}
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ============================================================================
+   SELECTABLE CARD COMPONENT (Single / Multi-Select with entire card click)
+   ============================================================================ */
+.select-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.625rem;
+  width: 100%;
+}
+
+.select-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 9px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-strong);
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+  text-align: left;
+  outline: none;
+}
+
+.select-card:hover {
+  background-color: var(--bg-surface-hover);
+  border-color: var(--input-border-hover);
+}
+
+.select-card:focus-within {
+  border-color: var(--input-border-focus);
+}
+
+/* Hidden native input, perfectly accessible */
+.select-card input[type="checkbox"],
+.select-card input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  pointer-events: none;
+}
+
+/* Custom sleek check indicator */
+.select-card-indicator {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  border: 1.5px solid var(--border-strong);
+  background-color: var(--input-bg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  color: var(--brand-contrast);
+}
+
+.select-card.radio .select-card-indicator {
+  border-radius: 50%;
+}
+
+.select-card-indicator svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 3;
+  transform: scale(0);
+  transition: transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Active / Checked State */
+.select-card:has(input:checked),
+.select-card.is-selected {
+  background-color: var(--brand-tint);
+  border-color: var(--brand);
+  box-shadow: 0 0 0 1px var(--brand);
+}
+
+html.dark .select-card:has(input:checked),
+html.dark .select-card.is-selected {
+  background-color: rgba(56, 189, 248, 0.08);
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 1px #38bdf8;
+}
+
+.select-card:has(input:checked) .select-card-indicator,
+.select-card.is-selected .select-card-indicator {
+  background-color: var(--brand);
+  border-color: var(--brand);
+}
+
+html.dark .select-card:has(input:checked) .select-card-indicator,
+html.dark .select-card.is-selected .select-card-indicator {
+  background-color: #38bdf8;
+  border-color: #38bdf8;
+  color: #0e1621;
+}
+
+.select-card:has(input:checked) .select-card-indicator svg,
+.select-card.is-selected .select-card-indicator svg {
+  transform: scale(1);
+}
+
+.select-card-content {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.select-card-title {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-main);
+  line-height: 1.3;
+}
+
+.select-card-desc {
+  font-size: 0.725rem;
+  color: var(--text-muted);
+  line-height: 1.35;
+}
+
+.select-card-meta {
+  margin-top: 0.25rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.6875rem;
+}
+

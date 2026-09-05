@@ -1,19 +1,51 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-aicb_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aicb_dev_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-aicb_dev}
+    ports:
+      # Exposed on the host too, in case you want to inspect it directly
+      # with psql or a GUI client during development.
+      - "5433:5432"
+    volumes:
+      - aicb_dev_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aicb_user} -d ${POSTGRES_DB:-aicb_dev}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   aicb:
-    build: .
-    container_name: aicb-engine
+    build:
+      context: .
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
       - "${AICB_PORT:-8422}:8000"
     env_file:
       - .env
+    environment:
+      ENVIRONMENT: development
+      DEBUG: "true"
+      PORT: 8000
+      HOST: 0.0.0.0
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-aicb_user}:${POSTGRES_PASSWORD:-aicb_dev_pass}@postgres:5432/${POSTGRES_DB:-aicb_dev}"
     volumes:
+      # Hot-reload: local source changes reflect without rebuilding the image.
       - ./app:/app/app
-      - ./aicb.db:/app/aicb.db
-      - ../sannex-agent/packages/python/sannex_agent:/app/sannex_agent
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 10s
+      start_period: 15s
+
+volumes:
+  aicb_dev_pgdata:

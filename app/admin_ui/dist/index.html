@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AICB Admin — Multi-Agent Studio & Business Portal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/_/admin/style.css" />
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+          },
+          colors: {
+            // Reads from CSS vars (not a flat hex) since brand flips from
+            // near-black in light mode to near-white in dark mode — a
+            // static value would go invisible against a dark sidebar/modal.
+            brand: 'var(--brand)',
+            brandHover: 'var(--brand-hover)',
+            'brand-contrast': 'var(--brand-contrast)',
+            app: 'var(--bg-app)',
+            surface: 'var(--bg-surface)',
+            'surface-elevated': 'var(--bg-surface-elevated)',
+            'surface-hover': 'var(--bg-surface-hover)',
+            sidebar: 'var(--bg-sidebar)',
+            subtle: 'var(--border-subtle)',
+            faint: 'var(--text-subtle)',
+            main: 'var(--text-main)',
+            muted: 'var(--text-muted)',
+            // Status colors — kept distinct from brand, since these convey
+            // state (success/error/warning/info) not identity.
+            emerald: '#008060',
+            rose: '#d72c0d',
+            amber: '#b45309',
+            sky: '#0369a1',
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-app text-main font-sans antialiased selection:bg-brand selection:text-brand-contrast">
+  <div id="app" class="min-h-screen flex flex-col">
+    <!-- App rendered dynamically by app.js -->
+  </div>
+
+  <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+  <div id="modal-root"></div>
+
+  <script type="module" src="/_/admin/js/main.js"></script>
+</body>
+</html>

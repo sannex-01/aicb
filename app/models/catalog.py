@@ -17,6 +17,11 @@ class CatalogItem(Base):
     image_url = Column(String(500), nullable=True)
     in_stock = Column(Boolean, default=True)
     stock_quantity = Column(Integer, default=100)
+    
+    # Access Group Scoping: JSON array of group IDs e.g. [1, 2]. Empty [] = globally accessible to all agents.
+    access_group_ids_json = Column(Text, default="[]")
+    access_tags_json = Column(Text, default="[]")
+    
     metadata_json = Column(Text, default="{}")
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

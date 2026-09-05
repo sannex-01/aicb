@@ -1,74 +1,66 @@
 # AICB (AI Conversational Business Bot Engine)
 
-A modular, lightweight, and production-ready AI & Interactive Step Chatbot engine designed for WhatsApp Cloud API, Telegram, and an embeddable Website Widget, with Unified Commerce (Bumpa, Paystack, Flutterwave, Monnify, Stripe).
+A modular, lightweight, and production-ready AI & Interactive Step Chatbot engine designed for WhatsApp Cloud API, Telegram, and an embeddable Website Widget, with Conversational Commerce powered by Paystack and Bumpa.
 
 ---
 
-## Two ways to run AICB
+## Architecture & Deployment
 
-AICB supports two deployment modes on the exact same codebase — pick one per instance.
+AICB runs as a standalone, autonomous conversational commerce hub with a built-in Single-Page Admin UI at **`/_/admin`**, paired seamlessly with [AgentOS](https://agentos.aicb.sannex.ng) for documentation, official releases, and telemetry.
 
-### 1. AgentOS-connected (one instance per bot)
+### 1. Standalone Multi-Agent Instance
 
-The classic mode: one AICB instance is paired 1:1 with a bot managed from [AgentOS](https://agentos.aicb.sannex.ng)'s dashboard. AgentOS syncs the bot's system prompt, model settings, catalog, and knowledge base into AICB automatically every 30 minutes (and on-demand via `POST /api/v1/sync`) — you don't touch AICB's own config for day-to-day bot management. AICB authenticates itself to AgentOS with `SANNEX_API_KEY`; AgentOS authenticates its own calls back into AICB (catalog edits, image uploads, order lookups) with `AICB_API_KEY`, a shared secret you copy from that bot's Identity settings in AgentOS.
+A single AICB instance runs its own complete admin studio at **`/_/admin`**, backed entirely by its database (SQLite in development, PostgreSQL in production):
 
-Channel credentials (WhatsApp/Telegram tokens) are set in AgentOS's own bot settings, not in AICB's `.env` — AgentOS syncs them down the same way it syncs the prompt and catalog.
+- **First-Run Onboarding (`/_/admin/setup`)**: Instantly creates the Super Admin account and business profile with store currency and brand assets.
+- **Multi-Agent Studio (`/_/admin/agents`)**: Deploy multiple distinct AI personas on the same deployment. Each agent can configure its own system prompt, LLM provider (Google Gemini, OpenAI, Groq, Anthropic), model parameters, access groups, and messaging channel credentials.
+- **Messaging Channels**:
+  - **WhatsApp Cloud API**: Interactive buttons, list pickers, carousels, and encrypted Meta flows.
+  - **Telegram Bot**: Automated webhook registration upon agent creation, inline secret token rotators, and interactive keyboards.
+  - **Website Widget**: Embeddable single-line script tag (`<script src="https://aicb.sannex.ng/widget.js" data-bot-id="default" async></script>`).
+- **Unified Commerce & Payments**: Direct integration with **Paystack** for automated checkout generation and instant order confirmations across conversations.
+- **Knowledge Base (RAG) & Catalog**: In-process hybrid BM25 + vector search and catalog scoping via access tags and access groups.
+- **Platform API Keys**: One-click generation and instant rotation for secure programmatic API access (`aicb_live_...`).
 
-### 2. Standalone (one instance per business, multiple agents)
+### 2. Sannex AgentOS Hub Integration
 
-For businesses that don't use AgentOS: a single AICB instance runs its own admin dashboard at **`/_/admin`**, backed entirely by its own database — no AgentOS required. On first boot, visiting `/_/admin` redirects to a one-time setup wizard (`/_/admin/setup`) that creates your Super Admin account and business profile; every other operation goes through `/_/admin/login` after that.
-
-A standalone instance can run **multiple AI agents** at once, each with its own persona (`system_prompt`), model/provider/temperature, and its own independent WhatsApp/Telegram credentials — so one deployment can serve several distinct bots (e.g. a sales agent and a support agent) that share the same product catalog and knowledge base but see different slices of it via **access tags** and **access groups**. Incoming WhatsApp messages route to the right agent automatically by matching the message's `phone_number_id`; incoming Telegram messages route by the `/api/v1/webhooks/telegram/{agent_id}` path or by bot token.
-
-The dashboard also holds a **Customers directory** (cross-channel order history and profiles) and **platform API key rotation** — the standalone equivalent of `AICB_API_KEY`, but platform-generated (`aicb_live_...`), hashed at rest, and rotatable with one click instead of a value you paste into `.env` yourself.
-
-> **Status:** the standalone admin dashboard is newer and under active development — check `git log` on `app/api/`, `app/admin_ui/`, and `app/models/{business,user,agent,access_group}.py` before assuming a given screen is finished. The AgentOS-connected mode is the long-established, stable path.
-
-### Which env vars matter for which mode
-
-See the fully-commented [.env.example](.env.example) — every section is labeled with which mode it applies to. In short: **neither mode puts WhatsApp/Telegram tokens in `.env`** — they're always set per agent, in whichever dashboard you're using (standalone: `/_/admin`; AgentOS-connected: AgentOS itself). Infra-level settings (LLM provider keys, database, payments, image storage, webhook-level secrets like `META_APP_SECRET`) are shared by both modes and always come from `.env`.
+- **Releases & Documentation**: Release notes and updates are fetched directly from the open-source AgentOS hub (`https://agentos.aicb.sannex.ng/releases`) and rendered within AICB's floating sidebar releases drawer.
+- **Telemetry & Feedback**: Asynchronous background telemetry powered by the `sannex-agent` SDK.
 
 ---
 
 ## Key Features
 
-1. **Multi-Channel Interaction**:
-   - **WhatsApp Cloud API**: Text messages, Quick-Reply Interactive Buttons, List Pickers, a free-form Interactive Media Carousel for browsing multiple products (swipeable image cards, no Meta Commerce Catalog required), and Interactive Flows (`flow_crypto.py` with RSA/AES encryption).
-   - **Telegram**: Text messages, Inline Keyboards, a swipeable product photo album (`sendMediaGroup`) for browsing multiple products, Native In-App Invoices, and **inline mode** (`@yourbot <search term>`, from any chat or via a switch-to-inline button in the current one) for quick product search.
-   - **Website Widget**: Embeddable `<script>` chat widget with product cards, buttons, formatted (bold/italic/list) message rendering, an expand/collapse size toggle, and checkout handoff.
-   - **Slack & Fallback**: Human escalation dispatch to Slack webhooks, and automated customer support contact cards.
+1. **Messaging Channels**:
+   - **WhatsApp Cloud API**: Text messages, Quick-Reply Interactive Buttons, List Pickers, Interactive Media Carousels, and Interactive WhatsApp Flows.
+   - **Telegram**: Text messages, Inline Keyboards, automatic webhook synchronization (`setWebhook`), and in-place secret token rotators.
+   - **Website Widget**: Lightweight embeddable chat widget with product card browsing, responsive drawer, dark/light theme, and direct checkout handoff.
+   - **Slack Escalation**: Seamless handoff to human agents via Slack incoming webhooks.
 
 2. **Multi-LLM Provider Engine**:
-   - Out-of-the-box support for **Google Gemini**, **OpenAI GPT**, and **Anthropic Claude**.
-   - In AgentOS-connected mode, runtime parameters (`temperature`, `model_name`, `max_tokens`, `system_prompt`) sync automatically from AgentOS with no server restart. In standalone mode, each Agent's settings live in AICB's own database and are edited directly in `/_/admin`.
-   - Any agent can override the global API key with its own (`api_key_override`); otherwise it falls back to the matching `*_API_KEY` in `.env`.
+   - Out-of-the-box support for **Google Gemini**, **OpenAI GPT**, **Groq**, and **Anthropic Claude**.
+   - Model parameters (`temperature`, `model_name`, `max_tokens`, `system_prompt`) configured per agent.
+   - Per-agent API key overrides or centralized `.env` fallback.
 
-3. **Multi-Source Catalog Manager**:
-   - Syncs and serves product/service catalogs from:
-     - **Paystack Products API** (`/product`)
-     - **Bumpa E-Commerce Store** (`/products`)
-     - **AgentOS / Local Database**
-   - Flexible multi-word product search (`CatalogManager.search_products`) ranks by how many distinct query words match, not just substring — finds "Wireless Blue Earbuds Pro" for a query like "blue wireless earbuds" even out of order.
-   - In standalone mode, catalog items and knowledge base docs can carry **access tags** so only agents with a matching tag (directly or via their access group) can see and recommend them; untagged items are public to every agent.
+3. **Multi-Source Catalog & Knowledge Base (RAG)**:
+   - Synchronizes products from **Paystack Products**, **Bumpa Store**, or local database.
+   - Smart multi-word keyword ranking (`CatalogManager.search_products`).
+   - Access-group tagging for restricted product visibility across specific agents.
+   - Grounded RAG document ingestion for accurate business FAQs and policies.
 
-4. **Unified Payment Gateway**:
-   - Generates checkout links and processes webhooks for **Paystack**, **Flutterwave**, **Monnify**, and **Stripe**.
-   - Automatically confirms orders upon payment receipt and notifies customers across WhatsApp or Telegram.
+4. **Paystack Payment Gateway**:
+   - Generates secure, instant checkout links and handles webhook events (`/api/v1/payments/webhook/paystack`).
+   - Multi-currency support (`NGN`, `USD`, `GHS`, `KES`, `ZAR`, `EUR`, `GBP`).
+   - Automatic order status confirmation and real-time customer messaging notifications upon payment receipt.
 
-5. **Customer Profiles & Pre-Checkout Collection**:
-   - Collects Full Name, Email, and Phone before checkout (pre-filled from WhatsApp/Telegram profile data where possible, always asked fresh on the widget), timeboxed to 10 minutes of inactivity before auto-cancelling.
-   - A standalone "My Profile" / "My Purchases" menu entry lets customers view/update their saved details and order history anytime, not just at checkout.
+5. **Customer Profiles & Order Tracking**:
+   - Pre-checkout customer detail collection (Name, Email, Phone).
+   - "My Purchases" and order status lookup directly from chat conversations.
+   - Customer directory in Admin UI with lifetime value and order history.
 
-6. **Self-Contained RAG & Memory**:
-   - In-process hybrid BM25 and vector similarity search over business knowledge documents and FAQs.
-   - Sliding-window conversation memory with configurable TTL auto-expiry (`SESSION_EXPIRY_HOURS`).
-
-7. **Sannex Agent Telemetry & 30m Sync Worker** *(AgentOS-connected mode)*:
-   - Asynchronous fire-and-forget telemetry queue with zero latency overhead.
-   - Automatic 30-minute background synchronization (plus manual `POST /api/v1/sync`) to pull updated prompts, catalogs, and knowledge bases from AgentOS.
-
-8. **Product Image Storage** *(optional)*:
-   - Cloudinary or Cloudflare R2 for product images, configured once in `.env` (shared across all agents on the instance). If left unconfigured, the product edit form simply won't ask for an image, and customers won't be sent a broken image link — everything else keeps working.
+6. **Interactive Overview & Setup Guide**:
+   - Onboarding milestone checklist on the dashboard overview (`/_/admin/overview`) with real-time completion tracking.
+   - Multi-Agent Studio empty state with instant agent creation wizards.
 
 ---
 
@@ -77,7 +69,7 @@ See the fully-commented [.env.example](.env.example) — every section is labele
 ### 1. Configure Environment
 ```bash
 cp .env.example .env
-# Edit .env — see the comments in .env.example for what each mode needs
+# Configure DATABASE_URL, APP_SECRET, and optional SANNEX_API_KEY
 ```
 
 ### 2. Run Pre-flight System Doctor
@@ -94,9 +86,8 @@ uvicorn app.main:app --port 8422 --reload
 docker compose up -d
 ```
 
-### 4. First run
-- **Standalone mode:** open [http://localhost:8422/_/admin](http://localhost:8422/_/admin) — you'll be redirected to the setup wizard to create your Super Admin account, business profile, and first agent.
-- **AgentOS-connected mode:** nothing to do here — make sure `AICB_API_KEY`/`SANNEX_API_KEY` are set, then manage the bot from AgentOS's dashboard as usual.
+### 4. First Run Onboarding
+Open [http://localhost:8422/_/admin](http://localhost:8422/_/admin) to complete the setup wizard and launch your AI agents.
 
 Open [http://localhost:8422/docs](http://localhost:8422/docs) to explore the interactive OpenAPI documentation.
 
@@ -107,19 +98,17 @@ Open [http://localhost:8422/docs](http://localhost:8422/docs) to explore the int
 | Service | Endpoint | Method |
 | :--- | :--- | :--- |
 | **WhatsApp Cloud API** | `/api/v1/webhooks/whatsapp` | `GET` (Challenge), `POST` (Updates) |
-| **Telegram Bot API** | `/api/v1/webhooks/telegram` or `/api/v1/webhooks/telegram/{agent_id}` | `POST` (Updates, Payments, Inline Queries) |
-| **Paystack** | `/api/v1/webhooks/payments/paystack` | `POST` (Charge events) |
-| **Flutterwave** | `/api/v1/webhooks/payments/flutterwave` | `POST` (Charge events) |
-| **Monnify** | `/api/v1/webhooks/payments/monnify` | `POST` (Transaction events) |
-| **Stripe** | `/api/v1/webhooks/payments/stripe` | `POST` (Checkout completed) |
-| **Bumpa** | `/api/v1/webhooks/bumpa` | `POST` (Product/Order updates) |
-| **Manual Sync** | `/api/v1/sync` | `POST` (Triggers AgentOS sync) |
-| **Standalone Setup** | `/api/v1/setup/status`, `/api/v1/setup/initialize` | `GET`, `POST` (First-run onboarding) |
-| **Standalone Admin Auth** | `/api/v1/auth/login`, `/api/v1/auth/me`, `/api/v1/auth/logout` | `POST`, `GET`, `POST` |
-| **Standalone Agents** | `/api/v1/agents` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
-| **Standalone Access Groups** | `/api/v1/access-groups` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
-| **Standalone Users** | `/api/v1/users` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
-| **Standalone Dashboard UI** | `/_/admin` | `GET` (SPA) |
+| **Telegram Bot API** | `/api/v1/webhooks/telegram` or `/api/v1/webhooks/telegram/{agent_id}` | `POST` (Updates & Commands) |
+| **Paystack Webhook** | `/api/v1/payments/webhook/paystack` | `POST` (Charge events) |
+| **Bumpa Webhook** | `/api/v1/webhooks/bumpa` | `POST` (Product/Order updates) |
+| **Manual Releases Sync** | `/api/v1/sync` | `POST` (Triggers AgentOS release sync) |
+| **Setup Wizard** | `/api/v1/setup/status`, `/api/v1/setup/initialize` | `GET`, `POST` (First-run onboarding) |
+| **Admin Auth** | `/api/v1/auth/login`, `/api/v1/auth/me`, `/api/v1/auth/logout` | `POST`, `GET`, `POST` |
+| **Multi-Agent CRUD** | `/api/v1/agents` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **Access Groups** | `/api/v1/access-groups` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **Team Accounts** | `/api/v1/users` | `GET`, `POST`, `PUT /{id}`, `DELETE /{id}` |
+| **Platform Settings** | `/api/v1/settings/profile`, `/api/v1/settings/payments` | `GET`, `PUT` |
+| **Admin Dashboard UI** | `/_/admin` | `GET` (SPA) |
 
 ---
 
@@ -129,36 +118,32 @@ Open [http://localhost:8422/docs](http://localhost:8422/docs) to explore the int
 aicb/
 ├── app/
 │   ├── main.py                     # FastAPI application & lifespan
-│   ├── admin_ui/                   # Standalone admin dashboard (SPA, served at /_/admin)
-│   ├── api/                        # Standalone mode REST API (setup, auth, users, agents, access groups, settings)
-│   ├── core/                       # Config, database, security (webhook verifiers, dashboard/JWT/platform-key auth), access-tag resolver
-│   ├── channels/                   # WhatsApp, Telegram, Slack, Website Widget endpoints
-│   ├── commerce/                   # CartManager, Catalog & Payments (Paystack, Flutterwave, Stripe), image storage
-│   ├── ai/                         # Multi-LLM providers, prompts, memory, RAG, tool calling
-│   ├── flows/                      # Deterministic 0-token fast-path button engine
-│   ├── telemetry/                  # Sannex telemetry dispatcher & 30m sync worker
-│   └── models/                     # SQLAlchemy models (Customer, Order, CatalogItem — plus BusinessProfile, AdminUser, Agent, AccessGroup for standalone mode)
+│   ├── admin_ui/                   # Standalone Admin SPA (served at /_/admin)
+│   │   └── dist/js/pages/          # Overview, Agents, Catalog, RAG, Orders, Users, Settings
+│   ├── api/                        # REST APIs (setup, auth, users, agents, access groups, settings, overview)
+│   ├── core/                       # Config, database, security (JWT, platform keys, webhook verifiers)
+│   ├── channels/                   # WhatsApp, Telegram, Slack, Website Widget handlers
+│   ├── commerce/                   # CartManager, Catalog & Paystack integration, image storage
+│   ├── ai/                         # Multi-LLM providers (Gemini, OpenAI, Groq, Claude), RAG & memory
+│   ├── flows/                      # Deterministic 0-token fast-path conversational engine
+│   ├── telemetry/                  # Sannex telemetry dispatcher & release sync worker
+│   └── models/                     # SQLAlchemy models (Customer, Order, CatalogItem, BusinessProfile, AdminUser, Agent, AccessGroup)
 ├── widget/                         # Embeddable website chat widget (Vite, builds to widget.js)
-├── ideas/                          # Local planning docs (gitignored — not part of the repo history)
 ├── doctor.py                       # Pre-flight diagnostic tool
 ├── Dockerfile                      # Production container image
 ├── docker-compose.yml              # Local development compose (port 8422)
-├── docker-compose.prod.yml         # Coolify production deployment stack
+├── docker-compose.prod.yml         # Production deployment stack
 ├── requirements.txt
 └── .env.example
 ```
 
 ---
 
-## Authentication model
-
-Four distinct, independent auth mechanisms exist — don't confuse them:
+## Authentication Model
 
 | Mechanism | Direction | Used for | Configured via |
 | :--- | :--- | :--- | :--- |
-| `AICB_API_KEY` | AgentOS → AICB | Dashboard calls into an AgentOS-connected instance (catalog, gateway-info, orders, image upload) | `.env`, matched against AgentOS's `client_bots.api_key` |
-| `SANNEX_API_KEY` | AICB → AgentOS | AICB pulling prompt/catalog/knowledge sync from AgentOS | `.env` |
-| `aicb_live_...` platform key | External caller → standalone AICB | Standalone-mode API access with no AgentOS present | Generated and rotated from `/_/admin` — never user-typed |
-| Admin JWT session | Browser → standalone AICB | `/_/admin` dashboard login sessions | Signed with `APP_SECRET`, issued by `/api/v1/auth/login` |
-
-Webhook signature verifiers (`verify_whatsapp_signature`, `verify_telegram_secret`, `verify_paystack_signature`, etc.) are a separate, fourth category — they authenticate inbound calls from Meta/Telegram/payment providers, not dashboard/API callers, and pass open (accept everything) when their corresponding secret is left unconfigured in development.
+| `aicb_live_...` platform key | External caller → AICB API | Programmatic API access | Generated and rotated from `/_/admin/settings` |
+| Admin JWT session | Browser → AICB Admin | `/_/admin` dashboard sessions | Signed with `APP_SECRET`, issued by `/api/v1/auth/login` |
+| `SANNEX_API_KEY` | AICB → AgentOS | Telemetry & Release Notes synchronization | `.env` |
+| Webhook Secrets | Provider → AICB | Meta, Telegram & Paystack verification | Verified cryptographically with rotation support |

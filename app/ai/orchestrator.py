@@ -15,8 +15,46 @@ from app.core.logger import logger
 from app.schemas.bot_response import BotResponse, ProductCard
 
 
+from app.models.agent import Agent
+from app.core.access import get_effective_agent_tags
+
+
 class AIOrchestrator:
     """Coordinates Multi-LLM inference, RAG context, sliding memory, and tool execution."""
+
+    @staticmethod
+    async def generate_agent_test_reply(
+        system_prompt: str,
+        user_message: str,
+        llm_provider: Optional[str] = "gemini",
+        model_name: Optional[str] = None,
+        temperature: float = 0.7,
+        max_tokens: int = 1000,
+        api_key_override: Optional[str] = None,
+    ) -> str:
+        provider_key = (llm_provider or settings.LLM_PROVIDER or "gemini").lower()
+        if provider_key == "anthropic":
+            provider_key = "claude"
+        elif provider_key == "groq":
+            provider_key = "openai"
+
+        try:
+            provider = get_llm_provider(provider_key, api_key=api_key_override)
+        except Exception:
+            provider = get_llm_provider("gemini", api_key=api_key_override)
+
+        messages = [
+            {"role": "user", "content": user_message}
+        ]
+
+        llm_response: LLMResponse = await provider.generate_response(
+            messages=messages,
+            system_prompt=system_prompt,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model_name=model_name,
+        )
+        return llm_response.content or "Hello! I am ready to assist you."
 
     @staticmethod
     async def process_message(
@@ -25,10 +63,11 @@ class AIOrchestrator:
         customer_identifier: str,
         user_message: str,
         customer_name: Optional[str] = None,
+        agent: Optional[Agent] = None,
     ) -> BotResponse:
         # 1. Get or create session & memory
         session = await MemoryManager.get_or_create_session(
-            db, channel=channel, customer_identifier=customer_identifier
+            db, channel=channel, customer_identifier=customer_identifier, agent_id=agent.id if agent else None
         )
 
         # 2. Check for dynamic config overrides synced from AgentOS
@@ -36,13 +75,32 @@ class AIOrchestrator:
         res = await db.execute(stmt)
         overrides = {row.key: row.value for row in res.scalars().all()}
 
-        provider_name = overrides.get("llm_provider", settings.LLM_PROVIDER)
-        model_name = overrides.get("model_name")
-        temperature = float(overrides.get("temperature", settings.LLM_TEMPERATURE))
-        max_tokens = int(overrides.get("max_tokens", settings.LLM_MAX_TOKENS))
+        provider_name = (agent.llm_provider if agent and agent.llm_provider else None) or overrides.get("llm_provider", settings.LLM_PROVIDER)
+        model_name = (agent.model_name if agent and agent.model_name else None) or overrides.get("model_name")
+        temperature = float(agent.temperature if agent and agent.temperature is not None else overrides.get("temperature", settings.LLM_TEMPERATURE))
+        max_tokens = int(agent.max_tokens if agent and agent.max_tokens is not None else overrides.get("max_tokens", settings.LLM_MAX_TOKENS))
+        agent_prompt = agent.system_prompt if agent and agent.system_prompt else None
 
-        # 3. Retrieve relevant knowledge base chunks via RAG
-        rag_context = await RAGEngine.retrieve_relevant_context(db, query=user_message, top_k=3)
+        # Resolve API key (agent override -> access group key -> system default)
+        agent_api_key = agent.api_key_override if agent and agent.api_key_override else None
+        if not agent_api_key and agent:
+            from app.core.access import get_agent_group_ids
+            from app.models.access_group import AccessGroup
+            gids = get_agent_group_ids(agent)
+            if gids:
+                grp_res = await db.execute(select(AccessGroup).where(AccessGroup.id.in_(gids)))
+                groups = grp_res.scalars().all()
+                for g in groups:
+                    if g.api_key:
+                        agent_api_key = g.api_key
+                        break
+
+        allowed_tags = get_effective_agent_tags(agent) if agent else None
+
+        # 3. Retrieve relevant knowledge base chunks via RAG with scoped access tags
+        rag_context = await RAGEngine.retrieve_relevant_context(
+            db, query=user_message, top_k=3, allowed_access_tags=allowed_tags
+        )
 
         # 4. Compose dynamic system prompt
         system_prompt = await get_system_prompt(
@@ -50,6 +108,7 @@ class AIOrchestrator:
             customer_name=customer_name,
             channel=channel,
             rag_context=rag_context if rag_context else None,
+            agent_system_prompt=agent_prompt,
         )
 
         # 5. Build conversation history
@@ -62,7 +121,7 @@ class AIOrchestrator:
         messages.append({"role": "user", "content": user_message})
 
         # 6. Execute LLM with tool calling loop
-        provider = get_llm_provider(provider_name)
+        provider = get_llm_provider(provider_name, api_key=agent_api_key)
 
         max_tool_iterations = 4
         current_iteration = 0
@@ -100,6 +159,7 @@ class AIOrchestrator:
                         arguments=tc.arguments,
                         customer_identifier=customer_identifier,
                         channel=channel,
+                        allowed_access_tags=allowed_tags,
                     )
 
                     if isinstance(tool_result, dict) and PROFILE_COLLECT_SENTINEL in tool_result:
@@ -167,27 +227,34 @@ class AIOrchestrator:
         customer_identifier: str,
         user_message: str,
         customer_name: Optional[str] = None,
+        agent: Optional[Agent] = None,
     ):
         session = await MemoryManager.get_or_create_session(
-            db, channel=channel, customer_identifier=customer_identifier
+            db, channel=channel, customer_identifier=customer_identifier, agent_id=agent.id if agent else None
         )
 
         stmt = select(ConfigOverride)
         res = await db.execute(stmt)
         overrides = {row.key: row.value for row in res.scalars().all()}
 
-        provider_name = overrides.get("llm_provider", settings.LLM_PROVIDER)
-        model_name = overrides.get("model_name")
-        temperature = float(overrides.get("temperature", settings.LLM_TEMPERATURE))
-        max_tokens = int(overrides.get("max_tokens", settings.LLM_MAX_TOKENS))
+        provider_name = (agent.llm_provider if agent and agent.llm_provider else None) or overrides.get("llm_provider", settings.LLM_PROVIDER)
+        model_name = (agent.model_name if agent and agent.model_name else None) or overrides.get("model_name")
+        temperature = float(agent.temperature if agent and agent.temperature is not None else overrides.get("temperature", settings.LLM_TEMPERATURE))
+        max_tokens = int(agent.max_tokens if agent and agent.max_tokens is not None else overrides.get("max_tokens", settings.LLM_MAX_TOKENS))
+        agent_prompt = agent.system_prompt if agent and agent.system_prompt else None
 
-        rag_context = await RAGEngine.retrieve_relevant_context(db, query=user_message, top_k=3)
+        allowed_tags = get_effective_agent_tags(agent) if agent else None
+
+        rag_context = await RAGEngine.retrieve_relevant_context(
+            db, query=user_message, top_k=3, allowed_access_tags=allowed_tags
+        )
 
         system_prompt = await get_system_prompt(
             db,
             customer_name=customer_name,
             channel=channel,
             rag_context=rag_context if rag_context else None,
+            agent_system_prompt=agent_prompt,
         )
 
         history = MemoryManager.get_history(session)
@@ -241,6 +308,7 @@ class AIOrchestrator:
                         arguments=tc.arguments,
                         customer_identifier=customer_identifier,
                         channel=channel,
+                        allowed_access_tags=allowed_tags,
                     )
 
                     if isinstance(tool_result, dict) and PROFILE_COLLECT_SENTINEL in tool_result:

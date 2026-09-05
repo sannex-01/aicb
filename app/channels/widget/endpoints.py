@@ -35,6 +35,7 @@ class WidgetActionRequest(BaseModel):
 class WidgetChatRequest(BaseModel):
     message: str
     session_id: str
+    bot_id: Optional[str] = None
 
 
 class WidgetProfileRequest(BaseModel):
@@ -70,6 +71,27 @@ async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: Async
 
     session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
 
+    # Dynamic Agent Resolution
+    from app.models.agent import Agent
+    agent = None
+    if req.bot_id:
+        if req.bot_id.isdigit():
+            stmt = select(Agent).where(Agent.id == int(req.bot_id), Agent.is_active == True)
+        else:
+            stmt = select(Agent).where(Agent.slug == req.bot_id, Agent.is_active == True)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
+    if not agent:
+        stmt = select(Agent).where(Agent.widget_enabled == True, Agent.is_active == True).limit(1)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
+    if not agent:
+        stmt = select(Agent).where(Agent.is_active == True).limit(1)
+        res = await db.execute(stmt)
+        agent = res.scalar_one_or_none()
+
     # If session is in profile_collect or quantity_select,
     # intercept free-text input and route to FlowEngine.
     if session.active_flow in ["profile_collect", "quantity_select"]:
@@ -90,6 +112,7 @@ async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: Async
             channel="widget",
             customer_identifier=req.session_id,
             user_message=req.message,
+            agent=agent,
         )
         async for chunk in stream:
             if isinstance(chunk, str):

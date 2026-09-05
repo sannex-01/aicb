@@ -12,21 +12,34 @@ from app.core.logger import logger
 from app.models.config_override import ConfigOverride
 from app.models.catalog import CatalogItem
 from app.models.knowledge import KnowledgeDoc
+from app.models.agent import Agent
+from app.models.release import ReleaseNote
 from app.commerce.catalog_provider import CatalogManager
+from sannex_agent import AsyncSannexClient
 
 router = APIRouter(prefix="/sync", tags=["Telemetry & Remote Sync"])
 scheduler = AsyncIOScheduler()
 
+_cached_support_config: Dict[str, Any] = {
+    "enabled": True,
+    "url": "https://github.com/sponsors/sannex",
+    "title": "Support Open-Source AICB",
+    "message": "Enjoying AICB? Consider supporting future open-source development and maintenance.",
+}
 
-from sannex_agent import AsyncSannexClient
+
+def get_support_config() -> Dict[str, Any]:
+    return _cached_support_config
+
 
 async def perform_sannex_sync(db: AsyncSession) -> Dict[str, Any]:
-    """Pulls latest prompts, LLM parameters, catalogs, and knowledge docs from AgentOS/Sannex."""
+    """Polls AgentOS in read-only mode for connectivity health and syncs release notes (only allowable write from AgentOS)."""
+    global _cached_support_config
     logger.info("Executing Sannex AgentOS Remote Synchronization...")
     summary: Dict[str, Any] = {
         "status": "success",
-        "overrides_updated": 0,
-        "knowledge_docs_synced": 0,
+        "agentos_connected": False,
+        "releases_synced": 0,
         "catalog_items_synced": 0,
     }
 
@@ -38,83 +51,59 @@ async def perform_sannex_sync(db: AsyncSession) -> Dict[str, Any]:
     try:
         async with AsyncSannexClient(api_key=settings.SANNEX_API_KEY, host=settings.SANNEX_HOST) as client:
             config_resp = await client.get_config()
-            
-            # The SDK returns a Pydantic model. We convert it to dict for easy access, or access attributes directly
-            data = config_resp.model_dump()
-            config = data.get("config", {})
+            summary["agentos_connected"] = True
+            logger.info("AgentOS connection verified successfully.")
 
-            # 1. Update Config Overrides (Prompt, Temp, Model, etc.)
-            for key in ["system_prompt", "temperature", "model_name", "llm_provider", "bot_mode", "max_tokens", "memory_window_size", "widget_profile_collection"]:
-                if key in config and config[key] is not None:
-                    val_str = str(config[key])
-                    stmt = select(ConfigOverride).where(ConfigOverride.key == key)
-                    result = await db.execute(stmt)
-                    override = result.scalars().first()
-                    if override:
-                        override.value = val_str
+            # Ingest support config if provided by AgentOS
+            if config_resp and getattr(config_resp, "support", None):
+                if isinstance(config_resp.support, dict):
+                    _cached_support_config = config_resp.support
+
+            # Ingest Release Notes (the only allowable write from AgentOS to AICB)
+            releases = await client.get_releases(app_version=settings.APP_VERSION)
+            if not releases and config_resp and getattr(config_resp, "releases", None):
+                releases = config_resp.releases
+
+            if releases:
+                synced_count = 0
+                for r in releases:
+                    if not getattr(r, "version", None):
+                        continue
+                    existing = await db.scalar(select(ReleaseNote).where(ReleaseNote.version == r.version))
+                    changelog_str = json.dumps(r.changelog) if isinstance(r.changelog, list) else str(r.changelog or "[]")
+                    if existing:
+                        existing.title = r.title or f"Version {r.version}"
+                        existing.description = r.description
+                        existing.changelog_json = changelog_str
+                        existing.release_date = r.release_date
+                        existing.is_critical = bool(r.is_critical)
+                        existing.download_url = r.download_url
                     else:
-                        db.add(ConfigOverride(key=key, value=val_str))
-                    summary["overrides_updated"] += 1
-
-            # 2. Sync Knowledge Base Documents
-            docs = data.get("knowledge_docs", [])
-            for d in docs:
-                ext_id = str(d.get("id"))
-                stmt = select(KnowledgeDoc).where(KnowledgeDoc.external_id == ext_id)
-                result = await db.execute(stmt)
-                kdoc = result.scalars().first()
-                if kdoc:
-                    kdoc.title = d.get("title", kdoc.title)
-                    kdoc.content = d.get("content", kdoc.content)
-                    kdoc.category = d.get("category", kdoc.category)
-                    kdoc.tags = d.get("tags", kdoc.tags)
-                    if "embedding" in d:
-                        kdoc.embedding_json = json.dumps(d["embedding"])
-                else:
-                    db.add(KnowledgeDoc(
-                        external_id=ext_id,
-                        title=d.get("title", "Untitled"),
-                        content=d.get("content", ""),
-                        category=d.get("category"),
-                        tags=d.get("tags"),
-                        embedding_json=json.dumps(d.get("embedding")) if "embedding" in d else None,
-                    ))
-                summary["knowledge_docs_synced"] += 1
-
-            # 3. Sync Remote Catalog items if provided
-            catalog_items = data.get("catalog_items", [])
-            for p in catalog_items:
-                ext_id = str(p.get("id"))
-                stmt = select(CatalogItem).where(CatalogItem.external_id == ext_id, CatalogItem.source == "agentos")
-                result = await db.execute(stmt)
-                c_item = result.scalars().first()
-                if c_item:
-                    c_item.title = p.get("title", c_item.title)
-                    c_item.description = p.get("description", c_item.description)
-                    c_item.price = float(p.get("price", c_item.price))
-                    c_item.currency = p.get("currency", c_item.currency)
-                    c_item.image_url = p.get("image_url", c_item.image_url)
-                else:
-                    db.add(CatalogItem(
-                        source="agentos",
-                        external_id=ext_id,
-                        title=p.get("title", "Product"),
-                        description=p.get("description"),
-                        price=float(p.get("price", 0.0)),
-                        currency=p.get("currency", "NGN"),
-                        image_url=p.get("image_url"),
-                    ))
-                summary["catalog_items_synced"] += 1
-
-            await db.commit()
-            logger.info(f"AgentOS Sync completed: {summary}")
+                        new_rel = ReleaseNote(
+                            version=r.version,
+                            title=r.title or f"Version {r.version}",
+                            description=r.description,
+                            changelog_json=changelog_str,
+                            release_date=r.release_date,
+                            is_critical=bool(r.is_critical),
+                            download_url=r.download_url,
+                        )
+                        db.add(new_rel)
+                    synced_count += 1
+                await db.commit()
+                summary["releases_synced"] = synced_count
+                logger.info(f"Successfully synced {synced_count} release note(s) from AgentOS.")
 
     except Exception as e:
-        logger.error(f"Error during Sannex AgentOS sync: {e}")
+        logger.error(f"Error during Sannex AgentOS sync check: {e}")
+        summary["status"] = "error"
+        summary["error"] = str(e)
 
-    # Also run Paystack/Bumpa external catalog sync
+    # Also run Paystack/Bumpa external catalog sync if configured
     ext_synced = await CatalogManager.sync_external_catalog(db)
-    summary["catalog_items_synced"] += ext_synced
+    summary["catalog_items_synced"] = ext_synced
+
+    return summary
 
     return summary
 

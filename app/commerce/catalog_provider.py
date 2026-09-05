@@ -2,7 +2,7 @@ import json
 import re
 from collections import Counter
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Set
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.catalog import CatalogItem
@@ -35,6 +35,7 @@ class CatalogManager:
         query: Optional[str] = None,
         category: Optional[str] = None,
         limit: int = 10,
+        allowed_access_tags: Optional[Set[str]] = None,
     ) -> List[CatalogItem]:
         """Flexible multi-word matching: an item matching ANY significant word
         in the query is a candidate; results are ranked by how many distinct
@@ -43,6 +44,8 @@ class CatalogManager:
         Earbuds Pro" even though the words appear in a different order and
         the title has an extra word, which a single %substring% match would
         have missed entirely."""
+        from app.core.access import filter_items_by_access_tags
+
         words = CatalogManager._query_words(query) if query else []
 
         stmt = select(CatalogItem)
@@ -83,6 +86,9 @@ class CatalogManager:
         result = await db.execute(stmt)
         candidates = list(result.scalars().all())
 
+        if allowed_access_tags is not None:
+            candidates = filter_items_by_access_tags(candidates, allowed_access_tags, tag_attr="access_tags_json")
+
         if not words:
             return candidates[:limit]
 
@@ -98,6 +104,7 @@ class CatalogManager:
         db: AsyncSession,
         limit: int = 6,
         lookback_days: int = 60,
+        allowed_access_tags: Optional[Set[str]] = None,
     ) -> List[CatalogItem]:
         """Ranks products for the undirected "browse" case (no search query):
         recent order frequency first, newest-listed as the tiebreak. Order
@@ -106,6 +113,8 @@ class CatalogManager:
         this app supports both SQLite and Postgres and catalog/order volumes
         here are small (single-business scale) — no need for DB-specific
         JSON functions."""
+        from app.core.access import filter_items_by_access_tags
+
         cutoff = datetime.now(timezone.utc) - timedelta(days=lookback_days)
         order_stmt = select(Order).where(
             Order.status.in_(["paid", "processing", "completed"]),
@@ -132,6 +141,9 @@ class CatalogManager:
         item_stmt = select(CatalogItem)
         item_result = await db.execute(item_stmt)
         all_items = list(item_result.scalars().all())
+
+        if allowed_access_tags is not None:
+            all_items = filter_items_by_access_tags(all_items, allowed_access_tags, tag_attr="access_tags_json")
 
         def _created_at_key(item: CatalogItem) -> datetime:
             # SQLite doesn't actually enforce DateTime(timezone=True) — rows

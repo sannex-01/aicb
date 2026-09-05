@@ -10,14 +10,17 @@ async def get_system_prompt(
     customer_name: Optional[str] = None,
     channel: Optional[str] = None,
     rag_context: Optional[str] = None,
+    agent_system_prompt: Optional[str] = None,
 ) -> str:
     """Builds the comprehensive system prompt combining baseline, dynamic overrides, and RAG knowledge."""
-    # Check for AgentOS synced prompt override
-    stmt = select(ConfigOverride).where(ConfigOverride.key == "system_prompt")
-    result = await db.execute(stmt)
-    override = result.scalars().first()
-
-    base_prompt = override.value if override else settings.DEFAULT_SYSTEM_PROMPT
+    if agent_system_prompt and agent_system_prompt.strip():
+        base_prompt = agent_system_prompt.strip()
+    else:
+        # Check for AgentOS synced prompt override
+        stmt = select(ConfigOverride).where(ConfigOverride.key == "system_prompt")
+        result = await db.execute(stmt)
+        override = result.scalars().first()
+        base_prompt = override.value if override else settings.DEFAULT_SYSTEM_PROMPT
 
     context_parts = [base_prompt]
 

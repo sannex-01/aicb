@@ -153,8 +153,8 @@ class FlowEngine:
             buttons = []
             product_cards = []
             for p in products:
-                product_lines.append(f"• *{p.title}* — {p.price:,.2f} {p.currency}\n  _{p.description or 'In stock'}_\n  👉 Tap below to add to cart")
-                buttons.append({"id": f"cart_add_{p.id}", "title": f"🛒 Buy {p.title[:20]}"})
+                product_lines.append(f"• *{p.title}* — {p.price:,.2f} {p.currency}\n  _{p.description or 'In stock'}_")
+                buttons.append({"id": f"cart_add_{p.id}", "title": f"{p.title[:24]}"})
                 product_cards.append(
                     ProductCard(
                         id=p.id,

@@ -13,6 +13,10 @@ class KnowledgeDoc(Base):
     content = Column(Text, nullable=False)
     embedding_json = Column(Text, nullable=True) # Serialized list of floats for fast in-process cosine search
     tags = Column(String(255), nullable=True)
+    
+    # Access Tagging: JSON array of strings e.g. ["support", "billing"]. Empty [] = public to all agents.
+    access_tags_json = Column(Text, default="[]")
+    
     metadata_json = Column(Text, default="{}")
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))

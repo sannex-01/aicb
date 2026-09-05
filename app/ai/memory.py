@@ -18,6 +18,7 @@ class MemoryManager:
         db: AsyncSession,
         channel: str,
         customer_identifier: str,
+        agent_id: Optional[int] = None,
     ) -> ConversationSession:
         session_key = f"{channel}:{customer_identifier}"
         now = datetime.now(timezone.utc)
@@ -31,6 +32,7 @@ class MemoryManager:
                 session_key=session_key,
                 channel=channel,
                 customer_identifier=customer_identifier,
+                agent_id=agent_id,
                 bot_mode=settings.BOT_MODE,
                 memory_json="[]",
                 state_data="{}",
@@ -41,6 +43,10 @@ class MemoryManager:
             await db.commit()
             await db.refresh(session)
             return session
+
+        # Update agent_id if newly provided
+        if agent_id and session.agent_id != agent_id:
+            session.agent_id = agent_id
 
         # Check if session has expired
         if session.expires_at:

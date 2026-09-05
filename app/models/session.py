@@ -10,8 +10,9 @@ class ConversationSession(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     session_key = Column(String(150), unique=True, index=True, nullable=False) # e.g. "whatsapp:+23480..." or "telegram:123456"
-    channel = Column(String(50), nullable=False) # whatsapp, telegram
+    channel = Column(String(50), nullable=False) # whatsapp, telegram, widget
     customer_identifier = Column(String(100), nullable=False, index=True)
+    agent_id = Column(Integer, ForeignKey("agents.id", ondelete="SET NULL"), nullable=True, index=True)
     
     # Active state & interactive flow tracking
     bot_mode = Column(String(50), default="hybrid") # conversational, interactive_flow, hybrid
@@ -30,6 +31,7 @@ class ConversationSession(Base):
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     messages = relationship("MessageLog", back_populates="session", cascade="all, delete-orphan")
+    agent = relationship("Agent", lazy="joined")
 
 
 class MessageLog(Base):
