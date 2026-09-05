@@ -621,6 +621,8 @@ function renderAdminShell(container, currentPath) {
     `;
 
     document.body.appendChild(modal);
+  };
+
   // Releases Offcanvas Handlers
   window.openReleasesModal = async function() {
     let existingModal = document.getElementById('releases-offcanvas-backdrop');
