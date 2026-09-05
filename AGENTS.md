@@ -47,8 +47,9 @@ Before cutting a new release, you **MUST** bump the version across all of the fo
 
 ## Versioning Standards (SemVer)
 
-- **PATCH (`0.2.1` &rarr; `0.2.2`)**: Bug fixes, minor UI tweaks, internal retry logic, or database migration patches.
-- **MINOR (`0.2.x` &rarr; `0.3.0`)**: New channels, payment providers, RAG capabilities, or additive CLI flags.
+- **PATCH (`0.1.0` &rarr; `0.1.1`)**: Bug fixes, minor UI tweaks, internal retry logic, or database migration patches.
+- **MINOR (`0.1.x` &rarr; `0.2.0`)**: New channels, payment providers, RAG capabilities, or additive CLI flags.
+
 - **MAJOR (`0.x.y` &rarr; `1.0.0`)**: Breaking database schema alterations, removed CLI commands, or breaking API changes.
 
 ---

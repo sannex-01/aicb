@@ -33,7 +33,7 @@ async def test_system_version_endpoint(async_session: AsyncSession):
         res = await ac.get("/api/v1/system/version")
         assert res.status_code == 200
         data = res.json()
-        assert data["version"] == "0.2.1"
+        assert data["version"] == "0.1.0"
         assert data["name"] == "AICB Assistant"
         assert "support" in data
         assert data["support"]["enabled"] is True
@@ -49,7 +49,7 @@ async def test_system_releases_endpoint_fallback(async_session: AsyncSession):
         assert res.status_code == 200
         releases = res.json()
         assert len(releases) >= 1
-        assert releases[0]["version"] == "0.2.1"
+        assert releases[0]["version"] == "0.1.0"
     app.dependency_overrides.clear()
 
 
@@ -59,7 +59,7 @@ async def test_perform_sannex_sync_ingests_release_notes(async_session: AsyncSes
     from sannex_agent.client import ReleaseNote as SannexReleaseNote, SannexConfigResponse
 
     mock_release = SannexReleaseNote(
-        version="0.2.1",
+        version="0.1.0",
         title="AgentOS Dynamic Release Sync",
         description="Release notes synced from AgentOS to AICB instance.",
         changelog=["Sync release notes", "Read-only config"],
@@ -80,7 +80,7 @@ async def test_perform_sannex_sync_ingests_release_notes(async_session: AsyncSes
         assert summary["releases_synced"] == 1
 
         # Check DB
-        rel = await async_session.scalar(select(ReleaseNote).where(ReleaseNote.version == "0.2.1"))
+        rel = await async_session.scalar(select(ReleaseNote).where(ReleaseNote.version == "0.1.0"))
         assert rel is not None
         assert rel.title == "AgentOS Dynamic Release Sync"
         assert "Read-only config" in rel.changelog_json

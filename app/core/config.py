@@ -12,7 +12,7 @@ class Settings(BaseSettings):
 
     # Application
     APP_NAME: str = "AICB Assistant"
-    APP_VERSION: str = "0.2.1"
+    APP_VERSION: str = "0.1.0"
     APP_SECRET: Optional[str] = None
     ENVIRONMENT: Literal["development", "production"] = "development"
     DEBUG: bool = True
