@@ -120,7 +120,7 @@ export async function loadConversationsPage(container) {
     }
 
     container.innerHTML = `
-      <div class="h-[calc(100vh-140px)] flex overflow-hidden rounded-xl border border-subtle bg-surface shadow-xs">
+      <div class="h-full min-h-[calc(100vh-48px)] flex-1 flex overflow-hidden rounded-xl border border-subtle bg-surface shadow-xs">
         
         <!-- Left Pane: Search, Filters & Session List -->
         <div class="w-84 sm:w-90 flex-shrink-0 border-r border-subtle flex flex-col bg-surface">
@@ -136,26 +136,26 @@ export async function loadConversationsPage(container) {
             </div>
 
             <!-- Search Input: Customer Name, Phone, Email -->
-            <div class="relative">
-              <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted pointer-events-none"></i>
-              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="input input-sm w-full pl-8 pr-7 text-xs bg-surface border-subtle" />
-              <button id="conv-search-clear" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-muted hover:text-main p-0.5" title="Clear search">
+            <div class="relative flex items-center">
+              <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 text-muted pointer-events-none"></i>
+              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="form-control text-xs pl-8 pr-7 py-1.5 w-full" />
+              <button id="conv-search-clear" class="hidden absolute right-2 text-muted hover:text-main p-0.5 cursor-pointer" title="Clear search">
                 <i data-lucide="x" class="w-3 h-3"></i>
               </button>
             </div>
 
             <!-- Filters Row: Agent Selector & Channel Selector -->
             <div class="grid grid-cols-2 gap-2 pt-0.5">
-              <div>
-                <label class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">Agent</label>
-                <select id="conv-filter-agent" class="input input-xs w-full text-xs bg-surface border-subtle">
+              <div class="space-y-1">
+                <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Agent</label>
+                <select id="conv-filter-agent" class="form-control text-xs py-1 px-2 w-full">
                   <option value="">All Agents</option>
                   ${agents.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}
                 </select>
               </div>
-              <div>
-                <label class="text-[10px] font-bold text-muted uppercase tracking-wider block mb-1">Channel</label>
-                <select id="conv-filter-channel" class="input input-xs w-full text-xs bg-surface border-subtle">
+              <div class="space-y-1">
+                <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Channel</label>
+                <select id="conv-filter-channel" class="form-control text-xs py-1 px-2 w-full">
                   <option value="">All Channels</option>
                   <option value="whatsapp">WhatsApp</option>
                   <option value="telegram">Telegram</option>

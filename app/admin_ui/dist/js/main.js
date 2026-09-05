@@ -367,15 +367,15 @@ function renderAdminShell(container, currentPath) {
 
           <!-- Theme Switcher in Sidebar -->
           ${!state.sidebarCollapsed ? `
-          <div class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-surface-elevated/50 border border-subtle text-[14px] text-muted">
+          <button type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 hover:bg-surface-hover border border-subtle text-[14px] text-muted hover:text-main transition-colors cursor-pointer text-left group" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
             <div class="flex items-center gap-2">
               <i data-lucide="${state.theme === 'dark' ? 'moon' : 'sun'}" class="w-4 h-4 text-brand flex-shrink-0"></i>
               <span class="text-[14px] font-medium text-main">${state.theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
             </div>
-            <button type="button" class="p-1 rounded-md hover:bg-surface-hover text-muted hover:text-main transition-colors cursor-pointer" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
+            <div class="p-1 rounded-md text-muted group-hover:text-main">
               <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-3.5 h-3.5"></i>
-            </button>
-          </div>
+            </div>
+          </button>
           ` : `
           <button type="button" class="w-full flex items-center justify-center p-2 rounded-lg text-muted hover:text-main hover:bg-surface-hover transition-colors cursor-pointer" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
             <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-4 h-4 text-brand"></i>
@@ -383,7 +383,7 @@ function renderAdminShell(container, currentPath) {
           `}
 
           <!-- User Identity Card -->
-          <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-1' : 'gap-2 pt-1'} border-t border-subtle/60">
+          <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-0.5' : 'gap-2 pt-0.5'}">
             <div class="w-7 h-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-[12px] flex-shrink-0">
               ${escapeHtml(user.name?.charAt(0) || 'U')}
             </div>
@@ -404,7 +404,7 @@ function renderAdminShell(container, currentPath) {
 
       <!-- Main Content Area (Full Height, No Top Header Bar) -->
       <main class="flex-1 flex flex-col min-w-0 bg-app relative h-screen overflow-hidden">
-        <div id="page-content" class="p-6 max-w-[1600px] mx-auto w-full flex-1 overflow-y-auto"></div>
+        <div id="page-content" class="p-6 max-w-[1600px] mx-auto w-full flex-1 min-h-0 flex flex-col overflow-y-auto"></div>
       </main>
     </div>
   `;
