@@ -210,11 +210,16 @@ async def main():
     print_header("SYSTEM DIAGNOSTIC SUMMARY")
     if db_ok:
         print("  [+] SUCCESS: AICB Engine is healthy and ready to run!")
-        print("  [+] Start the server: uvicorn app.main:app --port 8000 --reload")
-        print("  [+] Or with Docker: docker compose up -d\n")
+        print("  [+] Start the server: aicb start --port 8422")
+        print("  [+] Or with Docker:   docker compose up -d\n")
     else:
         print("  [-] ATTENTION: Please review database configuration errors above.\n")
 
 
+run_diagnostics = main
+
+
 if __name__ == "__main__":
     asyncio.run(main())
+
+
