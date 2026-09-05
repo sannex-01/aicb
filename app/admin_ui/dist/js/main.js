@@ -157,14 +157,14 @@ function showWeeklySponsorBanner() {
             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
-        <p class="text-[11px] text-slate-300 leading-relaxed">
+        <p class="text-[12px] text-slate-300 leading-relaxed">
           Support ongoing open-source development by starring our repo on GitHub or sponsoring us!
         </p>
         <div class="flex items-center gap-2 pt-2">
-          <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-all">
+          <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[12px] font-semibold flex items-center gap-1 transition-all">
             ⭐ Star on GitHub
           </a>
-          <a href="https://github.com/sponsors/sannex-01" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-semibold flex items-center gap-1 transition-all">
+          <a href="https://github.com/sponsors/sannex-01" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[12px] font-semibold flex items-center gap-1 transition-all">
             ❤️ Sponsor
           </a>
         </div>
@@ -390,7 +390,7 @@ function renderAdminShell(container, currentPath) {
             ${!state.sidebarCollapsed ? `
             <div class="flex-1 min-w-0">
               <div class="text-[14px] font-bold truncate text-main leading-none mb-0.5">${escapeHtml(user.name || 'User')}</div>
-              <span class="badge ${roleBadgeClass} text-[11px] px-1.5 py-0 font-medium">
+              <span class="badge ${roleBadgeClass} text-[12px] px-1.5 py-0 font-medium">
                 ${escapeHtml(user.role === 'super_admin' ? 'Super Admin' : (user.role === 'admin' ? 'Admin' : (user.role === 'operator' ? 'Operator' : (user.role || 'User'))))}
               </span>
             </div>
@@ -572,7 +572,7 @@ function renderAdminShell(container, currentPath) {
             </div>
             <div>
               <h3 class="text-sm font-bold text-main">AI Commerce Bots (AICB)</h3>
-              <p class="text-[11px] text-muted">Version <span class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">v${escapeHtml(version)}</span></p>
+              <p class="text-[12px] text-muted">Version <span class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">v${escapeHtml(version)}</span></p>
             </div>
           </div>
           <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
@@ -611,7 +611,7 @@ function renderAdminShell(container, currentPath) {
             </div>
             <div class="flex items-start justify-between gap-3">
               <span class="text-muted shrink-0">Instance ID:</span>
-              <span class="text-main font-mono text-[11px] break-all select-all text-right">${escapeHtml(instanceId)}</span>
+              <span class="text-main font-mono text-[12px] break-all select-all text-right">${escapeHtml(instanceId)}</span>
             </div>
             <div class="flex items-start justify-between gap-3">
               <span class="text-muted shrink-0">Debug Info:</span>
@@ -621,7 +621,7 @@ function renderAdminShell(container, currentPath) {
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2 border-t border-subtle text-[11px]">
+          <div class="flex items-center justify-between pt-2 border-t border-subtle text-[12px]">
             <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold">
               <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
               <span>GitHub Repository</span>
@@ -774,9 +774,9 @@ function renderAdminShell(container, currentPath) {
             <div class="min-w-0">
               <div class="flex items-center gap-2">
                 <h3 class="font-bold text-sm text-main truncate">AICB Releases</h3>
-                <span class="badge badge-emerald text-[9px] font-mono px-1.5 py-0.2">v${escapeHtml(state.appVersion || '0.1.0')}</span>
+                <span class="badge badge-emerald text-xs font-mono px-1.5 py-0.5">v${escapeHtml(state.appVersion || '0.1.0')}</span>
               </div>
-              <p class="text-[11px] text-muted truncate">Synchronized from AgentOS</p>
+              <p class="text-xs text-muted truncate">Synchronized from AgentOS</p>
             </div>
           </div>
           <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()" title="Close">
@@ -835,12 +835,12 @@ function renderAdminShell(container, currentPath) {
                 v${escapeHtml(rel.version)}
               </span>
               <h4 class="font-bold text-xs text-main truncate group-hover:text-rose-500 transition-colors">${escapeHtml(rel.title || 'Update')}</h4>
-              ${rel.is_critical ? '<span class="badge badge-rose text-[9px] font-bold uppercase">Critical</span>' : ''}
+              ${rel.is_critical ? '<span class="badge badge-rose text-xs font-semibold">Critical</span>' : ''}
             </div>
             <i data-lucide="external-link" class="w-3.5 h-3.5 text-muted group-hover:text-rose-500 transition-colors flex-shrink-0"></i>
           </div>
-          ${rel.description ? `<p class="text-[11px] text-muted line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
-          <div class="flex items-center justify-between text-[10px] text-muted mt-2 pt-1.5 border-t border-subtle/50">
+          ${rel.description ? `<p class="text-xs text-muted line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
+          <div class="flex items-center justify-between text-xs text-muted mt-2 pt-1.5 border-t border-subtle/50">
             <span>${rel.release_date ? escapeHtml(rel.release_date) : 'Official Release'}</span>
             <span class="text-rose-500 flex items-center gap-0.5 font-semibold">Read on AgentOS &rarr;</span>
           </div>

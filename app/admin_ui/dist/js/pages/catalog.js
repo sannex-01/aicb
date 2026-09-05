@@ -81,13 +81,13 @@ export async function loadCatalogPage(container) {
         render: (_, row) => {
           const names = Array.isArray(row.access_group_names) ? row.access_group_names : [];
           if (names.length) {
-            return names.map(n => `<span class="badge badge-sky mr-1 text-[10px]">${escapeHtml(n)}</span>`).join('');
+            return names.map(n => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(n)}</span>`).join('');
           }
           const tags = Array.isArray(row.access_tags) ? row.access_tags.filter(t => !t.match(/^\d+$/)) : [];
           if (tags.length) {
-            return tags.map(t => `<span class="badge badge-sky mr-1 text-[10px]">${escapeHtml(t)}</span>`).join('');
+            return tags.map(t => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(t)}</span>`).join('');
           }
-          return '<span class="badge badge-emerald text-[10px]">Global (All Agents)</span>';
+          return '<span class="badge badge-emerald text-[12px]">Global (All Agents)</span>';
         }
       }
     ];
@@ -198,9 +198,9 @@ async function editProductModal(product) {
           <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-2.5">
             <div class="flex items-center justify-between">
               <label class="form-label font-semibold text-main m-0">Access Groups</label>
-              <span class="text-[11px] text-muted">Empty = Globally Accessible</span>
+              <span class="text-[12px] text-muted">Empty = Globally Accessible</span>
             </div>
-            <p class="text-[11px] text-muted">Select which Access Groups can sell or view this product. If left unselected, this product is available to all agents across all channels.</p>
+            <p class="text-[12px] text-muted">Select which Access Groups can sell or view this product. If left unselected, this product is available to all agents across all channels.</p>
             
             <div class="max-h-44 overflow-y-auto pr-1">
               ${renderSelectCards({
@@ -211,7 +211,7 @@ async function editProductModal(product) {
                   title: g.name,
                   description: g.description,
                   metaHtml: g.has_api_key 
-                    ? `<div class="text-[10px] text-emerald font-mono flex items-center gap-1"><i data-lucide="key" class="w-3 h-3"></i> Key Set</div>` 
+                    ? `<div class="text-[12px] text-emerald font-mono flex items-center gap-1"><i data-lucide="key" class="w-3 h-3"></i> Key Set</div>` 
                     : '',
                 })),
                 selectedValues: selectedGroupIds,

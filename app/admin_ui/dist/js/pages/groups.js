@@ -50,8 +50,8 @@ export async function loadGroupsPage(container) {
           }
           return `
             <div class="flex items-center gap-1.5">
-              <span class="badge badge-sky text-[10px] uppercase font-semibold">${escapeHtml(val || 'Custom')}</span>
-              ${row.has_api_key ? '<span class="badge badge-emerald text-[10px] font-mono">Key Set</span>' : '<span class="badge badge-subtle text-[10px]">No Key</span>'}
+              <span class="badge badge-sky text-[12px] font-semibold">${escapeHtml(val || 'Custom')}</span>
+              ${row.has_api_key ? '<span class="badge badge-emerald text-[12px] font-mono">Key Set</span>' : '<span class="badge badge-subtle text-[12px]">No Key</span>'}
             </div>
           `;
         }
@@ -124,10 +124,10 @@ function editGroupModal(group) {
           </div>
 
           <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-3 pt-3">
-            <div class="flex items-center gap-2 text-xs font-semibold text-brand uppercase tracking-wider">
+            <div class="flex items-center gap-2 text-xs font-semibold text-brand">
               <i data-lucide="cpu" class="w-3.5 h-3.5"></i> Shared LLM Provider & Credentials (Optional)
             </div>
-            <p class="text-[11px] text-muted">Agents assigned to this group can inherit this API key for LLM inference.</p>
+            <p class="text-[12px] text-muted">Agents assigned to this group can inherit this API key for LLM inference.</p>
             
             <div class="grid grid-cols-2 gap-3">
               <div class="form-group">
@@ -149,7 +149,7 @@ function editGroupModal(group) {
             <div class="form-group">
               <label class="form-label flex items-center justify-between">
                 <span>Provider API Key</span>
-                ${hasKey ? `<span class="badge badge-emerald text-[10px] font-mono">Configured: ${escapeHtml(group.api_key_masked || '••••••••')}</span>` : ''}
+                ${hasKey ? `<span class="badge badge-emerald text-[12px] font-mono">Configured: ${escapeHtml(group.api_key_masked || '••••••••')}</span>` : ''}
               </label>
               <div class="relative flex items-center">
                 <input type="password" id="grp-api-key" class="form-control pr-10 font-mono text-xs" placeholder="${hasKey ? 'Leave blank to keep configured key' : 'Paste API Key (sk-..., AIzaSy...)'}" autocomplete="new-password" />

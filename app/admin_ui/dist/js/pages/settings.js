@@ -91,7 +91,7 @@ export async function loadSettingsPage(container) {
               <div class="form-group col-span-2 sm:col-span-1">
                 <label class="form-label flex items-center justify-between">
                   <span>Default Currency</span>
-                  ${state.paymentInfo?.configured ? '<span class="text-[10px] text-emerald-600 font-mono">Synced from Paystack</span>' : ''}
+                  ${state.paymentInfo?.configured ? '<span class="text-[12px] text-emerald-600 font-mono">Synced from Paystack</span>' : ''}
                 </label>
                 <select id="biz-curr" class="form-control">
                   ${(() => {
@@ -192,10 +192,10 @@ export async function loadSettingsPage(container) {
             <!-- WhatsApp Cloud API -->
             <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-semibold text-emerald uppercase tracking-wider">
+                <div class="flex items-center gap-2 text-xs font-semibold text-emerald">
                   <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp Cloud API
                 </div>
-                <span class="badge ${wa.app_secret_configured ? 'badge-emerald' : 'badge-subtle'} text-[10px]">
+                <span class="badge ${wa.app_secret_configured ? 'badge-emerald' : 'badge-subtle'} text-[12px]">
                   ${wa.app_secret_configured ? 'App Secret Configured' : 'Open / Unverified'}
                 </span>
               </div>
@@ -204,7 +204,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group">
                   <label class="form-label flex items-center justify-between">
                     <span>Webhook Callback URL</span>
-                    <span class="text-[10px] text-muted normal-case font-normal">Paste in Meta WhatsApp Configuration</span>
+                    <span class="text-[12px] text-muted normal-case font-normal">Paste in Meta WhatsApp Configuration</span>
                   </label>
                   <div class="code-preview text-xs">
                     <span class="truncate">${escapeHtml(wa.webhook_url || `${domain}/api/v1/webhooks/whatsapp`)}</span>
@@ -216,7 +216,7 @@ export async function loadSettingsPage(container) {
                   <div class="form-group">
                     <label class="form-label flex items-center justify-between">
                       <span>Webhook Verify Token</span>
-                      <button type="button" id="btn-rotate-wa-token" class="text-[10px] text-brand hover:underline flex items-center gap-1 cursor-pointer" title="Generate fresh random verify token">
+                      <button type="button" id="btn-rotate-wa-token" class="text-[12px] text-brand hover:underline flex items-center gap-1 cursor-pointer" title="Generate fresh random verify token">
                         <i data-lucide="refresh-cw" class="w-3 h-3"></i> Generate New
                       </button>
                     </label>
@@ -232,7 +232,7 @@ export async function loadSettingsPage(container) {
                   <div class="form-group">
                     <label class="form-label flex items-center justify-between">
                       <span>Meta App Secret (HMAC)</span>
-                      ${wa.app_secret_configured ? `<span class="badge badge-emerald text-[10px] font-mono">Configured: ${escapeHtml(wa.app_secret_masked)}</span>` : ''}
+                      ${wa.app_secret_configured ? `<span class="badge badge-emerald text-[12px] font-mono">Configured: ${escapeHtml(wa.app_secret_masked)}</span>` : ''}
                     </label>
                     <div class="relative flex items-center">
                       <input type="password" id="wa-app-secret" class="form-control pr-10 font-mono text-xs" placeholder="${wa.app_secret_configured ? 'Leave blank to keep current secret' : 'Meta App Secret for HMAC-SHA256'}" autocomplete="new-password" />
@@ -248,10 +248,10 @@ export async function loadSettingsPage(container) {
             <!-- Telegram Bot API -->
             <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
               <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-semibold text-sky uppercase tracking-wider">
+                <div class="flex items-center gap-2 text-xs font-semibold text-sky">
                   <i data-lucide="send" class="w-4 h-4"></i> Telegram Bot API
                 </div>
-                <span class="badge ${tg.webhook_secret_configured ? 'badge-sky' : 'badge-subtle'} text-[10px]">
+                <span class="badge ${tg.webhook_secret_configured ? 'badge-sky' : 'badge-subtle'} text-[12px]">
                   ${tg.webhook_secret_configured ? 'Secret Token Active' : 'Auto-Generated'}
                 </span>
               </div>
@@ -260,7 +260,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group">
                   <label class="form-label flex items-center justify-between">
                     <span>Webhook Callback URL</span>
-                    <span class="text-[10px] text-muted normal-case font-normal">Registered automatically via Telegram API</span>
+                    <span class="text-[12px] text-muted normal-case font-normal">Registered automatically via Telegram API</span>
                   </label>
                   <div class="code-preview text-xs">
                     <span class="truncate">${escapeHtml(tg.webhook_url || `${domain}/api/v1/webhooks/telegram`)}</span>
@@ -271,7 +271,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group">
                   <label class="form-label flex items-center justify-between">
                     <span>Webhook Secret Token (X-Telegram-Bot-Api-Secret-Token)</span>
-                    <button type="button" id="btn-rotate-tg-token" class="text-[10px] text-brand hover:underline flex items-center gap-1 cursor-pointer" title="Generate fresh secret token">
+                    <button type="button" id="btn-rotate-tg-token" class="text-[12px] text-brand hover:underline flex items-center gap-1 cursor-pointer" title="Generate fresh secret token">
                       <i data-lucide="refresh-cw" class="w-3 h-3"></i> Generate New
                     </button>
                   </label>
@@ -318,7 +318,7 @@ export async function loadSettingsPage(container) {
                   <li>Open your <span class="font-semibold text-main">Meta Developer App Dashboard</span>.</li>
                   <li>Go to <span class="font-semibold text-main">WhatsApp &rarr; Configuration</span>.</li>
                   <li>In <span class="font-semibold text-main">Webhook</span>, click <span class="font-semibold text-main">Edit</span>.</li>
-                  <li>Paste the <span class="font-mono text-[11px] text-main">Webhook Callback URL</span> and <span class="font-mono text-[11px] text-main">Verify Token</span> above.</li>
+                  <li>Paste the <span class="font-mono text-[12px] text-main">Webhook Callback URL</span> and <span class="font-mono text-[12px] text-main">Verify Token</span> above.</li>
                   <li>Click <span class="font-semibold text-main">Verify and Save</span>, then subscribe to the <code class="px-1 py-0.5 rounded bg-surface-elevated border border-subtle text-brand font-mono">messages</code> field.</li>
                 </ol>
               </div>
@@ -412,7 +412,7 @@ export async function loadSettingsPage(container) {
               <div class="flex items-center gap-1.5 font-bold mb-0.5">
                 <i data-lucide="check" class="w-4 h-4"></i> Webhook Set Successfully!
               </div>
-              <p class="text-[11px] text-emerald/90 leading-relaxed">${escapeHtml(res.description || 'Webhook URL registered with Telegram Bot API.')}</p>
+              <p class="text-[12px] text-emerald/90 leading-relaxed">${escapeHtml(res.description || 'Webhook URL registered with Telegram Bot API.')}</p>
             `;
           } else {
             resultDiv.classList.add('bg-rose/10', 'text-rose', 'border-rose/20');
@@ -420,7 +420,7 @@ export async function loadSettingsPage(container) {
               <div class="flex items-center gap-1.5 font-bold mb-0.5">
                 <i data-lucide="alert-circle" class="w-4 h-4"></i> Telegram API Error
               </div>
-              <p class="text-[11px] text-rose/90 leading-relaxed">${escapeHtml(res.description || 'Failed to register webhook.')}</p>
+              <p class="text-[12px] text-rose/90 leading-relaxed">${escapeHtml(res.description || 'Failed to register webhook.')}</p>
             `;
           }
           if (window.lucide) lucide.createIcons();
@@ -431,7 +431,7 @@ export async function loadSettingsPage(container) {
             <div class="flex items-center gap-1.5 font-bold mb-0.5">
               <i data-lucide="alert-circle" class="w-4 h-4"></i> Test Error
             </div>
-            <p class="text-[11px]">${escapeHtml(err.message || 'Connection failed')}</p>
+            <p class="text-[12px]">${escapeHtml(err.message || 'Connection failed')}</p>
           `;
           if (window.lucide) lucide.createIcons();
         } finally {
@@ -510,7 +510,7 @@ export async function loadSettingsPage(container) {
                 <input type="radio" name="storage-provider" value="cloudinary" ${currentProvider === 'cloudinary' ? 'checked' : ''} class="text-brand focus:ring-brand" onchange="window.switchStorageProviderUI('cloudinary')" />
                 <div>
                   <div class="font-semibold text-sm text-main">Cloudinary</div>
-                  <div class="text-[11px] text-muted">Image CDN & Optimization</div>
+                  <div class="text-[12px] text-muted">Image CDN & Optimization</div>
                 </div>
               </label>
 
@@ -518,7 +518,7 @@ export async function loadSettingsPage(container) {
                 <input type="radio" name="storage-provider" value="cloudflare_r2" ${currentProvider === 'cloudflare_r2' ? 'checked' : ''} class="text-brand focus:ring-brand" onchange="window.switchStorageProviderUI('cloudflare_r2')" />
                 <div>
                   <div class="font-semibold text-sm text-main">Cloudflare R2</div>
-                  <div class="text-[11px] text-muted">Zero Egress S3 Bucket</div>
+                  <div class="text-[12px] text-muted">Zero Egress S3 Bucket</div>
                 </div>
               </label>
 
@@ -526,7 +526,7 @@ export async function loadSettingsPage(container) {
                 <input type="radio" name="storage-provider" value="none" ${currentProvider === 'none' ? 'checked' : ''} class="text-brand focus:ring-brand" onchange="window.switchStorageProviderUI('none')" />
                 <div>
                   <div class="font-semibold text-sm text-main">Disabled</div>
-                  <div class="text-[11px] text-muted">URL Links Only</div>
+                  <div class="text-[12px] text-muted">URL Links Only</div>
                 </div>
               </label>
             </div>
@@ -535,7 +535,7 @@ export async function loadSettingsPage(container) {
           <form id="storage-settings-form" class="space-y-4">
             <!-- Cloudinary Fields -->
             <div id="storage-fields-cloudinary" class="${currentProvider === 'cloudinary' ? '' : 'hidden'} space-y-4 p-4 rounded-xl border border-subtle bg-surface-elevated/30">
-              <div class="font-semibold text-xs text-main uppercase tracking-wider">Cloudinary Credentials</div>
+              <div class="font-semibold text-xs text-main">Cloudinary Credentials</div>
               <div class="grid grid-cols-2 gap-4">
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Cloud Name</label>
@@ -546,7 +546,7 @@ export async function loadSettingsPage(container) {
                   <input type="text" id="cld-key" class="form-control" placeholder="123456789012345" value="${escapeHtml(conf.api_key || '')}" />
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
-                  <label class="form-label">API Secret ${conf.api_secret_masked ? '<span class="text-emerald text-[10px]">(Saved)</span>' : ''}</label>
+                  <label class="form-label">API Secret ${conf.api_secret_masked ? '<span class="text-emerald text-[12px]">(Saved)</span>' : ''}</label>
                   <input type="password" id="cld-secret" class="form-control" placeholder="${conf.api_secret_masked ? '••••••••••••••••••••••••••••' : 'Cloudinary API Secret'}" />
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
@@ -558,7 +558,7 @@ export async function loadSettingsPage(container) {
 
             <!-- Cloudflare R2 Fields -->
             <div id="storage-fields-cloudflare_r2" class="${currentProvider === 'cloudflare_r2' ? '' : 'hidden'} space-y-4 p-4 rounded-xl border border-subtle bg-surface-elevated/30">
-              <div class="font-semibold text-xs text-main uppercase tracking-wider">Cloudflare R2 Bucket Details</div>
+              <div class="font-semibold text-xs text-main">Cloudflare R2 Bucket Details</div>
               <div class="grid grid-cols-2 gap-4">
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Account ID</label>
@@ -573,7 +573,7 @@ export async function loadSettingsPage(container) {
                   <input type="text" id="r2-key" class="form-control" placeholder="R2 Token Access Key" value="${escapeHtml(conf.access_key_id || '')}" />
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
-                  <label class="form-label">Secret Access Key ${conf.secret_access_key_masked ? '<span class="text-emerald text-[10px]">(Saved)</span>' : ''}</label>
+                  <label class="form-label">Secret Access Key ${conf.secret_access_key_masked ? '<span class="text-emerald text-[12px]">(Saved)</span>' : ''}</label>
                   <input type="password" id="r2-secret" class="form-control" placeholder="${conf.secret_access_key_masked ? '••••••••••••••••••••••••••••' : 'R2 Secret Access Key'}" />
                 </div>
                 <div class="form-group col-span-2">
@@ -592,7 +592,7 @@ export async function loadSettingsPage(container) {
           <!-- Upload Sandbox Test -->
           ${st.configured ? `
             <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-3">
-              <div class="font-semibold text-xs text-main uppercase tracking-wider flex items-center gap-2">
+              <div class="font-semibold text-xs text-main flex items-center gap-2">
                 <i data-lucide="test-tube" class="w-4 h-4 text-brand"></i>
                 Test Live Upload
               </div>
@@ -757,7 +757,7 @@ export async function loadSettingsPage(container) {
               <p class="text-xs text-muted mt-0.5">Configure an email delivery provider for password resets, order notifications & customer alerts</p>
             </div>
             <span class="badge ${em.configured ? 'badge-emerald' : 'badge-subtle'}">
-              ${em.configured ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Active: ${escapeHtml((em.provider || '').toUpperCase())}` : 'Not Configured'}
+              ${em.configured ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Active: ${escapeHtml(em.provider ? (em.provider.charAt(0).toUpperCase() + em.provider.slice(1)) : '')}` : 'Not Configured'}
             </span>
           </div>
 
@@ -770,9 +770,9 @@ export async function loadSettingsPage(container) {
                 <div>
                   <div class="flex items-center gap-1.5 font-semibold text-sm text-main">
                     Resend
-                    <span class="badge badge-brand text-[9px] py-0 px-1">Recommended</span>
+                    <span class="badge badge-brand text-[12px] py-0 px-1">Recommended</span>
                   </div>
-                  <div class="text-[11px] text-muted mt-0.5">3,000 free emails/mo • Modern DX</div>
+                  <div class="text-[12px] text-muted mt-0.5">3,000 free emails/mo • Modern DX</div>
                 </div>
               </label>
 
@@ -782,7 +782,7 @@ export async function loadSettingsPage(container) {
                   <div class="flex items-center gap-1.5 font-semibold text-sm text-main">
                     Brevo
                   </div>
-                  <div class="text-[11px] text-muted mt-0.5">300 free emails/day (Sendinblue)</div>
+                  <div class="text-[12px] text-muted mt-0.5">300 free emails/day (Sendinblue)</div>
                 </div>
               </label>
 
@@ -790,7 +790,7 @@ export async function loadSettingsPage(container) {
                 <input type="radio" name="email-provider" value="none" ${currentProvider === 'none' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchEmailProviderUI('none')" />
                 <div>
                   <div class="font-semibold text-sm text-main">Disabled</div>
-                  <div class="text-[11px] text-muted mt-0.5">Email sending turned off</div>
+                  <div class="text-[12px] text-muted mt-0.5">Email sending turned off</div>
                 </div>
               </label>
             </div>
@@ -800,15 +800,15 @@ export async function loadSettingsPage(container) {
             <!-- Resend Fields -->
             <div id="email-fields-resend" class="${currentProvider === 'resend' ? '' : 'hidden'} space-y-4 p-4 rounded-xl border border-subtle bg-surface-elevated/30">
               <div class="flex items-center justify-between">
-                <div class="font-semibold text-xs text-main uppercase tracking-wider">Resend Configuration</div>
-                <a href="https://resend.com/api-keys" target="_blank" class="text-[11px] text-brand hover:underline flex items-center gap-1">
+                <div class="font-semibold text-xs text-main">Resend Configuration</div>
+                <a href="https://resend.com/api-keys" target="_blank" class="text-[12px] text-brand hover:underline flex items-center gap-1">
                   Get API Key <i data-lucide="external-link" class="w-3 h-3"></i>
                 </a>
               </div>
               <div class="form-group">
                 <label class="form-label flex items-center justify-between">
                   <span>API Key</span>
-                  ${currentProvider === 'resend' && cfg.api_key_configured ? `<span class="badge badge-emerald text-[9px] font-mono lowercase">configured (${cfg.api_key_masked})</span>` : ''}
+                  ${currentProvider === 'resend' && cfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">configured (${cfg.api_key_masked})</span>` : ''}
                 </label>
                 <input type="password" id="resend-api-key" class="form-control font-mono text-xs" placeholder="${currentProvider === 'resend' && cfg.api_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 're_123456789...'}" />
               </div>
@@ -816,7 +816,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Sender Email (From)</label>
                   <input type="email" id="resend-from-email" class="form-control text-xs" value="${escapeHtml(currentProvider === 'resend' ? (cfg.from_email || '') : '')}" placeholder="noreply@yourdomain.com" />
-                  <p class="text-[11px] text-muted mt-1">Must be verified under your Resend Domains.</p>
+                  <p class="text-[12px] text-muted mt-1">Must be verified under your Resend Domains.</p>
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Sender Display Name</label>
@@ -828,15 +828,15 @@ export async function loadSettingsPage(container) {
             <!-- Brevo Fields -->
             <div id="email-fields-brevo" class="${currentProvider === 'brevo' ? '' : 'hidden'} space-y-4 p-4 rounded-xl border border-subtle bg-surface-elevated/30">
               <div class="flex items-center justify-between">
-                <div class="font-semibold text-xs text-main uppercase tracking-wider">Brevo (Sendinblue) Configuration</div>
-                <a href="https://app.brevo.com/settings/keys/api" target="_blank" class="text-[11px] text-brand hover:underline flex items-center gap-1">
+                <div class="font-semibold text-xs text-main">Brevo (Sendinblue) Configuration</div>
+                <a href="https://app.brevo.com/settings/keys/api" target="_blank" class="text-[12px] text-brand hover:underline flex items-center gap-1">
                   Get v3 API Key <i data-lucide="external-link" class="w-3 h-3"></i>
                 </a>
               </div>
               <div class="form-group">
                 <label class="form-label flex items-center justify-between">
                   <span>v3 API Key</span>
-                  ${currentProvider === 'brevo' && cfg.api_key_configured ? `<span class="badge badge-emerald text-[9px] font-mono lowercase">configured (${cfg.api_key_masked})</span>` : ''}
+                  ${currentProvider === 'brevo' && cfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">configured (${cfg.api_key_masked})</span>` : ''}
                 </label>
                 <input type="password" id="brevo-api-key" class="form-control font-mono text-xs" placeholder="${currentProvider === 'brevo' && cfg.api_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'xkeysib-...'}" />
               </div>
@@ -844,7 +844,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Sender Email (From)</label>
                   <input type="email" id="brevo-from-email" class="form-control text-xs" value="${escapeHtml(currentProvider === 'brevo' ? (cfg.from_email || '') : '')}" placeholder="support@yourdomain.com" />
-                  <p class="text-[11px] text-muted mt-1">Must be an authorized sender in Brevo.</p>
+                  <p class="text-[12px] text-muted mt-1">Must be an authorized sender in Brevo.</p>
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Sender Display Name</label>
@@ -982,7 +982,7 @@ export async function loadSettingsPage(container) {
               <p class="text-xs text-muted mt-0.5">Configure Paystack to generate secure checkout and instant payment links across AI conversations</p>
             </div>
             <span class="badge ${pm.configured ? 'badge-emerald' : 'badge-subtle'}">
-              ${pm.configured ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Active: PAYSTACK` : 'Disabled'}
+              ${pm.configured ? `<span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1 animate-pulse"></span> Active: Paystack` : 'Disabled'}
             </span>
           </div>
 
@@ -996,9 +996,9 @@ export async function loadSettingsPage(container) {
                 <div>
                   <div class="flex items-center gap-1.5 font-semibold text-sm text-main">
                     Paystack
-                    <span class="badge badge-brand text-[9px] py-0 px-1">Confirmed</span>
+                    <span class="badge badge-brand text-[12px] py-0 px-1">Confirmed</span>
                   </div>
-                  <div class="text-[11px] text-muted mt-0.5">Accept Cards, Bank Transfer, USSD, Apple Pay & Mobile Money</div>
+                  <div class="text-[12px] text-muted mt-0.5">Accept Cards, Bank Transfer, USSD, Apple Pay & Mobile Money</div>
                 </div>
               </label>
 
@@ -1007,7 +1007,7 @@ export async function loadSettingsPage(container) {
                 <input type="radio" name="payment-provider" value="none" ${!isPaystack ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchPaymentProviderUI('none')" />
                 <div>
                   <div class="font-semibold text-sm text-main">Disabled</div>
-                  <div class="text-[11px] text-muted mt-0.5">Turn off automated checkout links generation</div>
+                  <div class="text-[12px] text-muted mt-0.5">Turn off automated checkout links generation</div>
                 </div>
               </label>
             </div>
@@ -1017,8 +1017,8 @@ export async function loadSettingsPage(container) {
             <!-- Paystack Fields -->
             <div id="payment-fields-paystack" class="${isPaystack ? '' : 'hidden'} space-y-4 p-4 rounded-xl border border-subtle bg-surface-elevated/30">
               <div class="flex items-center justify-between">
-                <div class="font-semibold text-xs text-main uppercase tracking-wider">Paystack API Credentials</div>
-                <a href="https://dashboard.paystack.com/#/settings/developer" target="_blank" class="text-[11px] text-brand hover:underline flex items-center gap-1">
+                <div class="font-semibold text-xs text-main">Paystack API Credentials</div>
+                <a href="https://dashboard.paystack.com/#/settings/developer" target="_blank" class="text-[12px] text-brand hover:underline flex items-center gap-1">
                   Developer Dashboard <i data-lucide="external-link" class="w-3 h-3"></i>
                 </a>
               </div>
@@ -1026,7 +1026,7 @@ export async function loadSettingsPage(container) {
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label flex items-center justify-between">
                     <span>Secret Key</span>
-                    ${cfg.secret_key_configured ? `<span class="badge badge-emerald text-[9px] font-mono lowercase">saved (${cfg.secret_key_masked})</span>` : ''}
+                    ${cfg.secret_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${cfg.secret_key_masked})</span>` : ''}
                   </label>
                   <input type="password" id="paystack-secret-key" class="form-control font-mono text-xs" placeholder="${cfg.secret_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'sk_live_...'}" />
                 </div>
@@ -1038,7 +1038,7 @@ export async function loadSettingsPage(container) {
               <div class="p-3 rounded-lg bg-surface text-xs text-muted flex items-start gap-2 border border-subtle">
                 <i data-lucide="info" class="w-4 h-4 text-brand flex-shrink-0 mt-0.5"></i>
                 <div>
-                  Set your Paystack Webhook URL to: <code class="text-brand font-mono text-[11px] select-all">${window.location.origin}/api/v1/payments/webhook/paystack</code>
+                  Set your Paystack Webhook URL to: <code class="text-brand font-mono text-[12px] select-all">${window.location.origin}/api/v1/payments/webhook/paystack</code>
                 </div>
               </div>
               ${pm.configured && pm.available_currencies && pm.available_currencies.length ? `
@@ -1049,7 +1049,7 @@ export async function loadSettingsPage(container) {
                   </div>
                   <div class="flex flex-wrap gap-1.5">
                     ${pm.available_currencies.map(c => `
-                      <span class="badge badge-emerald text-[10px] font-mono">${escapeHtml(c.code)} (${escapeHtml(c.symbol)})</span>
+                      <span class="badge badge-emerald text-[12px] font-mono">${escapeHtml(c.code)} (${escapeHtml(c.symbol)})</span>
                     `).join('')}
                   </div>
                 </div>

@@ -61,7 +61,7 @@ export function createCustomSelect({
       valueDisplay.innerHTML = `
         ${selected.icon ? `<i data-lucide="${selected.icon}" class="w-4 h-4 flex-shrink-0 text-muted"></i>` : ''}
         <span class="truncate font-medium text-main">${escapeHtml(selected.label || selected.value)}</span>
-        ${selected.badge ? `<span class="badge badge-subtle ml-auto text-[10px]">${escapeHtml(selected.badge)}</span>` : ''}
+        ${selected.badge ? `<span class="badge badge-subtle ml-auto text-[12px]">${escapeHtml(selected.badge)}</span>` : ''}
       `;
     } else {
       valueDisplay.innerHTML = `<span class="placeholder">${escapeHtml(placeholder)}</span>`;
@@ -95,9 +95,9 @@ export function createCustomSelect({
             ${opt.icon ? `<i data-lucide="${opt.icon}" class="w-3.5 h-3.5 flex-shrink-0 text-muted"></i>` : ''}
             <div class="min-w-0">
               <div class="text-main leading-snug truncate">${escapeHtml(opt.label || opt.value)}</div>
-              ${opt.description ? `<div class="text-[10px] text-muted truncate">${escapeHtml(opt.description)}</div>` : ''}
+              ${opt.description ? `<div class="text-[12px] text-muted truncate">${escapeHtml(opt.description)}</div>` : ''}
             </div>
-            ${opt.badge ? `<span class="badge badge-subtle ml-auto text-[9px]">${escapeHtml(opt.badge)}</span>` : ''}
+            ${opt.badge ? `<span class="badge badge-subtle ml-auto text-[12px]">${escapeHtml(opt.badge)}</span>` : ''}
           </div>
           <i data-lucide="check" class="option-check"></i>
         </div>

@@ -62,14 +62,14 @@ function renderReportsView(container, data) {
         
         <!-- Total Revenue / GMV -->
         <div class="card p-5 space-y-2 relative overflow-hidden transition-all hover:border-strong">
-          <div class="flex items-center justify-between text-muted text-xs font-semibold uppercase tracking-wider">
-            <span>TOTAL SALES (GMV)</span>
+          <div class="flex items-center justify-between text-muted text-xs font-semibold">
+            <span>Total Sales (GMV)</span>
             <span class="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">💰</span>
           </div>
           <div class="text-2xl sm:text-3xl font-black text-main tracking-tight font-mono">
             ${formatCurrency(data.total_revenue, currency)}
           </div>
-          <div class="text-[11px] text-muted flex items-center gap-1.5 font-mono">
+          <div class="text-[12px] text-muted flex items-center gap-1.5 font-mono">
             <span class="text-emerald-600 dark:text-emerald-400 font-semibold">${data.paid_orders} paid orders</span>
             <span>&bull;</span>
             <span>AOV: ${formatCurrency(data.average_order_value, currency)}</span>
@@ -78,42 +78,42 @@ function renderReportsView(container, data) {
 
         <!-- Conversion Rate -->
         <div class="card p-5 space-y-2 relative overflow-hidden transition-all hover:border-strong">
-          <div class="flex items-center justify-between text-muted text-xs font-semibold uppercase tracking-wider">
-            <span>ORDER CONVERSION</span>
+          <div class="flex items-center justify-between text-muted text-xs font-semibold">
+            <span>Order Conversion</span>
             <span class="p-1.5 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">📈</span>
           </div>
           <div class="text-2xl sm:text-3xl font-black text-main tracking-tight font-mono">
             ${data.conversion_rate}%
           </div>
-          <div class="text-[11px] text-muted font-mono">
+          <div class="text-[12px] text-muted font-mono">
             ${data.paid_orders} paid out of ${data.total_orders} total checkouts
           </div>
         </div>
 
         <!-- AI Resolution Rate -->
         <div class="card p-5 space-y-2 relative overflow-hidden transition-all hover:border-strong">
-          <div class="flex items-center justify-between text-muted text-xs font-semibold uppercase tracking-wider">
-            <span>AI RESOLUTION RATE</span>
+          <div class="flex items-center justify-between text-muted text-xs font-semibold">
+            <span>AI Resolution Rate</span>
             <span class="p-1.5 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">🤖</span>
           </div>
           <div class="text-2xl sm:text-3xl font-black text-main tracking-tight font-mono">
             ${data.ai_resolution_rate}%
           </div>
-          <div class="text-[11px] text-muted font-mono">
+          <div class="text-[12px] text-muted font-mono">
             ${data.ai_resolved_conversations} solved / ${data.human_escalated_conversations} escalated
           </div>
         </div>
 
         <!-- Total Sessions -->
         <div class="card p-5 space-y-2 relative overflow-hidden transition-all hover:border-strong">
-          <div class="flex items-center justify-between text-muted text-xs font-semibold uppercase tracking-wider">
-            <span>TOTAL SESSIONS</span>
+          <div class="flex items-center justify-between text-muted text-xs font-semibold">
+            <span>Total Sessions</span>
             <span class="p-1.5 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">💬</span>
           </div>
           <div class="text-2xl sm:text-3xl font-black text-main tracking-tight font-mono">
             ${data.total_conversations}
           </div>
-          <div class="text-[11px] text-muted font-mono">
+          <div class="text-[12px] text-muted font-mono">
             Across WhatsApp, Telegram & Widget
           </div>
         </div>
@@ -169,7 +169,7 @@ function renderReportsView(container, data) {
                 <div class="w-7 h-7 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center font-bold">1</div>
                 <div>
                   <div class="font-bold text-main">Total Customer Inquiries</div>
-                  <div class="text-[11px] text-muted">Incoming chat conversations</div>
+                  <div class="text-[12px] text-muted">Incoming chat conversations</div>
                 </div>
               </div>
               <span class="text-base font-black text-main font-mono">${data.total_conversations}</span>
@@ -180,7 +180,7 @@ function renderReportsView(container, data) {
                 <div class="w-7 h-7 rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center font-bold">2</div>
                 <div>
                   <div class="font-bold text-main">Checkouts Generated</div>
-                  <div class="text-[11px] text-muted">Automated payment checkouts created</div>
+                  <div class="text-[12px] text-muted">Automated payment checkouts created</div>
                 </div>
               </div>
               <span class="text-base font-black text-main font-mono">${data.total_orders}</span>
@@ -191,7 +191,7 @@ function renderReportsView(container, data) {
                 <div class="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold">3</div>
                 <div>
                   <div class="font-bold text-emerald-700 dark:text-emerald-400">Completed Purchases</div>
-                  <div class="text-[11px] text-muted">Verified paid transactions</div>
+                  <div class="text-[12px] text-muted">Verified paid transactions</div>
                 </div>
               </div>
               <span class="text-base font-black text-emerald-700 dark:text-emerald-400 font-mono">${data.paid_orders}</span>
@@ -214,7 +214,7 @@ function renderReportsView(container, data) {
         ${(data.top_products && data.top_products.length > 0) ? `
           <div class="overflow-x-auto border border-subtle rounded-xl">
             <table class="w-full text-left text-xs">
-              <thead class="bg-surface-elevated text-muted font-semibold border-b border-subtle uppercase tracking-wider text-[10px]">
+              <thead class="bg-surface-elevated text-muted font-semibold border-b border-subtle text-[12px]">
                 <tr>
                   <th class="p-3">Product Name</th>
                   <th class="p-3">Unit Price</th>

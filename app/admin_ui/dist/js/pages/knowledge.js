@@ -54,8 +54,8 @@ export async function loadKnowledgePage(container) {
         render: (val) => {
           const tags = Array.isArray(val) ? val : [];
           return tags.length 
-            ? tags.map(t => `<span class="badge badge-sky mr-1 text-[10px]">${escapeHtml(t)}</span>`).join('') 
-            : '<span class="badge badge-subtle text-[10px]">Public (All Agents)</span>';
+            ? tags.map(t => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(t)}</span>`).join('') 
+            : '<span class="badge badge-subtle text-[12px]">Public (All Agents)</span>';
         }
       }
     ];

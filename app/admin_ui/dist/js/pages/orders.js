@@ -22,19 +22,19 @@ export async function loadOrdersPage(container) {
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="stat-card">
-            <span class="text-xs font-semibold text-muted tracking-wider uppercase flex items-center gap-2">
+            <span class="text-xs font-semibold text-muted flex items-center gap-2">
               <i data-lucide="banknote" class="w-4 h-4 text-emerald"></i> Revenue (Paid)
             </span>
             <span class="text-2xl font-bold font-mono text-emerald">${formatCurrency(totalRevenue, state.user?.business?.currency || 'NGN')}</span>
           </div>
           <div class="stat-card">
-            <span class="text-xs font-semibold text-muted tracking-wider uppercase flex items-center gap-2">
+            <span class="text-xs font-semibold text-muted flex items-center gap-2">
               <i data-lucide="shopping-cart" class="w-4 h-4 text-brand"></i> Total Orders
             </span>
             <span class="text-2xl font-bold font-mono text-main">${orders.length}</span>
           </div>
           <div class="stat-card">
-            <span class="text-xs font-semibold text-muted tracking-wider uppercase flex items-center gap-2">
+            <span class="text-xs font-semibold text-muted flex items-center gap-2">
               <i data-lucide="check-circle" class="w-4 h-4 text-brand"></i> Paid Orders
             </span>
             <span class="text-2xl font-bold font-mono text-brand">${paidCount}</span>

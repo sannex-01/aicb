@@ -58,7 +58,7 @@ export async function loadUsersPage(container) {
           sortable: true,
           render: (val, row) => `
             <div>
-              <div class="font-semibold text-main">${escapeHtml(val || 'Unnamed')} ${row.id === state.user?.id ? '<span class="badge badge-subtle text-[10px] ml-1.5 font-normal">You</span>' : ''}</div>
+              <div class="font-semibold text-main">${escapeHtml(val || 'Unnamed')} ${row.id === state.user?.id ? '<span class="badge badge-subtle text-[12px] ml-1.5 font-normal">You</span>' : ''}</div>
               <div class="text-xs text-muted font-mono">${escapeHtml(row.email)}</div>
             </div>
           `
@@ -72,14 +72,15 @@ export async function loadUsersPage(container) {
             if (val === 'super_admin') badgeCls = 'badge-purple';
             else if (val === 'admin') badgeCls = 'badge-emerald';
             else if (val === 'operator') badgeCls = 'badge-sky';
-            return `<span class="badge ${badgeCls} text-[10px] uppercase">${escapeHtml(val === 'super_admin' ? 'Super Admin' : val)}</span>`;
+            const label = val === 'super_admin' ? 'Super Admin' : (val === 'admin' ? 'Admin' : (val === 'operator' ? 'Operator' : val));
+            return `<span class="badge ${badgeCls} text-[12px] font-medium">${escapeHtml(label)}</span>`;
           }
         },
         {
           key: 'is_active',
           label: 'Status',
           sortable: true,
-          render: (val) => `<span class="badge ${val ? 'badge-emerald' : 'badge-rose'} text-[10px] uppercase">${val ? 'Active' : 'Disabled'}</span>`
+          render: (val) => `<span class="badge ${val ? 'badge-emerald' : 'badge-rose'} text-[12px] font-medium">${val ? 'Active' : 'Disabled'}</span>`
         },
         {
           key: 'created_at',
@@ -247,7 +248,7 @@ function editUserModal(user) {
               <option value="admin" ${user.role === 'admin' || user.role === 'super_admin' ? 'selected' : ''}>Administrator (Full access & team management)</option>
               <option value="viewer" ${user.role === 'viewer' ? 'selected' : ''}>Viewer (Read-only)</option>
             </select>
-            ${isSelf ? '<p class="text-[11px] text-muted mt-1">You cannot modify your own administrator role.</p>' : ''}
+            ${isSelf ? '<p class="text-[12px] text-muted mt-1">You cannot modify your own administrator role.</p>' : ''}
           </div>
           <div class="form-group">
             <label class="form-label">Account Status</label>
@@ -255,7 +256,7 @@ function editUserModal(user) {
               <option value="true" ${user.is_active ? 'selected' : ''}>Active</option>
               <option value="false" ${!user.is_active ? 'selected' : ''}>Disabled</option>
             </select>
-            ${isSelf ? '<p class="text-[11px] text-muted mt-1">You cannot disable your own active account.</p>' : ''}
+            ${isSelf ? '<p class="text-[12px] text-muted mt-1">You cannot disable your own active account.</p>' : ''}
           </div>
         </div>
         <div class="modal-footer">

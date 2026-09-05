@@ -218,7 +218,7 @@ export function injectStyles(): void {
   align-items: center;
   justify-content: center;
   color: #9aa1a9;
-  font-size: 11px;
+  font-size: 12px;
 }
 .${PREFIX}-card-body { padding: 8px; }
 .${PREFIX}-card-title { font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }

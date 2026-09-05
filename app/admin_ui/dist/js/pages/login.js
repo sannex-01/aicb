@@ -50,7 +50,7 @@ export async function renderLoginView(container) {
           <div class="form-group">
             <div class="flex justify-between items-center mb-1">
               <label class="form-label mb-0">Password</label>
-              <a href="/_/admin/forgot-password" onclick="event.preventDefault(); navigate('/_/admin/forgot-password')" class="text-[11px] font-semibold text-brand hover:underline">Forgot password?</a>
+              <a href="/_/admin/forgot-password" onclick="event.preventDefault(); navigate('/_/admin/forgot-password')" class="text-[12px] font-semibold text-brand hover:underline">Forgot password?</a>
             </div>
             <div class="relative">
               <i data-lucide="lock" class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted pointer-events-none"></i>

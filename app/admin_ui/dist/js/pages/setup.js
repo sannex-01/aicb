@@ -116,7 +116,7 @@ export function renderSetupView(container) {
               <div class="form-group">
                 <div class="flex items-center justify-between">
                   <label class="form-label mb-0">Transactional Email Provider</label>
-                  <span class="badge badge-subtle text-[10px]">Optional</span>
+                  <span class="badge badge-subtle text-[12px]">Optional</span>
                 </div>
                 <select id="setup-email-provider" class="form-control" onchange="toggleSetupEmailFields(this.value)">
                   <option value="none">None (Skip for now)</option>

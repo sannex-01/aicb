@@ -45,7 +45,7 @@ export async function loadCustomersPage(container) {
           sortable: false,
           render: (val) => {
             const channels = Array.isArray(val) ? val : [];
-            return channels.map(ch => `<span class="badge ${ch === 'whatsapp' ? 'badge-emerald' : 'badge-sky'} mr-1 uppercase text-[10px]">${escapeHtml(ch)}</span>`).join('') || '<span class="text-faint text-xs">—</span>';
+            return channels.map(ch => `<span class="badge ${ch === 'whatsapp' ? 'badge-emerald' : 'badge-sky'} mr-1 text-[12px] capitalize">${escapeHtml(ch)}</span>`).join('') || '<span class="text-faint text-xs">—</span>';
           }
         },
         {
@@ -106,17 +106,17 @@ async function viewCustomerDetails(customerId) {
         <div class="modal-body space-y-6 max-h-[70vh]">
           <div class="grid grid-cols-2 gap-4">
             <div class="stat-card p-3">
-              <span class="text-xs font-semibold text-muted uppercase">Orders</span>
+              <span class="text-xs font-semibold text-muted">Orders</span>
               <span class="text-xl font-bold font-mono text-main">${c.total_orders}</span>
             </div>
             <div class="stat-card p-3">
-              <span class="text-xs font-semibold text-muted uppercase">Total Spent</span>
+              <span class="text-xs font-semibold text-muted">Total Spent</span>
               <span class="text-xl font-bold font-mono text-emerald">${formatCurrency(c.total_spent)}</span>
             </div>
           </div>
 
           <div>
-            <h4 class="text-xs font-bold uppercase tracking-wider text-muted mb-3">Order History</h4>
+            <h4 class="text-xs font-bold text-muted mb-3">Order History</h4>
             ${data.orders.length === 0 ? '<p class="text-xs text-muted">No orders associated with this customer.</p>' : `
               <div class="card p-0 overflow-hidden border border-subtle">
                 <table class="data-table text-xs">
@@ -139,19 +139,19 @@ async function viewCustomerDetails(customerId) {
           </div>
 
           <div>
-            <h4 class="text-xs font-bold uppercase tracking-wider text-muted mb-3">Recent Conversation Transcripts</h4>
+            <h4 class="text-xs font-bold text-muted mb-3">Recent Conversation Transcripts</h4>
             ${data.sessions.length === 0 ? '<p class="text-xs text-muted">No chat logs recorded.</p>' : `
               <div class="space-y-4">
                 ${data.sessions.map(s => `
                   <div class="border border-subtle rounded-xl p-3 bg-surface-elevated/40 space-y-2">
                     <div class="flex justify-between text-xs text-muted mb-2">
-                      <span class="badge badge-subtle uppercase">${escapeHtml(s.channel)}</span>
+                      <span class="badge badge-subtle capitalize">${escapeHtml(s.channel)}</span>
                       <span>${formatDate(s.last_active_at)}</span>
                     </div>
                     <div class="space-y-2 max-h-48 overflow-y-auto">
                       ${s.messages.map(m => `
                         <div class="text-xs ${m.role === 'user' ? 'text-brand font-medium' : 'text-main'}">
-                          <span class="font-bold text-[10px] text-muted uppercase">${m.role === 'user' ? 'Customer' : 'Bot'}:</span> ${escapeHtml(m.content)}
+                          <span class="font-semibold text-xs text-muted">${m.role === 'user' ? 'Customer' : 'Bot'}:</span> ${escapeHtml(m.content)}
                         </div>
                       `).join('')}
                     </div>

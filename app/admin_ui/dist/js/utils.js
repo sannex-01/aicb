@@ -62,7 +62,7 @@ export function renderSelectCards({
             <div class="select-card-content">
               <div class="flex items-center justify-between gap-1.5">
                 <span class="select-card-title truncate">${escapeHtml(title)}</span>
-                ${badge ? `<span class="badge ${item.badgeClass || 'badge-subtle'} text-[10px] py-0 px-1">${escapeHtml(badge)}</span>` : ''}
+                ${badge ? `<span class="badge ${item.badgeClass || 'badge-subtle'} text-[12px] py-0.5 px-1.5">${escapeHtml(badge)}</span>` : ''}
               </div>
               ${desc ? `<div class="select-card-desc line-clamp-2">${escapeHtml(desc)}</div>` : ''}
               ${metaHtml ? `<div class="select-card-meta">${metaHtml}</div>` : ''}
@@ -479,12 +479,12 @@ export function renderImageUploadField({
       <div class="flex items-center justify-between mb-1.5">
         <label class="form-label">${escapeHtml(label)}</label>
         ${storageConfigured ? `
-          <span class="text-[10px] text-emerald flex items-center gap-1 font-semibold">
-            <i data-lucide="cloud" class="w-3 h-3"></i> Cloud Upload Ready
+          <span class="text-[12px] text-emerald flex items-center gap-1 font-semibold">
+            <i data-lucide="cloud" class="w-3.5 h-3.5"></i> Cloud Upload Ready
           </span>
         ` : `
-          <span class="text-[10px] text-amber flex items-center gap-1 font-medium">
-            <i data-lucide="alert-circle" class="w-3 h-3"></i> Storage Not Configured
+          <span class="text-[12px] text-amber flex items-center gap-1 font-medium">
+            <i data-lucide="alert-circle" class="w-3.5 h-3.5"></i> Storage Not Configured
           </span>
         `}
       </div>
@@ -518,7 +518,7 @@ export function renderImageUploadField({
             <input type="text" id="${id}" class="form-control text-xs font-mono" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value || '')}" />
           ` : `
             <input type="text" id="${id}" class="form-control text-xs font-mono" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value || '')}" oninput="window.updateImageUploadPreview('${id}', this.value)" />
-            <div class="text-[11px] text-amber flex items-start gap-1.5 mt-1 leading-normal bg-amber/5 p-2 rounded-lg border border-amber/10">
+            <div class="text-[12px] text-amber flex items-start gap-1.5 mt-1 leading-normal bg-amber/5 p-2 rounded-lg border border-amber/10">
               <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber"></i>
               <span>To enable direct drag-and-drop file uploads, set up Cloudinary or Cloudflare R2 in <a href="/_/admin/settings" onclick="event.preventDefault(); closeModal(); navigate('/_/admin/settings')" class="font-semibold underline hover:text-amber-300">Settings &rarr; Storage</a>.</span>
             </div>
@@ -703,14 +703,14 @@ export function checkPasswordStrength(password = '') {
 export function renderPasswordStrengthMarkup(idPrefix = 'pwd') {
   return `
     <div id="${idPrefix}-strength-wrap" class="space-y-2 pt-1 hidden">
-      <div class="flex items-center justify-between text-[11px]">
+      <div class="flex items-center justify-between text-[12px]">
         <span class="text-muted">Password Security:</span>
         <span id="${idPrefix}-strength-label" class="font-semibold text-rose">Weak</span>
       </div>
       <div class="w-full bg-surface-elevated rounded-full h-1.5 overflow-hidden">
         <div id="${idPrefix}-strength-bar" class="h-full bg-rose transition-all duration-300 rounded-full" style="width: 25%"></div>
       </div>
-      <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted pt-1">
+      <div class="grid grid-cols-2 gap-x-2 gap-y-1 text-[12px] text-muted pt-1">
         <div id="${idPrefix}-req-length" class="flex items-center gap-1.5 transition-colors">
           <span class="w-1.5 h-1.5 rounded-full bg-subtle"></span> 8+ characters
         </div>

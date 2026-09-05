@@ -98,7 +98,7 @@ export async function loadOverviewPage(container) {
               <div>
                 <h2 class="font-bold text-base text-main flex items-center gap-2">
                   Quick Setup Guide
-                  <span class="badge ${progressPercent === 100 ? 'badge-emerald' : 'badge-brand'} text-[11px] py-0.5">
+                  <span class="badge ${progressPercent === 100 ? 'badge-emerald' : 'badge-brand'} text-[12px] py-0.5">
                     ${completedCount} of ${totalSetupCount} Completed
                   </span>
                 </h2>
@@ -114,7 +114,7 @@ export async function loadOverviewPage(container) {
           <div class="mt-3.5 ${isGuideCollapsed ? 'hidden' : ''}" id="setup-guide-content">
             <!-- Progress Bar -->
             <div class="space-y-1.5 mb-5">
-              <div class="flex justify-between text-[11px] text-muted">
+              <div class="flex justify-between text-[12px] text-muted">
                 <span>Setup Progress</span>
                 <span class="font-semibold font-mono text-main">${progressPercent}%</span>
               </div>
@@ -130,16 +130,16 @@ export async function loadOverviewPage(container) {
                   <div>
                     <div class="flex items-start justify-between gap-2 mb-2">
                       <div class="flex items-center gap-2">
-                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${step.completed ? 'bg-emerald-500 text-white' : 'bg-surface-elevated border border-subtle text-muted'}">
+                        <span class="w-5 h-5 rounded-full flex items-center justify-center text-[12px] font-bold ${step.completed ? 'bg-emerald-500 text-white' : 'bg-surface-elevated border border-subtle text-muted'}">
                           ${step.completed ? '<i data-lucide="check" class="w-3 h-3"></i>' : idx + 1}
                         </span>
                         <h3 class="font-semibold text-xs text-main">${escapeHtml(step.title)}</h3>
                       </div>
-                      <span class="badge ${step.completed ? 'badge-emerald' : 'badge-subtle'} text-[9px] py-0 px-1.5">
+                      <span class="badge ${step.completed ? 'badge-emerald' : 'badge-subtle'} text-[12px] py-0 px-1.5">
                         ${escapeHtml(step.meta || (step.completed ? 'Done' : 'Pending'))}
                       </span>
                     </div>
-                    <p class="text-[11px] text-muted leading-relaxed line-clamp-2 mb-3 pl-7">${escapeHtml(step.desc)}</p>
+                    <p class="text-[12px] text-muted leading-relaxed line-clamp-2 mb-3 pl-7">${escapeHtml(step.desc)}</p>
                   </div>
                   <div class="flex justify-end pt-2 border-t border-subtle/60">
                     <button class="btn ${step.completed ? 'btn-secondary' : 'btn-primary'} btn-xs flex items-center gap-1" onclick="navigate('${step.route}')">
@@ -156,28 +156,28 @@ export async function loadOverviewPage(container) {
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           <div class="card p-5 flex flex-col gap-1">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-muted uppercase tracking-wider">Active Agents</span>
+              <span class="text-xs font-semibold text-muted">Active Agents</span>
               <i data-lucide="bot" class="w-4 h-4 text-muted"></i>
             </div>
             <div class="text-2xl font-bold text-main">${data.stats.active_agents} <span class="text-sm text-muted font-medium">/ ${data.stats.total_agents} total</span></div>
           </div>
           <div class="card p-5 flex flex-col gap-1">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-muted uppercase tracking-wider">Total Customers</span>
+              <span class="text-xs font-semibold text-muted">Total Customers</span>
               <i data-lucide="users" class="w-4 h-4 text-muted"></i>
             </div>
             <div class="text-2xl font-bold text-main">${data.stats.total_customers}</div>
           </div>
           <div class="card p-5 flex flex-col gap-1">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-muted uppercase tracking-wider">Total Orders</span>
+              <span class="text-xs font-semibold text-muted">Total Orders</span>
               <i data-lucide="shopping-cart" class="w-4 h-4 text-muted"></i>
             </div>
             <div class="text-2xl font-bold text-main">${data.stats.total_orders}</div>
           </div>
           <div class="card p-5 flex flex-col gap-1">
             <div class="flex items-center justify-between mb-2">
-              <span class="text-xs font-semibold text-muted uppercase tracking-wider">Total Revenue</span>
+              <span class="text-xs font-semibold text-muted">Total Revenue</span>
               <i data-lucide="credit-card" class="w-4 h-4 text-muted"></i>
             </div>
             <div class="text-2xl font-bold text-main">${formatCurrency(data.stats.total_revenue, data.business.currency)}</div>

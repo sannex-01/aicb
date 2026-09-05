@@ -66,10 +66,10 @@ export async function loadAgentsPage(container) {
                 <div>
                   <div class="flex items-start justify-between mb-3">
                     <div>
-                      <h3 class="font-bold text-lg">${escapeHtml(agent.name)}</h3>
+                      <h3 class="font-bold text-base text-main">${escapeHtml(agent.name)}</h3>
                       <span class="text-xs font-mono text-faint">/${escapeHtml(agent.slug)}</span>
                     </div>
-                    <span class="badge ${agent.is_active ? 'badge-emerald' : 'badge-subtle'}">${agent.is_active ? 'Active' : 'Inactive'}</span>
+                    <span class="badge ${agent.is_active ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${agent.is_active ? 'Active' : 'Inactive'}</span>
                   </div>
 
                   <p class="text-xs text-muted line-clamp-2 mb-4">${escapeHtml(agent.description || 'No description provided.')}</p>
@@ -82,14 +82,14 @@ export async function loadAgentsPage(container) {
                     <div class="flex justify-between text-muted">
                       <span>Access Groups:</span>
                       <span class="text-main">
-                        ${groupNames.length ? groupNames.map(gn => `<span class="badge badge-sky mr-1 text-[10px]">${escapeHtml(gn)}</span>`).join('') : '<span class="badge badge-emerald text-[10px]">Global (All Products)</span>'}
+                        ${groupNames.length ? groupNames.map(gn => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(gn)}</span>`).join('') : '<span class="badge badge-emerald text-[12px]">Global (All Products)</span>'}
                       </span>
                     </div>
                     <div class="flex flex-wrap items-center gap-1.5 pt-2.5 border-t border-subtle">
                       ${hasWa ? '<span class="badge badge-emerald inline-flex items-center gap-1"><i data-lucide="message-circle" class="w-3 h-3"></i> WhatsApp</span>' : ''}
                       ${hasTg ? '<span class="badge badge-sky inline-flex items-center gap-1"><i data-lucide="send" class="w-3 h-3"></i> Telegram</span>' : ''}
                       ${hasWidget ? '<span class="badge badge-amber inline-flex items-center gap-1"><i data-lucide="globe" class="w-3 h-3"></i> Widget</span>' : ''}
-                      ${!(hasWa || hasTg || hasWidget) ? '<span class="text-[11px] text-muted italic">No channels active</span>' : ''}
+                      ${!(hasWa || hasTg || hasWidget) ? '<span class="text-[12px] text-muted italic">No channels active</span>' : ''}
                     </div>
                   </div>
                 </div>
@@ -159,7 +159,7 @@ function editAgentModal(agent, groups) {
               <div class="form-group">
                 <label class="form-label flex items-center justify-between">
                   <span>Slug Identifier</span>
-                  <span class="text-[10px] text-muted normal-case font-normal">Auto-created from name</span>
+                  <span class="text-[12px] text-muted normal-case font-normal">Auto-created from name</span>
                 </label>
                 <input type="text" id="ag-slug" class="form-control bg-surface-elevated text-muted font-mono text-xs cursor-not-allowed" readonly placeholder="sales-assistant" />
               </div>
@@ -183,9 +183,9 @@ function editAgentModal(agent, groups) {
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <label class="form-label font-semibold text-main m-0">Access Groups</label>
-              <span class="text-[11px] text-muted">Multiple Select</span>
+              <span class="text-[12px] text-muted">Multiple Select</span>
             </div>
-            <p class="text-[11px] text-muted">Select the Access Groups this agent belongs to. The agent will have access to products assigned to these groups, and can inherit their configured LLM keys. If left empty, the agent has global access to all products.</p>
+            <p class="text-[12px] text-muted">Select the Access Groups this agent belongs to. The agent will have access to products assigned to these groups, and can inherit their configured LLM keys. If left empty, the agent has global access to all products.</p>
             
             <div class="max-h-56 overflow-y-auto pr-1">
               ${renderSelectCards({
@@ -196,7 +196,7 @@ function editAgentModal(agent, groups) {
                   title: g.name,
                   description: g.description,
                   metaHtml: g.has_api_key 
-                    ? `<div class="text-[10px] text-emerald font-mono flex items-center gap-1"><i data-lucide="key" class="w-3 h-3"></i> Key Set (${escapeHtml(g.llm_provider || 'default')})</div>` 
+                    ? `<div class="text-[12px] text-emerald font-mono flex items-center gap-1"><i data-lucide="key" class="w-3 h-3"></i> Key Set (${escapeHtml(g.llm_provider || 'default')})</div>` 
                     : '',
                 })),
                 selectedValues: selectedGroupIds,
@@ -230,7 +230,7 @@ function editAgentModal(agent, groups) {
             <div class="p-3 rounded-xl border border-subtle bg-app/40 space-y-2">
               <label class="form-label flex items-center justify-between m-0">
                 <span class="font-semibold text-main">Agent API Key Override (Optional)</span>
-                ${agentKeyConfigured ? `<span class="badge badge-emerald text-[10px] font-mono">Configured: ${escapeHtml(agent.api_key_masked || '••••••••')}</span>` : ''}
+                ${agentKeyConfigured ? `<span class="badge badge-emerald text-[12px] font-mono">Configured: ${escapeHtml(agent.api_key_masked || '••••••••')}</span>` : ''}
               </label>
               <div class="relative flex items-center">
                 <input type="password" id="ag-api-key" class="form-control pr-10 font-mono text-xs" placeholder="${agentKeyConfigured ? 'Leave blank to keep configured key' : 'Provider API Key (sk-..., AIzaSy...)'}" autocomplete="new-password" />
@@ -238,7 +238,7 @@ function editAgentModal(agent, groups) {
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               </div>
-              <p class="text-[11px] text-muted m-0">If left empty, this agent will automatically inherit the provider key configured on its assigned Access Group, or fall back to system settings.</p>
+              <p class="text-[12px] text-muted m-0">If left empty, this agent will automatically inherit the provider key configured on its assigned Access Group, or fall back to system settings.</p>
             </div>
 
             <div class="grid grid-cols-2 gap-3">
@@ -268,7 +268,7 @@ function editAgentModal(agent, groups) {
           return `
           <div class="space-y-4">
             <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-3">
-              <div class="flex items-center gap-2 text-xs font-semibold text-emerald uppercase tracking-wider">
+              <div class="flex items-center gap-2 text-xs font-semibold text-emerald">
                 <i data-lucide="message-circle" class="w-3.5 h-3.5"></i> WhatsApp
               </div>
               <div class="form-group">
@@ -278,7 +278,7 @@ function editAgentModal(agent, groups) {
               <div class="form-group">
                 <label class="form-label flex items-center justify-between">
                   <span>WhatsApp Token</span>
-                  ${waConfigured ? `<span class="badge badge-emerald text-[10px] font-mono">Configured: ${escapeHtml(agent.whatsapp_token_masked || '••••••••')}</span>` : ''}
+                  ${waConfigured ? `<span class="badge badge-emerald text-[12px] font-mono">Configured: ${escapeHtml(agent.whatsapp_token_masked || '••••••••')}</span>` : ''}
                 </label>
                 <div class="relative flex items-center">
                   <input type="password" id="ag-wa-token" class="form-control pr-10 font-mono text-xs" placeholder="${waConfigured ? 'Leave blank to keep configured' : 'Meta Access Token'}" autocomplete="new-password" />
@@ -290,13 +290,13 @@ function editAgentModal(agent, groups) {
             </div>
 
             <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-3">
-              <div class="flex items-center gap-2 text-xs font-semibold text-sky uppercase tracking-wider">
+              <div class="flex items-center gap-2 text-xs font-semibold text-sky">
                 <i data-lucide="send" class="w-3.5 h-3.5"></i> Telegram Bot API
               </div>
               <div class="form-group">
                 <label class="form-label flex items-center justify-between">
                   <span>Telegram Bot Token</span>
-                  ${tgConfigured ? `<span class="badge badge-sky text-[10px] font-mono">Configured: ${escapeHtml(agent.telegram_bot_token_masked || '••••••••')}</span>` : ''}
+                  ${tgConfigured ? `<span class="badge badge-sky text-[12px] font-mono">Configured: ${escapeHtml(agent.telegram_bot_token_masked || '••••••••')}</span>` : ''}
                 </label>
                 <div class="relative flex items-center">
                   <input type="password" id="ag-tg-token" class="form-control pr-10 font-mono text-xs" placeholder="${tgConfigured ? 'Leave blank to keep configured' : 'Telegram Bot Token from @BotFather'}" autocomplete="new-password" />
@@ -304,7 +304,7 @@ function editAgentModal(agent, groups) {
                     <i data-lucide="eye" class="w-4 h-4"></i>
                   </button>
                 </div>
-                <p class="text-[11px] text-muted mt-1">Webhook is configured automatically with your active secret token.</p>
+                <p class="text-[12px] text-muted mt-1">Webhook is configured automatically with your active secret token.</p>
               </div>
             </div>
 
@@ -315,7 +315,7 @@ function editAgentModal(agent, groups) {
                 </div>
                 <div>
                   <div class="font-medium text-xs text-main">Website Chat Widget</div>
-                  <div class="text-[11px] text-muted">Allow customers & visitors to chat with this agent via embedded web widget</div>
+                  <div class="text-[12px] text-muted">Allow customers & visitors to chat with this agent via embedded web widget</div>
                 </div>
               </div>
               <label class="relative inline-flex items-center cursor-pointer m-0">
@@ -431,7 +431,7 @@ function testAgentModal(agentId, agentName) {
           </div>
           <div class="min-w-0">
             <h3 class="font-bold text-sm text-main truncate">${escapeHtml(agentName)}</h3>
-            <span class="text-[11px] text-muted block truncate">Interactive Sandbox Test</span>
+            <span class="text-[12px] text-muted block truncate">Interactive Sandbox Test</span>
           </div>
         </div>
         <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
@@ -440,7 +440,7 @@ function testAgentModal(agentId, agentName) {
       <!-- Chat Transcript (Scrollable) -->
       <div id="test-chat-transcript" class="flex-1 overflow-y-auto p-4 space-y-3 bg-app/40">
         <div class="flex flex-col items-start">
-          <span class="text-[10px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
+          <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
           <div class="bg-surface border border-subtle text-main rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
             👋 Hello! I am <strong>${escapeHtml(agentName)}</strong>. Send me a message to test how I respond.
           </div>
@@ -477,7 +477,7 @@ function testAgentModal(agentId, agentName) {
     // Render User Bubble
     transcript.innerHTML += `
       <div class="flex flex-col items-end">
-        <span class="text-[10px] text-muted mb-1 px-1 font-medium">You</span>
+        <span class="text-[12px] text-muted mb-1 px-1 font-medium">You</span>
         <div class="bg-brand text-brand-contrast rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
           ${escapeHtml(msg)}
         </div>
@@ -490,12 +490,12 @@ function testAgentModal(agentId, agentName) {
     const typingId = `typing-${Date.now()}`;
     transcript.innerHTML += `
       <div id="${typingId}" class="flex flex-col items-start">
-        <span class="text-[10px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
+        <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
         <div class="bg-surface border border-subtle text-muted rounded-2xl rounded-tl-sm px-3.5 py-2 text-xs flex items-center gap-1.5 shadow-sm">
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse"></span>
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse [animation-delay:0.2s]"></span>
           <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse [animation-delay:0.4s]"></span>
-          <span class="text-[11px] ml-1">Thinking...</span>
+          <span class="text-[12px] ml-1">Thinking...</span>
         </div>
       </div>
     `;
@@ -515,7 +515,7 @@ function testAgentModal(agentId, agentName) {
 
       transcript.innerHTML += `
         <div class="flex flex-col items-start">
-          <span class="text-[10px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
+          <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
           <div class="bg-surface border border-subtle text-main rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
             ${escapeHtml(res.reply)}
           </div>
@@ -528,7 +528,7 @@ function testAgentModal(agentId, agentName) {
 
       transcript.innerHTML += `
         <div class="flex flex-col items-start">
-          <span class="text-[10px] text-rose mb-1 px-1 font-medium">Error</span>
+          <span class="text-[12px] text-rose mb-1 px-1 font-medium">Error</span>
           <div class="bg-rose/10 border border-rose/20 text-rose rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%]">
             Failed to get response: ${escapeHtml(err.message || 'Unknown error')}
           </div>
@@ -574,7 +574,7 @@ window.showEmbedSnippet = function(agentId, agentSlug) {
             <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy
           </button>
         </div>
-        <div class="p-2.5 rounded-lg border border-subtle bg-surface text-[11px] text-muted flex items-center gap-2">
+        <div class="p-2.5 rounded-lg border border-subtle bg-surface text-[12px] text-muted flex items-center gap-2">
           <i data-lucide="info" class="w-4 h-4 text-brand flex-shrink-0"></i>
           <span>Auto-loads the chat bubble and connects directly to this AI agent.</span>
         </div>

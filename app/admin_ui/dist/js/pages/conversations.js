@@ -34,7 +34,7 @@ export async function loadConversationsPage(container) {
           <div class="p-8 text-center text-muted text-xs flex flex-col items-center justify-center gap-2">
             <i data-lucide="message-square-off" class="w-7 h-7 text-subtle"></i>
             <p class="font-medium text-main">No conversations found</p>
-            <p class="text-[11px]">Try adjusting your search or filters.</p>
+            <p class="text-[12px]">Try adjusting your search or filters.</p>
           </div>
         `;
         if (window.lucide) lucide.createIcons();
@@ -56,7 +56,7 @@ export async function loadConversationsPage(container) {
           <div id="session-item-${s.id}" class="p-3.5 cursor-pointer transition-colors border-b border-subtle/50 flex flex-col gap-1.5 ${isSelected ? 'bg-surface-hover' : 'hover:bg-surface-hover'}" onclick="window.loadConversationThread(${s.id})">
             <div class="flex justify-between items-start gap-2">
               <div class="flex items-center gap-2 min-w-0">
-                <div class="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[11px] font-bold flex-shrink-0">
+                <div class="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[12px] font-bold flex-shrink-0">
                   ${escapeHtml((displayName.charAt(0) || 'U').toUpperCase())}
                 </div>
                 <span class="font-medium text-[14px] text-main truncate max-w-[200px]">
@@ -70,11 +70,11 @@ export async function loadConversationsPage(container) {
               <span class="text-[12px] text-muted truncate max-w-[190px] font-mono">${escapeHtml(subText)}</span>
               <div class="flex items-center gap-1.5 flex-shrink-0">
                 ${s.agent?.name ? `
-                  <span class="badge badge-subtle text-[10px] py-0.5 px-1.5 truncate max-w-[95px]" title="Agent: ${escapeHtml(s.agent.name)}">
+                  <span class="badge badge-subtle text-[12px] py-0.5 px-1.5 truncate max-w-[95px]" title="Agent: ${escapeHtml(s.agent.name)}">
                     ${escapeHtml(s.agent.name)}
                   </span>
                 ` : ''}
-                <span class="badge ${channelBadgeClass} text-[10px] uppercase py-0.5 px-1.5">
+                <span class="badge ${channelBadgeClass} text-[12px] py-0.5 px-1.5">
                   ${escapeHtml(s.channel)}
                 </span>
               </div>
@@ -130,7 +130,7 @@ export async function loadConversationsPage(container) {
                 <i data-lucide="message-square" class="w-4 h-4 text-brand"></i>
                 <span class="font-bold text-[16px] text-main">Sessions</span>
               </div>
-              <span class="badge badge-brand text-[10px] font-mono font-bold px-2 py-0.5" id="conv-count-badge">${sessions.length}</span>
+              <span class="badge badge-brand text-[12px] font-mono font-bold px-2 py-0.5" id="conv-count-badge">${sessions.length}</span>
             </div>
 
             <!-- Search Input (Normal Design System Input Size) -->
@@ -145,11 +145,11 @@ export async function loadConversationsPage(container) {
             <!-- Filters Row: Custom Agent Selector & Custom Channel Selector -->
             <div class="grid grid-cols-2 gap-2 pt-0.5">
               <div class="space-y-1">
-                <label class="form-label-sm block text-[12px] font-bold text-muted uppercase tracking-wider">Agent</label>
+                <label class="form-label-sm block text-[12px] font-semibold text-muted">Agent</label>
                 <div id="conv-agent-select-container"></div>
               </div>
               <div class="space-y-1">
-                <label class="form-label-sm block text-[12px] font-bold text-muted uppercase tracking-wider">Channel</label>
+                <label class="form-label-sm block text-[12px] font-semibold text-muted">Channel</label>
                 <div id="conv-channel-select-container"></div>
               </div>
             </div>
@@ -326,12 +326,12 @@ export async function loadConversationsPage(container) {
 
             <div class="flex items-center gap-2">
               ${thread.agent?.name ? `
-                <span class="badge badge-brand text-[10px] flex items-center gap-1 font-medium">
+                <span class="badge badge-brand text-[12px] flex items-center gap-1 font-medium">
                   <i data-lucide="bot" class="w-3.5 h-3.5"></i>
                   ${escapeHtml(thread.agent.name)}
                 </span>
               ` : ''}
-              <span class="badge ${channelBadgeClass} text-[10px] uppercase font-bold">
+              <span class="badge ${channelBadgeClass} text-[12px] font-medium">
                 ${escapeHtml(thread.channel)}
               </span>
               <button id="conv-sidebar-toggle-btn" class="p-1.5 rounded-lg text-muted hover:text-main hover:bg-surface-elevated transition-colors ${convSidebarOpen ? 'text-brand' : ''} cursor-pointer" onclick="window.toggleConvSidebar()" title="Toggle Session Details">
@@ -367,7 +367,7 @@ export async function loadConversationsPage(container) {
           metaContainer.innerHTML = `
             <!-- Customer Section -->
             <div class="space-y-1.5">
-              <span class="text-[12px] font-bold text-muted uppercase tracking-wider">Customer Identity</span>
+              <span class="text-[12px] font-semibold text-muted">Customer Identity</span>
               <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-2">
                 <div class="font-bold text-[16px] text-main">${thread.customer?.name ? escapeHtml(thread.customer.name) : 'Anonymous Customer'}</div>
                 <div class="text-[12px] text-muted flex items-center gap-2">
@@ -385,7 +385,7 @@ export async function loadConversationsPage(container) {
             <!-- Agent Assigned Section -->
             ${thread.agent ? `
             <div class="space-y-1.5">
-              <span class="text-[12px] font-bold text-muted uppercase tracking-wider">Assigned AI Agent</span>
+              <span class="text-[12px] font-semibold text-muted">Assigned AI Agent</span>
               <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-1.5">
                 <div class="flex items-center gap-2">
                   <div class="w-6 h-6 rounded-lg bg-brand/10 text-brand flex items-center justify-center flex-shrink-0">
@@ -402,15 +402,15 @@ export async function loadConversationsPage(container) {
 
             <!-- Session Details Section -->
             <div class="space-y-1.5">
-              <span class="text-[10px] font-bold text-muted uppercase tracking-wider">Session State</span>
+              <span class="text-[12px] font-semibold text-muted">Session State</span>
               <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-2 text-[12px]">
                 <div class="flex justify-between items-center">
                   <span class="text-muted">Channel</span>
-                  <span class="font-semibold text-main uppercase">${escapeHtml(thread.channel || 'N/A')}</span>
+                  <span class="font-semibold text-main capitalize">${escapeHtml(thread.channel || 'N/A')}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-muted">Bot Mode</span>
-                  <span class="badge badge-brand text-[10px]">${escapeHtml(thread.bot_mode || 'conversational')}</span>
+                  <span class="badge badge-brand text-[12px] capitalize">${escapeHtml(thread.bot_mode || 'conversational')}</span>
                 </div>
                 ${thread.active_flow ? `
                 <div class="flex justify-between items-center">
@@ -428,19 +428,19 @@ export async function loadConversationsPage(container) {
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-muted">Started</span>
-                  <span class="text-muted text-[11px]">${formatDate(thread.created_at)}</span>
+                  <span class="text-muted text-[12px]">${formatDate(thread.created_at)}</span>
                 </div>
                 <div class="flex justify-between items-center">
                   <span class="text-muted">Last Active</span>
-                  <span class="text-muted text-[11px]">${formatDate(thread.last_active_at)}</span>
+                  <span class="text-muted text-[12px]">${formatDate(thread.last_active_at)}</span>
                 </div>
               </div>
             </div>
 
             <!-- Session Key -->
             <div class="space-y-1">
-              <span class="text-[10px] font-bold text-muted uppercase tracking-wider">Session Key</span>
-              <div class="p-2 bg-app rounded-lg text-[10px] font-mono text-muted break-all select-all border border-subtle/30">
+              <span class="text-[12px] font-semibold text-muted">Session Key</span>
+              <div class="p-2 bg-app rounded-lg text-[12px] font-mono text-muted break-all select-all border border-subtle/30">
                 ${escapeHtml(thread.session_key || `session_${thread.id}`)}
               </div>
             </div>
