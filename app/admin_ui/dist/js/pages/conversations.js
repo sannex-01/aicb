@@ -2,11 +2,14 @@ import { state } from '../state.js';
 import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { showToast, escapeHtml, formatDate, skeletonPage } from '../utils.js';
+import { createCustomSelect } from '../components/custom-select.js';
 
 let currentThreadData = null;
 let convSidebarOpen = true;
 let currentSelectedSessionId = null;
 let searchDebounceTimer = null;
+let selectedAgentId = '';
+let selectedChannel = '';
 
 export async function loadConversationsPage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 8 });
@@ -84,13 +87,8 @@ export async function loadConversationsPage(container) {
     }
 
     async function applyFiltersAndReload() {
-      const agentSelect = document.getElementById('conv-filter-agent');
-      const channelSelect = document.getElementById('conv-filter-channel');
       const searchInput = document.getElementById('conv-search-input');
       const clearBtn = document.getElementById('conv-search-clear');
-
-      const agentId = agentSelect?.value || '';
-      const channel = channelSelect?.value || '';
       const search = searchInput?.value?.trim() || '';
 
       if (clearBtn) {
@@ -98,8 +96,8 @@ export async function loadConversationsPage(container) {
       }
 
       const params = new URLSearchParams({ limit: '50' });
-      if (agentId) params.set('agent_id', agentId);
-      if (channel) params.set('channel', channel);
+      if (selectedAgentId) params.set('agent_id', selectedAgentId);
+      if (selectedChannel) params.set('channel', selectedChannel);
       if (search) params.set('search', search);
 
       const listContainer = document.getElementById('conv-session-list');
@@ -126,7 +124,7 @@ export async function loadConversationsPage(container) {
         <div class="w-84 sm:w-90 flex-shrink-0 border-r border-subtle flex flex-col bg-surface">
           
           <!-- Pane Header & Filter Controls -->
-          <div class="p-3.5 border-b border-subtle bg-surface-elevated/40 space-y-2.5 flex-shrink-0">
+          <div class="p-3.5 border-b border-subtle bg-surface-elevated/40 space-y-3 flex-shrink-0">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <i data-lucide="message-square" class="w-4 h-4 text-brand"></i>
@@ -135,32 +133,24 @@ export async function loadConversationsPage(container) {
               <span class="badge badge-brand text-xs font-mono font-bold px-2 py-0.5" id="conv-count-badge">${sessions.length}</span>
             </div>
 
-            <!-- Search Input: Customer Name, Phone, Email -->
+            <!-- Search Input (Normal Design System Input Size) -->
             <div class="relative flex items-center">
-              <i data-lucide="search" class="w-3.5 h-3.5 absolute left-2.5 text-muted pointer-events-none"></i>
-              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="form-control text-xs pl-8 pr-7 py-1.5 w-full" />
-              <button id="conv-search-clear" class="hidden absolute right-2 text-muted hover:text-main p-0.5 cursor-pointer" title="Clear search">
-                <i data-lucide="x" class="w-3 h-3"></i>
+              <i data-lucide="search" class="w-4 h-4 absolute left-3 text-muted pointer-events-none"></i>
+              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="form-control pl-9.5 pr-8 py-2 w-full text-sm" />
+              <button id="conv-search-clear" class="hidden absolute right-2.5 text-muted hover:text-main p-1 cursor-pointer" title="Clear search">
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
               </button>
             </div>
 
-            <!-- Filters Row: Agent Selector & Channel Selector -->
+            <!-- Filters Row: Custom Agent Selector & Custom Channel Selector -->
             <div class="grid grid-cols-2 gap-2 pt-0.5">
               <div class="space-y-1">
                 <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Agent</label>
-                <select id="conv-filter-agent" class="form-control text-xs py-1 px-2 w-full">
-                  <option value="">All Agents</option>
-                  ${agents.map(a => `<option value="${a.id}">${escapeHtml(a.name)}</option>`).join('')}
-                </select>
+                <div id="conv-agent-select-container"></div>
               </div>
               <div class="space-y-1">
                 <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Channel</label>
-                <select id="conv-filter-channel" class="form-control text-xs py-1 px-2 w-full">
-                  <option value="">All Channels</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="telegram">Telegram</option>
-                  <option value="widget">Widget</option>
-                </select>
+                <div id="conv-channel-select-container"></div>
               </div>
             </div>
           </div>
@@ -203,11 +193,48 @@ export async function loadConversationsPage(container) {
 
     renderSessionList(sessions);
 
-    // Bind Filter & Search Events
+    // Initialize Custom Selects
+    const agentOptions = [
+      { value: '', label: 'All Agents' },
+      ...agents.map(a => ({ value: String(a.id), label: a.name }))
+    ];
+
+    createCustomSelect({
+      container: '#conv-agent-select-container',
+      id: 'conv-agent-custom-select',
+      value: selectedAgentId,
+      options: agentOptions,
+      placeholder: 'All Agents',
+      searchable: agents.length > 5,
+      onChange: (val) => {
+        selectedAgentId = val;
+        applyFiltersAndReload();
+      }
+    });
+
+    const channelOptions = [
+      { value: '', label: 'All Channels' },
+      { value: 'whatsapp', label: 'WhatsApp', icon: 'message-circle' },
+      { value: 'telegram', label: 'Telegram', icon: 'send' },
+      { value: 'widget', label: 'Widget', icon: 'globe' },
+    ];
+
+    createCustomSelect({
+      container: '#conv-channel-select-container',
+      id: 'conv-channel-custom-select',
+      value: selectedChannel,
+      options: channelOptions,
+      placeholder: 'All Channels',
+      searchable: false,
+      onChange: (val) => {
+        selectedChannel = val;
+        applyFiltersAndReload();
+      }
+    });
+
+    // Bind Search Events
     const searchInput = document.getElementById('conv-search-input');
     const searchClear = document.getElementById('conv-search-clear');
-    const agentFilter = document.getElementById('conv-filter-agent');
-    const channelFilter = document.getElementById('conv-filter-channel');
 
     if (searchInput) {
       searchInput.addEventListener('input', () => {
@@ -229,14 +256,6 @@ export async function loadConversationsPage(container) {
           applyFiltersAndReload();
         }
       });
-    }
-
-    if (agentFilter) {
-      agentFilter.addEventListener('change', applyFiltersAndReload);
-    }
-
-    if (channelFilter) {
-      channelFilter.addEventListener('change', applyFiltersAndReload);
     }
 
     // Global toggle for the right metadata sidebar
