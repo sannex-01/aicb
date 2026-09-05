@@ -19,10 +19,18 @@ router = APIRouter(prefix="/webhooks/whatsapp", tags=["WhatsApp Webhook"])
 
 
 async def _deliver(wa_client: WhatsAppClient, to: str, resp: BotResponse) -> None:
-    """Sends a BotResponse to WhatsApp: an interactive list message when there
-    are product cards, otherwise quick-reply buttons, otherwise plain text."""
+    """Sends a BotResponse to WhatsApp: a swipeable media carousel when there
+    are 2+ product cards with images, an interactive list message for other
+    product-card/multi-button cases, otherwise quick-reply buttons, otherwise
+    plain text."""
     rendered = WhatsAppRenderer.render(resp)
-    if rendered["list_sections"]:
+    if rendered["carousel"]:
+        await wa_client.send_media_carousel(
+            to=to,
+            body=rendered["carousel"]["body"],
+            cards=rendered["carousel"]["cards"],
+        )
+    elif rendered["list_sections"]:
         await wa_client.send_list_message(
             to=to,
             body=rendered["text"],

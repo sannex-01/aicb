@@ -123,6 +123,52 @@ class WhatsAppClient:
         }
         return await self._send(payload)
 
+    async def send_media_carousel(
+        self,
+        to: str,
+        body: str,
+        cards: List[Dict[str, Any]],
+        # [{"image_url": str, "caption": Optional[str], "button_id": str, "button_title": str}]
+    ) -> Dict[str, Any]:
+        """Sends a free-form Interactive Media Carousel (2-10 swipeable cards,
+        each with its own image + one quick-reply button) — no pre-approved
+        template and no Meta Commerce Catalog required, unlike the
+        catalog-linked "Interactive Product Carousel". Cards need no prior
+        Meta-side product sync; images are just URLs we already host."""
+        carousel_cards = []
+        for i, card in enumerate(cards[:10]):
+            entry: Dict[str, Any] = {
+                "card_index": i,
+                "header": {"type": "image", "image": {"link": card["image_url"]}},
+                "action": {
+                    "buttons": [
+                        {
+                            "type": "quick_reply",
+                            "quick_reply": {
+                                "id": card["button_id"],
+                                "title": card["button_title"][:20],
+                            },
+                        }
+                    ]
+                },
+            }
+            if card.get("caption"):
+                entry["body"] = {"text": card["caption"][:160]}
+            carousel_cards.append(entry)
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": to,
+            "type": "interactive",
+            "interactive": {
+                "type": "carousel",
+                "body": {"text": body[:1024]},
+                "action": {"cards": carousel_cards},
+            },
+        }
+        return await self._send(payload)
+
     async def send_image_message(self, to: str, image_url: str, caption: Optional[str] = None) -> Dict[str, Any]:
         """Sends an image message."""
         payload = {

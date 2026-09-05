@@ -19,18 +19,15 @@ router = APIRouter(prefix="/webhooks/telegram", tags=["Telegram Webhook"])
 
 
 async def _deliver(tg_client: TelegramClient, chat_id: int | str, resp: BotResponse) -> None:
-    """Sends a BotResponse to Telegram: one photo per product card (if any),
-    then the text reply with its inline keyboard."""
+    """Sends a BotResponse to Telegram: one swipeable media-group album for
+    all product cards (if any) plus a buy-buttons follow-up, then the text
+    reply with its own inline keyboard."""
     rendered = TelegramRenderer.render(resp)
-    for card in rendered["photo_items"]:
-        card_msg = TelegramRenderer.product_card_message(card)
-        if card_msg["photo_url"]:
-            await tg_client.send_photo(
-                chat_id=chat_id,
-                photo_url=card_msg["photo_url"],
-                caption=card_msg["caption"],
-                reply_markup=card_msg["reply_markup"],
-            )
+    if rendered["photo_items"]:
+        album = TelegramRenderer.product_album(rendered["photo_items"])
+        if album["media_items"]:
+            await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
+        await tg_client.send_inline_buttons(chat_id=chat_id, text=album["actions_text"], buttons=album["actions_keyboard"])
     if rendered["inline_keyboard"]:
         await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
     else:
@@ -55,6 +52,42 @@ async def handle_telegram_webhook(
 
     tg_client = TelegramClient()
 
+    # 0. Handle Inline Mode Search Queries (bots/inline) — "@botname <query>",
+    # either from another chat or via a switch_inline_query_current_chat
+    # button in this same chat. No session/flow state involved: this is a
+    # stateless search-and-pick, independent of the normal message/callback
+    # flow below.
+    if "inline_query" in update:
+        iq = update["inline_query"]
+        iq_id = iq.get("id")
+        query_text = (iq.get("query") or "").strip()
+
+        if not query_text:
+            await tg_client.answer_inline_query(iq_id, results=[])
+        else:
+            from app.commerce.catalog_provider import CatalogManager
+            from app.commerce.storage.manager import StorageManager
+            from app.schemas.bot_response import ProductCard
+
+            products = await CatalogManager.search_products(db, query=query_text, limit=10)
+            storage_ok = StorageManager.is_configured()
+            cards = [
+                ProductCard(
+                    id=p.id,
+                    title=p.title,
+                    description=p.description,
+                    price=p.price,
+                    currency=p.currency,
+                    image_url=p.image_url if storage_ok else None,
+                    buy_action_id=f"cart_add_{p.id}",
+                )
+                for p in products
+            ]
+            results = TelegramRenderer.inline_query_results(cards)
+            await tg_client.answer_inline_query(iq_id, results=results)
+
+        return {"ok": True}
+
     # 1. Handle Inline Button Clicks (callback_query)
     if "callback_query" in update:
         cb = update["callback_query"]
@@ -78,16 +111,13 @@ async def handle_telegram_webhook(
         rendered = TelegramRenderer.render(flow_res)
 
         # Product cards can't be edited in-place onto an existing text message —
-        # send them fresh, then fall through to the normal edit-or-send text path.
-        for card in rendered["photo_items"]:
-            card_msg = TelegramRenderer.product_card_message(card)
-            if card_msg["photo_url"]:
-                await tg_client.send_photo(
-                    chat_id=chat_id,
-                    photo_url=card_msg["photo_url"],
-                    caption=card_msg["caption"],
-                    reply_markup=card_msg["reply_markup"],
-                )
+        # send a fresh media-group album + its own buy-buttons message, then
+        # fall through to the normal edit-or-send text path for the rest.
+        if rendered["photo_items"]:
+            album = TelegramRenderer.product_album(rendered["photo_items"])
+            if album["media_items"]:
+                await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
+            await tg_client.send_inline_buttons(chat_id=chat_id, text=album["actions_text"], buttons=album["actions_keyboard"])
 
         # Edit the existing message in-place for a clean, app-like experience
         edit_success = False

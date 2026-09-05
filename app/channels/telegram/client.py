@@ -75,6 +75,53 @@ class TelegramClient:
             res = await self._post("sendPhoto", payload)
         return res
 
+    async def answer_inline_query(
+        self,
+        inline_query_id: str,
+        results: List[Dict[str, Any]],
+        cache_time: int = 30,
+    ) -> Dict[str, Any]:
+        """Answers an inline_query (bots/inline) with up to 50 results —
+        used for @botname <search> product search from any chat, or from
+        the current chat via a switch_inline_query_current_chat button."""
+        payload = {
+            "inline_query_id": inline_query_id,
+            "results": results[:50],
+            "cache_time": cache_time,
+        }
+        return await self._post("answerInlineQuery", payload)
+
+    async def send_media_group(
+        self,
+        chat_id: int | str,
+        items: List[Dict[str, Any]],  # [{"photo_url": str, "caption": Optional[str]}]
+    ) -> Dict[str, Any]:
+        """Sends up to 10 photos as one native swipeable album (sendMediaGroup).
+
+        Telegram doesn't allow inline keyboards on individual album items, so
+        this only carries images + captions — callers should follow up with a
+        separate send_inline_buttons/send_message call for any actions (e.g.
+        "Buy Product A" / "Buy Product B") since per-card buttons aren't
+        possible inside the album itself.
+        """
+        media = []
+        for item in items[:10]:
+            entry: Dict[str, Any] = {"type": "photo", "media": item["photo_url"]}
+            if item.get("caption"):
+                entry["caption"] = item["caption"][:1024]
+                entry["parse_mode"] = "Markdown"
+            media.append(entry)
+
+        payload = {"chat_id": chat_id, "media": media}
+        res = await self._post("sendMediaGroup", payload)
+        if not res.get("ok"):
+            # Retry without Markdown in case a caption has unescaped special chars
+            logger.info("Retrying sendMediaGroup without parse_mode markdown formatting...")
+            for entry in media:
+                entry.pop("parse_mode", None)
+            res = await self._post("sendMediaGroup", {"chat_id": chat_id, "media": media})
+        return res
+
     async def send_inline_buttons(
         self,
         chat_id: int | str,

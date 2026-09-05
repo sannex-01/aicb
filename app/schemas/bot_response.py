@@ -4,10 +4,13 @@ from pydantic import BaseModel, Field
 
 class ResponseButton(BaseModel):
     """A clickable button. 'action' round-trips its id into FlowEngine.handle_action;
-    'url' opens an external link directly."""
+    'url' opens an external link directly; 'inline_search' opens Telegram's
+    bots/inline search UI in the current chat (switch_inline_query_current_chat)
+    — Telegram-only, ignored by WhatsApp/widget renderers since neither has an
+    equivalent."""
     id: str
     title: str
-    kind: Literal["action", "url"] = "action"
+    kind: Literal["action", "url", "inline_search"] = "action"
     url: Optional[str] = None
 
 

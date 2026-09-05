@@ -19,17 +19,40 @@ class WhatsAppRenderer:
 
     @staticmethod
     def render(resp: BotResponse) -> Dict[str, Any]:
-        """Returns {"text": str, "buttons": Optional[list], "list_sections": Optional[list]}.
+        """Returns {"text": str, "buttons": Optional[list], "list_sections": Optional[list],
+        "carousel": Optional[dict]}.
 
-        Product cards render as a single interactive list message (up to 10
-        rows) rather than N separate image messages — WhatsApp's own
-        interactive-message constraints mean an image message can't carry a
-        reply button, and a wall of separate photos is worse UX than one
-        list here. Falls back to quick-reply buttons when there are no cards.
+        Product cards render as a free-form Interactive Media Carousel
+        (swipeable image cards, one quick-reply button each) when there are
+        2+ cards with images — Meta's carousel requires at least 2 cards and
+        no template/catalog setup for this variant. Falls back to the
+        interactive list message (no images, just tappable rows) when there
+        are 0-1 images available, since a carousel of fewer than 2 cards
+        isn't valid. Falls back further to quick-reply buttons when there
+        are no cards at all.
         """
         text = resp.text + _url_buttons_as_text(resp.buttons)
 
         if resp.product_cards:
+            cards_with_images = [c for c in resp.product_cards if c.image_url][:10]
+            if len(cards_with_images) >= 2:
+                carousel_cards = [
+                    {
+                        "image_url": card.image_url,
+                        "caption": f"{card.title}\n{card.price:,.2f} {card.currency}"
+                        + (f"\n{card.description}" if card.description else ""),
+                        "button_id": card.buy_action_id,
+                        "button_title": f"🛒 Buy {card.title}",
+                    }
+                    for card in cards_with_images
+                ]
+                return {
+                    "text": text,
+                    "buttons": None,
+                    "list_sections": None,
+                    "carousel": {"body": text, "cards": carousel_cards},
+                }
+
             rows = [
                 {
                     "id": card.buy_action_id,
@@ -42,6 +65,7 @@ class WhatsAppRenderer:
                 "text": text,
                 "buttons": None,
                 "list_sections": [{"title": "Available Products", "rows": rows}],
+                "carousel": None,
             }
 
         action_button_list = [b for b in resp.buttons if b.kind == "action"]
@@ -53,6 +77,7 @@ class WhatsAppRenderer:
                 "text": text,
                 "buttons": None,
                 "list_sections": [{"title": "Options", "rows": rows}],
+                "carousel": None,
             }
 
         action_buttons = _wa_buttons(resp.buttons)
@@ -60,4 +85,5 @@ class WhatsAppRenderer:
             "text": text,
             "buttons": action_buttons if action_buttons else None,
             "list_sections": None,
+            "carousel": None,
         }

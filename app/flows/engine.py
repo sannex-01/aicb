@@ -141,7 +141,7 @@ class FlowEngine:
 
         # 2. Browse Products Flow
         elif action == "flow_browse_catalog":
-            products = await CatalogManager.get_featured_products(db, limit=6)
+            products = await CatalogManager.get_featured_products(db, limit=10)
             if not products:
                 return BotResponse(
                     text="🛍️ Our catalog is currently being updated. Please check back shortly!",
@@ -167,6 +167,11 @@ class FlowEngine:
                     )
                 )
 
+            if session.channel == "telegram":
+                # Telegram-only: opens bots/inline search (@botname <query>)
+                # scoped to this chat. WhatsApp/widget renderers drop
+                # "inline_search" buttons automatically (no equivalent).
+                buttons.append({"id": "noop_inline_search", "title": "🔍 Search Products", "kind": "inline_search"})
             buttons.append({"id": "flow_view_cart", "title": "🛒 View Cart"})
             buttons.append({"id": "flow_main_menu", "title": "🏠 Menu"})
 
