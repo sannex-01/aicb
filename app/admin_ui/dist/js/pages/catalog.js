@@ -151,7 +151,7 @@ async function editProductModal(product) {
   const selectedGroupIds = new Set(product?.access_group_ids || []);
 
   openModal(`
-    <div class="modal-dialog max-w-xl">
+    <div class="modal-dialog max-w-2xl">
       <div class="modal-header">
         <h3 class="font-bold text-lg text-main">${isEdit ? 'Edit Product' : 'Add Catalog Product'}</h3>
         <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>

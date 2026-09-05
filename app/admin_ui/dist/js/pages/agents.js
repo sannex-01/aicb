@@ -422,7 +422,7 @@ function deleteAgent(agentId, agentSlug = '', agentName = '') {
 
 function testAgentModal(agentId, agentName) {
   openModal(`
-    <div class="modal-dialog max-w-lg w-full flex flex-col h-[520px] max-h-[85vh] p-0 overflow-hidden">
+    <div class="modal-dialog max-w-2xl w-full flex flex-col h-[560px] max-h-[85vh] p-0 overflow-hidden">
       <!-- Modal Header -->
       <div class="modal-header flex items-center justify-between border-b border-subtle px-5 py-3.5 bg-surface flex-shrink-0">
         <div class="flex items-center gap-2.5 min-w-0">
@@ -553,7 +553,7 @@ window.showEmbedSnippet = function(agentId, agentSlug) {
   const snippet = `<script src="${host}/widget.js" data-bot-id="${botId}" async></script>`;
 
   openModal(`
-    <div class="modal-dialog max-w-lg w-full">
+    <div class="modal-dialog max-w-xl w-full">
       <div class="modal-header">
         <div class="flex items-center gap-2">
           <div class="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center">

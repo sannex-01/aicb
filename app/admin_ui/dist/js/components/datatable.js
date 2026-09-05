@@ -236,7 +236,7 @@ export class DataTable {
                         ${isSortable ? `data-sort-key="${escapeHtml(col.key)}"` : ''}
                       >
                         <div class="inline-flex items-center gap-1.5 ${col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : 'justify-start'}">
-                          <span class="font-semibold text-[11px] uppercase tracking-wider text-muted group-hover:text-main transition-colors">${escapeHtml(col.label)}</span>
+                          <span class="font-semibold text-[12px] text-muted group-hover:text-main transition-colors">${escapeHtml(col.label)}</span>
                           ${isSortable ? `
                             <span class="inline-flex items-center">
                               ${isSorted 

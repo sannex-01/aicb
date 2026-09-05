@@ -128,7 +128,7 @@ export async function loadUsersPage(container) {
 
 function openAddUserModal(isEmailConfigured) {
   openModal(`
-    <div class="modal-dialog max-w-md w-full">
+    <div class="modal-dialog max-w-xl w-full">
       <div class="modal-header">
         <div>
           <h3 class="font-bold text-lg text-main">${isEmailConfigured ? 'Invite Team Member' : 'Add Team Member'}</h3>
@@ -222,7 +222,7 @@ function editUserModal(user) {
   const isSelf = user.id === state.user?.id;
 
   openModal(`
-    <div class="modal-dialog max-w-md w-full">
+    <div class="modal-dialog max-w-xl w-full">
       <div class="modal-header">
         <div>
           <h3 class="font-bold text-lg text-main">Edit Team Member</h3>

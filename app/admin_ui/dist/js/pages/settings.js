@@ -57,10 +57,10 @@ export async function loadSettingsPage(container) {
         </div>
 
         <div class="flex flex-col md:flex-row gap-6 items-start">
-          <!-- Left Tabs -->
-          <nav class="w-full md:w-56 flex-shrink-0 flex flex-row md:flex-col gap-1 p-1 bg-surface rounded-xl border border-subtle">
+          <!-- Left Tabs (Settings Sidebar 14px font size) -->
+          <nav class="w-full md:w-60 flex-shrink-0 flex flex-row md:flex-col gap-1 p-1.5 bg-surface rounded-xl border border-subtle">
             ${tabs.map(t => `
-              <button class="settings-tab flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-sm font-medium text-left transition-colors ${activeTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-tab="${t.id}">
+              <button class="settings-tab flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] font-medium text-left transition-colors ${activeTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-tab="${t.id}">
                 <i data-lucide="${t.icon}" class="w-4 h-4 flex-shrink-0"></i>
                 <span>${t.label}</span>
               </button>

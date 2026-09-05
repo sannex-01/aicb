@@ -207,8 +207,6 @@ h4 { font-size: 14px; font-weight: 600; line-height: 1.4; }
   font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
 }
 .form-control {
   background-color: var(--input-bg);
@@ -281,7 +279,7 @@ select.form-control option {
   color: var(--text-main);
   padding: 0.55rem 0.75rem;
   border-radius: 7px;
-  font-size: 0.8125rem;
+  font-size: 14px;
   line-height: 1.45;
   cursor: pointer;
   transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
@@ -363,7 +361,7 @@ select.form-control option {
 .custom-select-search-input {
   width: 100%;
   padding: 0.35rem 0.6rem;
-  font-size: 0.75rem;
+  font-size: 13px;
   background-color: var(--input-bg);
   border: 1px solid var(--input-border);
   color: var(--text-main);
@@ -386,7 +384,7 @@ select.form-control option {
   justify-content: space-between;
   gap: 0.5rem;
   padding: 0.45rem 0.65rem;
-  font-size: 0.8125rem;
+  font-size: 14px;
   border-radius: 5px;
   color: var(--text-main);
   cursor: pointer;
@@ -419,23 +417,20 @@ select.form-control option {
 }
 .custom-select-empty {
   padding: 0.75rem;
-  font-size: 0.75rem;
+  font-size: 13px;
   color: var(--text-muted);
   text-align: center;
 }
 
-/* Badges — flat tint, no border-radius-full pill exaggeration beyond
-   Shopify's own small pill shape */
+/* Badges — flat tint, clean proportions, no all-caps */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 0.15rem 0.45rem;
+  padding: 0.18rem 0.5rem;
   border-radius: 4px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  line-height: 1.2;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.25;
 }
 .badge-emerald { background-color: rgba(0, 128, 96, 0.12); color: #008060; }
 .badge-amber { background-color: rgba(245, 158, 11, 0.12); color: #b45309; }
@@ -514,7 +509,7 @@ select.form-control option {
   border-radius: 6px;
   padding: 0.75rem 1rem;
   font-family: 'JetBrains Mono', monospace;
-  font-size: 0.8125rem;
+  font-size: 13px;
   color: var(--text-main);
   display: flex;
   align-items: center;
@@ -533,7 +528,7 @@ select.form-control option {
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 14px;
   font-weight: 500;
   animation: slideInRight 0.2s ease-out;
   min-width: 300px;
@@ -570,7 +565,7 @@ select.form-control option {
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.8125rem;
+  font-size: 14px;
 }
 .data-table th {
   text-align: left;
@@ -578,9 +573,7 @@ select.form-control option {
   font-weight: 600;
   color: var(--text-subtle);
   border-bottom: 1px solid var(--border-subtle);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.6875rem;
+  font-size: 12px;
   background-color: var(--bg-surface-elevated);
 }
 .data-table td {

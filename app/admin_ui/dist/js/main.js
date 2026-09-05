@@ -296,8 +296,8 @@ function renderAdminShell(container, currentPath) {
 
   container.innerHTML = `
     <div class="flex h-screen bg-app overflow-hidden text-[14px]">
-      <!-- Sidebar -->
-      <aside class="${state.sidebarCollapsed ? 'w-16' : 'w-60'} bg-sidebar border-r border-subtle flex flex-col flex-shrink-0 z-20 relative transition-all duration-200">
+      <!-- Sidebar (Expanded: w-64 / 256px, Collapsed: w-16 / 64px) -->
+      <aside class="${state.sidebarCollapsed ? 'w-16' : 'w-64'} bg-sidebar border-r border-subtle flex flex-col flex-shrink-0 z-20 relative transition-all duration-200">
 
         <!-- Business Identity Card & Sidebar Toggle -->
         <div class="p-3 border-b border-subtle flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col gap-2' : 'justify-between gap-2'}">
@@ -316,7 +316,7 @@ function renderAdminShell(container, currentPath) {
             ` : ''}
           </div>
           <button type="button" class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer flex-shrink-0" onclick="window.toggleSidebar()" title="${state.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg class="${state.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect width="18" height="18" x="3" y="3" rx="2"/>
               <path d="M9 3v18"/>
             </svg>
@@ -331,14 +331,14 @@ function renderAdminShell(container, currentPath) {
             return `
               <div>
                 ${!state.sidebarCollapsed ? `
-                  <div class="px-2.5 pb-1.5 text-[12px] font-bold text-muted uppercase tracking-wider">${section.title}</div>
+                  <div class="px-2.5 pb-1.5 text-[12px] font-semibold text-muted">${section.title}</div>
                 ` : ''}
                 <nav class="flex flex-col gap-1">
                   ${visibleItems.map(item => {
                     const isActive = currentPath === item.path;
                     return `
                       <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-[14px] font-medium transition-colors group ${isActive ? 'bg-surface-hover text-main' : 'text-muted hover:bg-surface-hover hover:text-main'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
-                        <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${isActive ? 'text-main' : 'text-muted group-hover:text-main transition-colors'}"></i>
+                        <i data-lucide="${item.icon}" class="${state.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} flex-shrink-0 ${isActive ? 'text-main' : 'text-muted group-hover:text-main transition-colors'}"></i>
                         ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
                       </a>
                     `;
@@ -356,7 +356,7 @@ function renderAdminShell(container, currentPath) {
           <div class="relative">
             <button type="button" id="sidebar-help-btn" class="w-full flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg text-[14px] font-medium text-muted hover:text-main hover:bg-surface-hover transition-colors group cursor-pointer" onclick="window.toggleHelpMenu(event)" title="Help, Documentation & About AICB">
               <div class="flex items-center gap-2 min-w-0">
-                <i data-lucide="help-circle" class="w-4 h-4 text-muted group-hover:text-main flex-shrink-0"></i>
+                <i data-lucide="help-circle" class="${state.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} text-muted group-hover:text-main flex-shrink-0"></i>
                 ${!state.sidebarCollapsed ? `<span class="truncate">Help</span>` : ''}
               </div>
               ${!state.sidebarCollapsed ? `
@@ -378,25 +378,25 @@ function renderAdminShell(container, currentPath) {
           </button>
           ` : `
           <button type="button" class="w-full flex items-center justify-center p-2 rounded-lg text-muted hover:text-main hover:bg-surface-hover transition-colors cursor-pointer" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
-            <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-4 h-4 text-brand"></i>
+            <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-[18px] h-[18px] text-brand"></i>
           </button>
           `}
 
           <!-- User Identity Card -->
           <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-0.5' : 'gap-2 pt-0.5'}">
-            <div class="w-7 h-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-[12px] flex-shrink-0">
+            <div class="${state.sidebarCollapsed ? 'w-8 h-8 text-[13px]' : 'w-7 h-7 text-[12px]'} rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold flex-shrink-0">
               ${escapeHtml(user.name?.charAt(0) || 'U')}
             </div>
             ${!state.sidebarCollapsed ? `
             <div class="flex-1 min-w-0">
               <div class="text-[14px] font-bold truncate text-main leading-none mb-0.5">${escapeHtml(user.name || 'User')}</div>
-              <span class="badge ${roleBadgeClass} text-[10px] px-1 py-0 uppercase font-bold tracking-wider">
-                ${escapeHtml(user.role || 'operator')}
+              <span class="badge ${roleBadgeClass} text-[11px] px-1.5 py-0 font-medium">
+                ${escapeHtml(user.role === 'super_admin' ? 'Super Admin' : (user.role === 'admin' ? 'Admin' : (user.role === 'operator' ? 'Operator' : (user.role || 'User'))))}
               </span>
             </div>
             ` : ''}
             <button class="text-faint hover:text-rose transition-colors p-1 hover:bg-rose/10 rounded-md ${state.sidebarCollapsed ? 'mt-1' : ''}" onclick="window.logout()" title="Logout">
-              <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+              <i data-lucide="log-out" class="${state.sidebarCollapsed ? 'w-4 h-4' : 'w-3.5 h-3.5'}"></i>
             </button>
           </div>
         </div>
@@ -506,7 +506,7 @@ function renderAdminShell(container, currentPath) {
 
       <!-- What's New Section -->
       <div class="p-3 border-t border-subtle bg-surface-elevated/50 space-y-2">
-        <div class="text-[12px] font-bold text-muted uppercase tracking-wider">What's new</div>
+        <div class="text-[12px] font-semibold text-muted">What's new</div>
         
         <!-- One Highlight Item (Clickable to open What's New modal) -->
         <button onclick="window.openWhatsNewModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-start gap-2 text-left p-1.5 rounded-lg hover:bg-surface-hover transition-colors group cursor-pointer">
@@ -539,12 +539,12 @@ function renderAdminShell(container, currentPath) {
     setTimeout(() => document.addEventListener('click', closeListener), 10);
   };
 
-  // About AICB Modal (Matching n8n About Modal)
+  // About AICB Modal
   window.openAboutModal = async function() {
     let existing = document.getElementById('about-aicb-modal');
     if (existing) existing.remove();
 
-    const version = state.appVersion || '0.2.1';
+    const version = state.appVersion || '0.1.0';
     let instanceId = '7966745583d50cb1210cd8041b0817e4ab54c3eaf22487b2c3433d3d07506383';
     let debugData = null;
 
@@ -562,70 +562,76 @@ function renderAdminShell(container, currentPath) {
     };
 
     modal.innerHTML = `
-      <div class="modal-surface rounded-xl max-w-md w-full overflow-hidden animate-scale-in text-main border border-subtle p-6" onclick="event.stopPropagation()">
+      <div class="modal-surface rounded-xl max-w-lg w-full overflow-hidden animate-scale-in text-main border border-subtle" onclick="event.stopPropagation()">
         
         <!-- Header -->
-        <div class="flex items-center justify-between pb-4">
-          <h3 class="text-[20px] font-bold text-main">About AICB</h3>
-          <button class="text-muted hover:text-main p-1 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
+        <div class="p-5 border-b border-subtle flex items-center justify-between bg-surface-elevated/40">
+          <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-lg bg-brand text-brand-contrast flex items-center justify-center font-bold text-lg shadow-sm">
+              A
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-main">AI Commerce Bots (AICB)</h3>
+              <p class="text-[11px] text-muted">Version <span class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">v${escapeHtml(version)}</span></p>
+            </div>
+          </div>
+          <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <!-- Details Grid matching n8n list -->
-        <div class="space-y-4 py-2 text-[14px] leading-relaxed">
-          
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">AICB Version</span>
-            <span class="col-span-2 text-main font-medium">${escapeHtml(version)}</span>
-          </div>
+        <!-- Body -->
+        <div class="p-5 space-y-4 text-xs text-muted leading-relaxed">
+          <p class="text-main font-medium">
+            Autonomous Omnichannel Conversational Commerce Platform & Multi-Agent Grounding Engine.
+          </p>
 
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">Source Code</span>
-            <div class="col-span-2">
-              <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline break-all">
+          <div class="space-y-2.5 p-3.5 rounded-lg bg-surface-elevated/50 border border-subtle text-[12px] font-mono">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">AICB Version:</span>
+              <span class="text-main font-semibold text-right">v${escapeHtml(version)}</span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">Source Code:</span>
+              <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline break-all text-right font-sans">
                 https://github.com/sannex-01/aicb
               </a>
             </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">License</span>
-            <div class="col-span-2">
-              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
-                Sustainable Use License + AICB Enterprise License
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">License:</span>
+              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline text-right font-sans">
+                Sustainable Use License + AICB Enterprise
               </a>
             </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">Third-Party Licenses</span>
-            <div class="col-span-2">
-              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">Third-Party:</span>
+              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline text-right font-sans">
                 View all third-party licenses
               </a>
             </div>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">Instance ID</span>
-            <span class="col-span-2 font-mono text-[12px] text-main break-all select-all leading-tight">${escapeHtml(instanceId)}</span>
-          </div>
-
-          <div class="grid grid-cols-3 gap-2 items-start">
-            <span class="text-muted">Debug</span>
-            <div class="col-span-2">
-              <button type="button" id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[14px] font-normal text-left">
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">Instance ID:</span>
+              <span class="text-main font-mono text-[11px] break-all select-all text-right">${escapeHtml(instanceId)}</span>
+            </div>
+            <div class="flex items-start justify-between gap-3">
+              <span class="text-muted shrink-0">Debug Info:</span>
+              <button type="button" id="copy-debug-btn" class="text-sky-600 dark:text-sky-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[12px] font-mono text-right">
                 Copy debug information
               </button>
             </div>
           </div>
 
+          <div class="flex items-center justify-between pt-2 border-t border-subtle text-[11px]">
+            <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold">
+              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+              <span>GitHub Repository</span>
+            </a>
+            <span class="text-muted">&copy; Sannex Tech LTD</span>
+          </div>
         </div>
 
-        <!-- Footer with Close button on left -->
-        <div class="pt-6 flex justify-start">
-          <button type="button" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[14px] transition-colors cursor-pointer shadow-xs" onclick="document.getElementById('about-aicb-modal')?.remove()">
+        <div class="p-3 border-t border-subtle bg-surface-elevated/40 flex justify-end">
+          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('about-aicb-modal')?.remove()">
             Close
           </button>
         </div>

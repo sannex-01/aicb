@@ -107,7 +107,7 @@ function editGroupModal(group) {
   const hasKey = Boolean(group?.has_api_key || group?.api_key_masked);
 
   openModal(`
-    <div class="modal-dialog max-w-lg">
+    <div class="modal-dialog max-w-xl">
       <div class="modal-header">
         <h3 class="font-bold text-lg text-main">${isEdit ? 'Edit Access Group' : 'New Access Group'}</h3>
         <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>

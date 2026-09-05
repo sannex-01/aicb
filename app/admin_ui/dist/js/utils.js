@@ -213,7 +213,7 @@ export function openOffcanvas({
   extraFooterLeft = '',
   extraFooterStep = null,
   submitLabel = 'Save',
-  maxWidth = '520px',
+  maxWidth = '600px',
   mode = 'wizard', // 'wizard' | 'tabs'
 }) {
   const totalSteps = steps.length;
@@ -237,7 +237,7 @@ export function openOffcanvas({
     topNavigation = `
       <div class="px-5 pt-4 pb-3 border-b border-subtle">
         <div class="flex items-center justify-between mb-2">
-          ${steps.map((s, i) => `<span class="text-[10px] font-semibold uppercase tracking-wide cursor-pointer select-none hover:opacity-80 transition-all ${i === 0 ? 'text-brand' : 'text-faint'}" data-progress-label="${i}" title="Jump to ${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>`).join('')}
+          ${steps.map((s, i) => `<span class="text-[12px] font-medium cursor-pointer select-none hover:opacity-80 transition-all ${i === 0 ? 'text-brand font-semibold' : 'text-faint'}" data-progress-label="${i}" title="Jump to ${escapeHtml(s.label)}">${escapeHtml(s.label)}</span>`).join('')}
         </div>
         <div class="h-1 bg-subtle rounded-full overflow-hidden">
           <div id="${formId}-progress-fill" class="h-full bg-brand transition-all duration-200" style="width: ${(1 / totalSteps * 100).toFixed(1)}%"></div>
