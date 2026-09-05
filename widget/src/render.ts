@@ -1,5 +1,6 @@
 import type { BotResponse, ProductCard, ResponseButton } from "./types";
 import { PREFIX } from "./styles";
+import { formatMessageHtml } from "./format";
 
 export interface RenderHandlers {
   onAction: (actionId: string) => void;
@@ -121,7 +122,7 @@ export function renderBotResponse(resp: BotResponse, handlers: RenderHandlers): 
 
   if (resp.text) {
     const bubble = el("div", `${PREFIX}-bubble-msg bot`);
-    bubble.textContent = resp.text;
+    bubble.innerHTML = formatMessageHtml(resp.text);
     turnEl.appendChild(bubble);
   }
 

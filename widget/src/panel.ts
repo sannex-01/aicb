@@ -2,6 +2,7 @@ import { PREFIX } from "./styles";
 import { WidgetAPI } from "./api";
 import { renderBotResponse, renderUserMessage, type RenderHandlers } from "./render";
 import { renderProfileForm } from "./profile-form";
+import { formatMessageHtml } from "./format";
 import type { BotResponse } from "./types";
 
 function getOrCreateSessionId(): string {
@@ -26,8 +27,14 @@ export class WidgetPanel {
   constructor(baseUrl: string) {
     this.api = new WidgetAPI(baseUrl);
     this.handlers = {
-      onAction: (actionId) => this.dispatchAction(actionId),
-      onQuickReply: (text) => this.sendMessage(text),
+      onAction: (actionId) => {
+        this.setChatInputAvailable(true);
+        this.dispatchAction(actionId);
+      },
+      onQuickReply: (text) => {
+        this.setChatInputAvailable(true);
+        this.sendMessage(text);
+      },
     };
 
     this.el = document.createElement("div");
@@ -38,12 +45,28 @@ export class WidgetPanel {
     header.className = `${PREFIX}-header`;
     const title = document.createElement("span");
     title.textContent = "Chat with us";
+
+    const headerActions = document.createElement("div");
+    headerActions.className = `${PREFIX}-header-actions`;
+
+    // A pure-CSS icon (not a Unicode glyph) so it renders identically on
+    // every platform/font rather than risking mojibake on fonts that lack
+    // an expand-arrows character.
+    const expandBtn = document.createElement("button");
+    expandBtn.className = `${PREFIX}-expand-btn`;
+    expandBtn.setAttribute("aria-label", "Expand chat");
+    expandBtn.onclick = () => this.toggleExpanded();
+    this.expandBtnEl = expandBtn;
+
     const closeBtn = document.createElement("button");
     closeBtn.textContent = "✕";
     closeBtn.setAttribute("aria-label", "Close chat");
     closeBtn.onclick = () => this.hide();
+
+    headerActions.appendChild(expandBtn);
+    headerActions.appendChild(closeBtn);
     header.appendChild(title);
-    header.appendChild(closeBtn);
+    header.appendChild(headerActions);
     this.headerTitleEl = title;
 
     this.messagesEl = document.createElement("div");
@@ -70,8 +93,17 @@ export class WidgetPanel {
   }
 
   private headerTitleEl: HTMLSpanElement;
+  private expandBtnEl: HTMLButtonElement;
   private inputRowEl: HTMLDivElement;
   private initialized = false;
+  private expanded = false;
+
+  private toggleExpanded(): void {
+    this.expanded = !this.expanded;
+    this.el.classList.toggle(`${PREFIX}-panel-expanded`, this.expanded);
+    this.expandBtnEl.classList.toggle(`${PREFIX}-expand-btn-active`, this.expanded);
+    this.expandBtnEl.setAttribute("aria-label", this.expanded ? "Collapse chat" : "Expand chat");
+  }
 
   async show(): Promise<void> {
     this.el.hidden = false;
@@ -141,6 +173,34 @@ export class WidgetPanel {
     this.inputRowEl.hidden = blocked;
   }
 
+  /** Whether the latest bot turn currently has any tappable action left. */
+  private static hasButtons(resp: BotResponse): boolean {
+    return resp.buttons.length > 0 || resp.product_cards.length > 0 || resp.quick_replies.length > 0;
+  }
+
+  /**
+   * Disables the free-text input while the latest bot turn has buttons —
+   * matching Telegram/WhatsApp's deterministic flows, where the intended
+   * next step is a tap, not typing. Re-enabled the instant any of those
+   * buttons is actually clicked (see the onAction/onQuickReply handlers
+   * above), or whenever a fresh turn without buttons is rendered. Tracked
+   * separately from setBusy's in-flight-request disabling — the final
+   * disabled state is "busy OR buttons pending".
+   */
+  private buttonsPending = false;
+
+  private setChatInputAvailable(available: boolean): void {
+    this.buttonsPending = !available;
+    this.applyInputDisabledState();
+    this.inputEl.placeholder = available ? "Type a message..." : "Tap a button above to continue";
+  }
+
+  private applyInputDisabledState(): void {
+    const disabled = this.busy || this.buttonsPending;
+    this.inputEl.disabled = disabled;
+    this.sendBtn.disabled = disabled;
+  }
+
   hide(): void {
     this.el.hidden = true;
   }
@@ -195,24 +255,33 @@ export class WidgetPanel {
     this.messagesEl.appendChild(streamingBubble);
     this.scrollToBottom();
 
+    // Accumulate raw text and re-render the whole thing formatted on each
+    // chunk (cheap at chat-message length) rather than formatting each
+    // partial chunk in isolation, which could misparse e.g. a "*bold"
+    // marker split across two chunks.
+    let rawText = "";
+
     try {
       await this.api.streamChat(
         text,
         this.sessionId,
         (chunk) => {
-          streamingBubble.textContent += chunk;
+          rawText += chunk;
+          streamingBubble.innerHTML = formatMessageHtml(rawText);
           this.scrollToBottom();
         },
         (finalResp) => {
           // Streamed text already rendered incrementally above; only append
           // structured extras (product cards / buttons) from the final event.
-          if (finalResp.product_cards.length || finalResp.buttons.length || finalResp.quick_replies.length) {
+          const hasButtons = WidgetPanel.hasButtons(finalResp);
+          if (hasButtons) {
             const extras = renderBotResponse(
               { ...finalResp, text: "" },
               this.handlers
             );
             this.messagesEl.appendChild(extras);
           }
+          this.setChatInputAvailable(!hasButtons);
           this.maybeOpenCheckout(finalResp);
         }
       );
@@ -244,12 +313,15 @@ export class WidgetPanel {
 
   private appendBotResponse(resp: BotResponse): void {
     this.messagesEl.appendChild(renderBotResponse(resp, this.handlers));
+    this.setChatInputAvailable(!WidgetPanel.hasButtons(resp));
     this.scrollToBottom();
   }
 
+  private busy = false;
+
   private setBusy(busy: boolean): void {
-    this.sendBtn.disabled = busy;
-    this.inputEl.disabled = busy;
+    this.busy = busy;
+    this.applyInputDisabledState();
   }
 
   private scrollToBottom(): void {

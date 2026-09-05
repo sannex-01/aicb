@@ -48,8 +48,16 @@ export function injectStyles(): void {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   font-size: 14px;
   color: #1a1a1a;
+  transition: width 0.18s ease, height 0.18s ease, bottom 0.18s ease, right 0.18s ease;
 }
 .${PREFIX}-panel[hidden] { display: none; }
+.${PREFIX}-panel-expanded {
+  width: 480px;
+  height: 720px;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100vh - 32px);
+  bottom: 20px;
+}
 
 .${PREFIX}-header {
   background: #008060;
@@ -60,6 +68,11 @@ export function injectStyles(): void {
   align-items: center;
   justify-content: space-between;
 }
+.${PREFIX}-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .${PREFIX}-header button {
   background: none;
   border: none;
@@ -67,6 +80,54 @@ export function injectStyles(): void {
   cursor: pointer;
   font-size: 18px;
   opacity: 0.85;
+}
+.${PREFIX}-header button:hover { opacity: 1; }
+
+.${PREFIX}-expand-btn {
+  position: relative;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+}
+.${PREFIX}-expand-btn::before,
+.${PREFIX}-expand-btn::after {
+  content: "";
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid #fff;
+}
+.${PREFIX}-expand-btn::before {
+  top: 0;
+  left: 0;
+  border-right: none;
+  border-bottom: none;
+}
+.${PREFIX}-expand-btn::after {
+  bottom: 0;
+  right: 0;
+  border-left: none;
+  border-top: none;
+}
+.${PREFIX}-expand-btn-active::before,
+.${PREFIX}-expand-btn-active::after {
+  border-color: #fff;
+}
+.${PREFIX}-expand-btn-active::before {
+  top: 3px;
+  left: 3px;
+  border-right: 1.5px solid #fff;
+  border-bottom: 1.5px solid #fff;
+  border-left: none;
+  border-top: none;
+}
+.${PREFIX}-expand-btn-active::after {
+  bottom: 3px;
+  right: 3px;
+  border-left: 1.5px solid #fff;
+  border-top: 1.5px solid #fff;
+  border-right: none;
+  border-bottom: none;
 }
 
 .${PREFIX}-messages {
@@ -83,8 +144,7 @@ export function injectStyles(): void {
   max-width: 85%;
   padding: 9px 12px;
   border-radius: 12px;
-  line-height: 1.4;
-  white-space: pre-wrap;
+  line-height: 1.45;
   word-break: break-word;
 }
 .${PREFIX}-bubble-msg.user {
@@ -92,6 +152,7 @@ export function injectStyles(): void {
   background: #008060;
   color: #fff;
   border-bottom-right-radius: 3px;
+  white-space: pre-wrap;
 }
 .${PREFIX}-bubble-msg.bot {
   align-self: flex-start;
@@ -99,6 +160,20 @@ export function injectStyles(): void {
   border: 1px solid #e5e7eb;
   border-bottom-left-radius: 3px;
 }
+.${PREFIX}-bubble-msg.bot strong { font-weight: 700; }
+.${PREFIX}-bubble-msg.bot em { font-style: italic; }
+.${PREFIX}-bubble-msg.bot code {
+  background: #f1f3f5;
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 0.92em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.${PREFIX}-bubble-msg.bot ul {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+.${PREFIX}-bubble-msg.bot li { margin: 2px 0; }
 
 .${PREFIX}-buttons {
   display: flex;
