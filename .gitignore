@@ -10,9 +10,9 @@ venv/
 ENV/
 
 # Distribution & Build Artifacts
-build/
+/build/
 develop-eggs/
-dist/
+/dist/
 downloads/
 eggs/
 .eggs/

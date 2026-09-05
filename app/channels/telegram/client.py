@@ -1,7 +1,34 @@
+import json
+import asyncio
 from typing import List, Dict, Any, Optional
 import httpx
 from app.core.config import settings
 from app.core.logger import logger
+
+
+def _optimize_telegram_media_url(url: str) -> str:
+    """Optimizes image URLs for Telegram Bot API (e.g. adding fast auto-formatting and resizing for Cloudinary)."""
+    if not url or not isinstance(url, str):
+        return url
+    if "res.cloudinary.com" in url and "/image/upload/" in url:
+        # Avoid duplicating transformation flags if already present
+        if "/image/upload/f_" not in url and "/image/upload/q_" not in url and "/image/upload/w_" not in url:
+            return url.replace("/image/upload/", "/image/upload/f_jpg,q_auto,w_1000/")
+    return url
+
+
+async def _download_photo_bytes(url: str) -> Optional[bytes]:
+    """Downloads photo bytes with timeout for fallback multipart upload to Telegram."""
+    try:
+        opt_url = _optimize_telegram_media_url(url)
+        headers = {"User-Agent": "AICB-Telegram-Bot/1.0"}
+        async with httpx.AsyncClient(timeout=8.0, follow_redirects=True) as client:
+            res = await client.get(opt_url, headers=headers)
+            if res.status_code == 200 and res.content:
+                return res.content
+    except Exception as e:
+        logger.warning(f"Failed to download photo from {url} for Telegram fallback: {e}")
+    return None
 
 
 class TelegramClient:
@@ -10,15 +37,35 @@ class TelegramClient:
     def __init__(self, token: Optional[str] = None):
         self.token = token or settings.TELEGRAM_BOT_TOKEN
 
-    async def _post(self, method: str, payload: Dict[str, Any]) -> Dict[str, Any]:
+    async def _post(
+        self,
+        method: str,
+        payload: Optional[Dict[str, Any]] = None,
+        files: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         if not self.token:
             logger.info(f"[DEV MOCK] Telegram API {method} payload: {payload}")
             return {"ok": True, "result": {"message_id": 9999, "status": "mocked"}}
 
         url = f"https://api.telegram.org/bot{self.token}/{method}"
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            res = await client.post(url, json=payload)
-            data = res.json()
+        async with httpx.AsyncClient(timeout=25.0) as client:
+            if files:
+                data_payload = {}
+                if payload:
+                    for k, v in payload.items():
+                        if isinstance(v, (dict, list)):
+                            data_payload[k] = json.dumps(v)
+                        else:
+                            data_payload[k] = str(v)
+                res = await client.post(url, data=data_payload, files=files)
+            else:
+                res = await client.post(url, json=payload or {})
+
+            try:
+                data = res.json()
+            except Exception:
+                data = {"ok": False, "error_code": res.status_code, "description": res.text}
+
             if not data.get("ok"):
                 logger.error(f"Telegram API {method} error: {data}")
             return data
@@ -57,9 +104,10 @@ class TelegramClient:
         reply_markup: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Sends a photo (e.g. a product card image) with an optional caption and inline keyboard."""
+        opt_url = _optimize_telegram_media_url(photo_url)
         payload: Dict[str, Any] = {
             "chat_id": chat_id,
-            "photo": photo_url,
+            "photo": opt_url,
         }
         if caption:
             payload["caption"] = caption
@@ -69,10 +117,20 @@ class TelegramClient:
             payload["reply_markup"] = reply_markup
 
         res = await self._post("sendPhoto", payload)
-        if not res.get("ok") and parse_mode:
-            logger.info("Retrying sendPhoto without parse_mode markdown formatting...")
-            payload.pop("parse_mode", None)
-            res = await self._post("sendPhoto", payload)
+        if not res.get("ok"):
+            desc = res.get("description", "")
+            # If failed due to URL curl failure, fallback to uploading bytes directly
+            if "WEBPAGE_CURL_FAILED" in desc or "failed to get HTTP URL content" in desc:
+                logger.info("Telegram URL curl failed for sendPhoto; falling back to direct multipart upload...")
+                raw_bytes = await _download_photo_bytes(photo_url)
+                if raw_bytes:
+                    files = {"photo": ("product.jpg", raw_bytes, "image/jpeg")}
+                    payload.pop("photo", None)
+                    res = await self._post("sendPhoto", payload=payload, files=files)
+            elif parse_mode:
+                logger.info("Retrying sendPhoto without parse_mode markdown formatting...")
+                payload.pop("parse_mode", None)
+                res = await self._post("sendPhoto", payload)
         return res
 
     async def answer_inline_query(
@@ -96,17 +154,11 @@ class TelegramClient:
         chat_id: int | str,
         items: List[Dict[str, Any]],  # [{"photo_url": str, "caption": Optional[str]}]
     ) -> Dict[str, Any]:
-        """Sends up to 10 photos as one native swipeable album (sendMediaGroup).
-
-        Telegram doesn't allow inline keyboards on individual album items, so
-        this only carries images + captions — callers should follow up with a
-        separate send_inline_buttons/send_message call for any actions (e.g.
-        "Buy Product A" / "Buy Product B") since per-card buttons aren't
-        possible inside the album itself.
-        """
+        """Sends up to 10 photos as one native swipeable album (sendMediaGroup) with multipart upload fallback."""
         media = []
         for item in items[:10]:
-            entry: Dict[str, Any] = {"type": "photo", "media": item["photo_url"]}
+            opt_url = _optimize_telegram_media_url(item["photo_url"])
+            entry: Dict[str, Any] = {"type": "photo", "media": opt_url}
             if item.get("caption"):
                 entry["caption"] = item["caption"][:1024]
                 entry["parse_mode"] = "Markdown"
@@ -114,12 +166,39 @@ class TelegramClient:
 
         payload = {"chat_id": chat_id, "media": media}
         res = await self._post("sendMediaGroup", payload)
+
         if not res.get("ok"):
-            # Retry without Markdown in case a caption has unescaped special chars
-            logger.info("Retrying sendMediaGroup without parse_mode markdown formatting...")
-            for entry in media:
-                entry.pop("parse_mode", None)
-            res = await self._post("sendMediaGroup", {"chat_id": chat_id, "media": media})
+            desc = res.get("description", "")
+            # 1. Fallback for WEBPAGE_CURL_FAILED: download images and upload directly via multipart/form-data
+            if "WEBPAGE_CURL_FAILED" in desc or "failed to get HTTP URL content" in desc:
+                logger.info("Telegram URL curl failed for sendMediaGroup; falling back to direct multipart upload...")
+                download_tasks = [_download_photo_bytes(item["photo_url"]) for item in items[:10]]
+                downloaded_photos = await asyncio.gather(*download_tasks)
+
+                multipart_media = []
+                files = {}
+                for idx, (item, photo_bytes) in enumerate(zip(items[:10], downloaded_photos)):
+                    if photo_bytes:
+                        attach_key = f"photo_{idx}"
+                        files[attach_key] = (f"photo_{idx}.jpg", photo_bytes, "image/jpeg")
+                        entry = {"type": "photo", "media": f"attach://{attach_key}"}
+                        if item.get("caption"):
+                            entry["caption"] = item["caption"][:1024]
+                        multipart_media.append(entry)
+
+                if multipart_media:
+                    res = await self._post(
+                        "sendMediaGroup",
+                        payload={"chat_id": chat_id, "media": multipart_media},
+                        files=files,
+                    )
+            elif "can't parse entities" in desc.lower() or "markdown" in desc.lower():
+                # Retry without Markdown in case a caption has unescaped special chars
+                logger.info("Retrying sendMediaGroup without parse_mode markdown formatting...")
+                for entry in media:
+                    entry.pop("parse_mode", None)
+                res = await self._post("sendMediaGroup", {"chat_id": chat_id, "media": media})
+
         return res
 
     async def send_inline_buttons(

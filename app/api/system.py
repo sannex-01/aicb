@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.release import ReleaseNote
+from app.models.business import BusinessProfile
 from app.telemetry.sync_worker import perform_sannex_sync, get_support_config
 
 router = APIRouter(prefix="/system", tags=["System & Releases"])
@@ -139,12 +140,20 @@ async def get_health_summary(db: AsyncSession = Depends(get_db)):
     else:
         active_model = settings.GEMINI_MODEL
 
+    biz_res = await db.execute(select(BusinessProfile).limit(1))
+    biz = biz_res.scalar_one_or_none()
+
     return {
         "status": "operational" if db_ok else "degraded",
-        "app_name": "AICB (AI Commerce Bots)",
+        "app_name": biz.name if biz else "AICB (AI Commerce Bots)",
         "version": settings.APP_VERSION,
         "environment": settings.ENVIRONMENT,
         "instance_id": settings.INSTANCE_ID,
+        "business": {
+            "name": biz.name if biz else "AICB Business",
+            "logo_url": biz.logo_url if biz else None,
+            "currency": biz.currency if biz else "NGN",
+        } if biz else None,
         "database": {
             "status": "operational" if db_ok else "disconnected",
             "type": db_type,
@@ -175,7 +184,7 @@ async def get_health_summary(db: AsyncSession = Depends(get_db)):
         "commerce": {
             "status": "operational",
             "provider": settings.DEFAULT_PAYMENT_GATEWAY.capitalize(),
-            "currency": "NGN",
+            "currency": biz.currency if (biz and biz.currency) else "NGN",
         },
         "docs_url": "https://agentos.sannex.ng/docs",
         "github_url": "https://github.com/sannex-01/aicb",
