@@ -53,28 +53,28 @@ export async function loadConversationsPage(container) {
         const subText = s.customer?.phone_number || s.customer?.email || s.customer_identifier;
 
         return `
-          <div id="session-item-${s.id}" class="p-3.5 cursor-pointer transition-all border-b border-subtle/50 flex flex-col gap-1.5 ${isSelected ? 'bg-brand/10 border-l-3 border-l-brand' : 'hover:bg-surface-hover'}" onclick="window.loadConversationThread(${s.id})">
+          <div id="session-item-${s.id}" class="p-3.5 cursor-pointer transition-colors border-b border-subtle/50 flex flex-col gap-1.5 ${isSelected ? 'bg-surface-hover' : 'hover:bg-surface-hover'}" onclick="window.loadConversationThread(${s.id})">
             <div class="flex justify-between items-start gap-2">
               <div class="flex items-center gap-2 min-w-0">
-                <div class="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[10px] font-bold flex-shrink-0">
+                <div class="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[11px] font-bold flex-shrink-0">
                   ${escapeHtml((displayName.charAt(0) || 'U').toUpperCase())}
                 </div>
-                <span class="font-medium text-xs text-main truncate max-w-[140px]">
+                <span class="font-medium text-[14px] text-main truncate max-w-[200px]">
                   ${escapeHtml(displayName)}
                 </span>
               </div>
-              <span class="text-[10px] text-muted whitespace-nowrap">${formatDate(s.last_active_at)}</span>
+              <span class="text-[12px] text-muted whitespace-nowrap">${formatDate(s.last_active_at)}</span>
             </div>
 
-            <div class="flex items-center justify-between gap-1 pl-8">
-              <span class="text-[11px] text-muted truncate max-w-[130px] font-mono">${escapeHtml(subText)}</span>
-              <div class="flex items-center gap-1 flex-shrink-0">
+            <div class="flex items-center justify-between gap-2 pl-8">
+              <span class="text-[12px] text-muted truncate max-w-[190px] font-mono">${escapeHtml(subText)}</span>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
                 ${s.agent?.name ? `
-                  <span class="badge badge-subtle text-[9px] py-0 px-1 truncate max-w-[75px]" title="Agent: ${escapeHtml(s.agent.name)}">
+                  <span class="badge badge-subtle text-[10px] py-0.5 px-1.5 truncate max-w-[95px]" title="Agent: ${escapeHtml(s.agent.name)}">
                     ${escapeHtml(s.agent.name)}
                   </span>
                 ` : ''}
-                <span class="badge ${channelBadgeClass} text-[9px] uppercase py-0 px-1">
+                <span class="badge ${channelBadgeClass} text-[10px] uppercase py-0.5 px-1.5">
                   ${escapeHtml(s.channel)}
                 </span>
               </div>
@@ -102,7 +102,7 @@ export async function loadConversationsPage(container) {
 
       const listContainer = document.getElementById('conv-session-list');
       if (listContainer) {
-        listContainer.innerHTML = `<div class="p-8 text-center text-muted text-xs"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-brand mb-2"></i>Loading conversations...</div>`;
+        listContainer.innerHTML = `<div class="p-8 text-center text-muted text-[14px]"><i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto text-brand mb-2"></i>Loading conversations...</div>`;
         if (window.lucide) lucide.createIcons();
       }
 
@@ -112,31 +112,31 @@ export async function loadConversationsPage(container) {
         renderSessionList(sessions);
       } catch (err) {
         if (listContainer) {
-          listContainer.innerHTML = `<div class="p-6 text-center text-rose text-xs">Failed to filter conversations: ${escapeHtml(err.message)}</div>`;
+          listContainer.innerHTML = `<div class="p-6 text-center text-rose-500 text-[14px]">Failed to filter conversations: ${escapeHtml(err.message)}</div>`;
         }
       }
     }
 
     container.innerHTML = `
-      <div class="h-full min-h-[calc(100vh-48px)] flex-1 flex overflow-hidden rounded-xl border border-subtle bg-surface shadow-xs">
+      <div class="h-full min-h-[calc(100vh-48px)] flex-1 flex overflow-hidden rounded-xl border border-subtle bg-surface shadow-xs text-[14px]">
         
-        <!-- Left Pane: Search, Filters & Session List -->
-        <div class="w-84 sm:w-90 flex-shrink-0 border-r border-subtle flex flex-col bg-surface">
+        <!-- Left Pane: Search, Filters & Session List (Widened to 380px) -->
+        <div class="w-[380px] flex-shrink-0 border-r border-subtle flex flex-col bg-surface">
           
           <!-- Pane Header & Filter Controls -->
           <div class="p-3.5 border-b border-subtle bg-surface-elevated/40 space-y-3 flex-shrink-0">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
                 <i data-lucide="message-square" class="w-4 h-4 text-brand"></i>
-                <span class="font-bold text-sm text-main">Sessions</span>
+                <span class="font-bold text-[16px] text-main">Sessions</span>
               </div>
-              <span class="badge badge-brand text-xs font-mono font-bold px-2 py-0.5" id="conv-count-badge">${sessions.length}</span>
+              <span class="badge badge-brand text-[10px] font-mono font-bold px-2 py-0.5" id="conv-count-badge">${sessions.length}</span>
             </div>
 
             <!-- Search Input (Normal Design System Input Size) -->
             <div class="relative flex items-center">
               <i data-lucide="search" class="w-4 h-4 absolute left-3 text-muted pointer-events-none"></i>
-              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="form-control pl-9.5 pr-8 py-2 w-full text-sm" />
+              <input type="text" id="conv-search-input" placeholder="Search name, phone, email..." class="form-control pl-9.5 pr-8 py-2 w-full text-[14px]" />
               <button id="conv-search-clear" class="hidden absolute right-2.5 text-muted hover:text-main p-1 cursor-pointer" title="Clear search">
                 <i data-lucide="x" class="w-3.5 h-3.5"></i>
               </button>
@@ -145,11 +145,11 @@ export async function loadConversationsPage(container) {
             <!-- Filters Row: Custom Agent Selector & Custom Channel Selector -->
             <div class="grid grid-cols-2 gap-2 pt-0.5">
               <div class="space-y-1">
-                <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Agent</label>
+                <label class="form-label-sm block text-[12px] font-bold text-muted uppercase tracking-wider">Agent</label>
                 <div id="conv-agent-select-container"></div>
               </div>
               <div class="space-y-1">
-                <label class="form-label-sm block text-[10px] font-bold text-muted uppercase tracking-wider">Channel</label>
+                <label class="form-label-sm block text-[12px] font-bold text-muted uppercase tracking-wider">Channel</label>
                 <div id="conv-channel-select-container"></div>
               </div>
             </div>
@@ -161,30 +161,30 @@ export async function loadConversationsPage(container) {
 
         <!-- Center Pane: Chat Thread View -->
         <div class="flex-1 flex flex-col bg-app min-w-0" id="thread-container">
-          <div class="flex-1 flex items-center justify-center text-muted text-sm flex-col gap-3">
+          <div class="flex-1 flex items-center justify-center text-muted text-[14px] flex-col gap-3">
             <div class="w-12 h-12 rounded-xl bg-surface border border-subtle flex items-center justify-center text-muted/40 shadow-xs">
               <i data-lucide="message-square" class="w-6 h-6"></i>
             </div>
             <div class="text-center">
-              <p class="font-semibold text-main text-sm">No Conversation Selected</p>
-              <p class="text-xs text-muted mt-0.5">Select a customer session from the left to view message transcripts</p>
+              <p class="font-semibold text-main text-[16px]">No Conversation Selected</p>
+              <p class="text-[12px] text-muted mt-0.5">Select a customer session from the left to view message transcripts</p>
             </div>
           </div>
         </div>
 
-        <!-- Right Pane: Collapsible Metadata Sidebar -->
-        <div id="conv-metadata-sidebar" class="${convSidebarOpen ? 'w-80' : 'w-0 hidden'} flex-shrink-0 border-l border-subtle flex flex-col bg-surface transition-all duration-200 overflow-hidden">
+        <!-- Right Pane: Collapsible Metadata Sidebar (Widened to 380px) -->
+        <div id="conv-metadata-sidebar" class="${convSidebarOpen ? 'w-[380px]' : 'w-0 hidden'} flex-shrink-0 border-l border-subtle flex flex-col bg-surface transition-all duration-200 overflow-hidden">
           <div class="p-4 border-b border-subtle flex items-center justify-between bg-surface-elevated/40">
             <div class="flex items-center gap-2">
               <i data-lucide="info" class="w-4 h-4 text-brand"></i>
-              <span class="font-bold text-sm text-main">Session Details</span>
+              <span class="font-bold text-[16px] text-main">Session Details</span>
             </div>
             <button class="p-1 rounded-md text-muted hover:text-main hover:bg-surface transition-colors cursor-pointer" onclick="window.toggleConvSidebar()" title="Close Details">
               <i data-lucide="x" class="w-4 h-4"></i>
             </button>
           </div>
-          <div id="conv-metadata-content" class="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-            <div class="text-muted text-xs text-center py-8">Select a conversation session to view full customer identity, state and metadata.</div>
+          <div id="conv-metadata-content" class="flex-1 overflow-y-auto p-4 space-y-4 text-[14px]">
+            <div class="text-muted text-[14px] text-center py-8">Select a conversation session to view full customer identity, state and metadata.</div>
           </div>
         </div>
 
@@ -266,9 +266,9 @@ export async function loadConversationsPage(container) {
       if (sidebar) {
         if (convSidebarOpen) {
           sidebar.classList.remove('w-0', 'hidden');
-          sidebar.classList.add('w-80');
+          sidebar.classList.add('w-[380px]');
         } else {
-          sidebar.classList.remove('w-80');
+          sidebar.classList.remove('w-[380px]');
           sidebar.classList.add('w-0', 'hidden');
         }
       }
@@ -286,15 +286,15 @@ export async function loadConversationsPage(container) {
         const el = document.getElementById(`session-item-${s.id}`);
         if (el) {
           if (s.id === sessionId) {
-            el.className = 'p-3.5 cursor-pointer transition-all border-b border-subtle/50 flex flex-col gap-1.5 bg-brand/10 border-l-3 border-l-brand';
+            el.className = 'p-3.5 cursor-pointer transition-colors border-b border-subtle/50 flex flex-col gap-1.5 bg-surface-hover';
           } else {
-            el.className = 'p-3.5 cursor-pointer transition-all border-b border-subtle/50 flex flex-col gap-1.5 hover:bg-surface-hover';
+            el.className = 'p-3.5 cursor-pointer transition-colors border-b border-subtle/50 flex flex-col gap-1.5 hover:bg-surface-hover';
           }
         }
       });
 
       const tc = document.getElementById('thread-container');
-      tc.innerHTML = `<div class="flex-1 flex items-center justify-center text-muted text-sm"><i data-lucide="loader-2" class="w-6 h-6 animate-spin text-brand"></i></div>`;
+      tc.innerHTML = `<div class="flex-1 flex items-center justify-center text-muted text-[14px]"><i data-lucide="loader-2" class="w-6 h-6 animate-spin text-brand"></i></div>`;
       if (window.lucide) lucide.createIcons();
       
       try {
@@ -312,26 +312,26 @@ export async function loadConversationsPage(container) {
           <!-- Thread Header -->
           <div class="h-14 px-5 border-b border-subtle bg-surface flex items-center justify-between flex-shrink-0">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-xs">
+              <div class="w-8 h-8 rounded-full bg-brand/10 text-brand flex items-center justify-center font-bold text-[12px] flex-shrink-0 shadow-xs">
                 ${escapeHtml((displayName.charAt(0) || 'U').toUpperCase())}
               </div>
               <div class="min-w-0">
-                <div class="font-bold text-sm text-main truncate flex items-center gap-2">
+                <div class="font-bold text-[16px] text-main truncate flex items-center gap-2">
                   ${escapeHtml(displayName)}
-                  ${thread.customer?.phone_number ? `<span class="text-xs text-muted font-normal font-mono">(${escapeHtml(thread.customer.phone_number)})</span>` : ''}
+                  ${thread.customer?.phone_number ? `<span class="text-[12px] text-muted font-normal font-mono">(${escapeHtml(thread.customer.phone_number)})</span>` : ''}
                 </div>
-                <div class="text-[11px] text-muted truncate">${escapeHtml(thread.customer_identifier)}</div>
+                <div class="text-[12px] text-muted truncate">${escapeHtml(thread.customer_identifier)}</div>
               </div>
             </div>
 
             <div class="flex items-center gap-2">
               ${thread.agent?.name ? `
-                <span class="badge badge-brand text-xs flex items-center gap-1 font-medium">
+                <span class="badge badge-brand text-[10px] flex items-center gap-1 font-medium">
                   <i data-lucide="bot" class="w-3.5 h-3.5"></i>
                   ${escapeHtml(thread.agent.name)}
                 </span>
               ` : ''}
-              <span class="badge ${channelBadgeClass} text-xs uppercase font-bold">
+              <span class="badge ${channelBadgeClass} text-[10px] uppercase font-bold">
                 ${escapeHtml(thread.channel)}
               </span>
               <button id="conv-sidebar-toggle-btn" class="p-1.5 rounded-lg text-muted hover:text-main hover:bg-surface-elevated transition-colors ${convSidebarOpen ? 'text-brand' : ''} cursor-pointer" onclick="window.toggleConvSidebar()" title="Toggle Session Details">
@@ -346,18 +346,18 @@ export async function loadConversationsPage(container) {
               const isUser = m.role === 'user';
               return `
                 <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} group">
-                  <div class="flex items-center gap-1.5 mb-1 px-1 text-[11px] text-muted">
+                  <div class="flex items-center gap-1.5 mb-1 px-1 text-[12px] text-muted">
                     <span class="font-semibold ${isUser ? 'text-main' : 'text-brand'}">${isUser ? 'Customer' : (thread.agent?.name || 'Assistant')}</span>
                     <span>•</span>
                     <span>${formatDate(m.created_at)}</span>
                   </div>
-                  <div class="${isUser ? 'bg-brand text-white shadow-sm' : 'bg-surface border border-subtle text-main shadow-xs'} rounded-2xl px-4 py-2.5 text-xs sm:text-sm max-w-[80%] whitespace-pre-wrap leading-relaxed">
+                  <div class="${isUser ? 'bg-brand text-white shadow-sm' : 'bg-surface border border-subtle text-main shadow-xs'} rounded-2xl px-4 py-2.5 text-[14px] max-w-[80%] whitespace-pre-wrap leading-relaxed">
                     ${escapeHtml(m.content)}
                   </div>
                 </div>
               `;
             }).join('')}
-            ${thread.messages.length === 0 ? `<div class="text-center text-muted text-xs py-12">No messages logged in this session.</div>` : ''}
+            ${thread.messages.length === 0 ? `<div class="text-center text-muted text-[14px] py-12">No messages logged in this session.</div>` : ''}
           </div>
         `;
 
@@ -367,15 +367,15 @@ export async function loadConversationsPage(container) {
           metaContainer.innerHTML = `
             <!-- Customer Section -->
             <div class="space-y-1.5">
-              <span class="text-[10px] font-bold text-muted uppercase tracking-wider">Customer Identity</span>
+              <span class="text-[12px] font-bold text-muted uppercase tracking-wider">Customer Identity</span>
               <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-2">
-                <div class="font-bold text-sm text-main">${thread.customer?.name ? escapeHtml(thread.customer.name) : 'Anonymous Customer'}</div>
-                <div class="text-xs text-muted flex items-center gap-2">
+                <div class="font-bold text-[16px] text-main">${thread.customer?.name ? escapeHtml(thread.customer.name) : 'Anonymous Customer'}</div>
+                <div class="text-[12px] text-muted flex items-center gap-2">
                   <i data-lucide="phone" class="w-3.5 h-3.5 text-faint flex-shrink-0"></i>
                   <span class="font-mono">${escapeHtml(thread.customer?.phone_number || thread.customer_identifier)}</span>
                 </div>
                 ${thread.customer?.email ? `
-                <div class="text-xs text-muted flex items-center gap-2">
+                <div class="text-[12px] text-muted flex items-center gap-2">
                   <i data-lucide="mail" class="w-3.5 h-3.5 text-faint flex-shrink-0"></i>
                   <span>${escapeHtml(thread.customer.email)}</span>
                 </div>` : ''}
@@ -385,15 +385,15 @@ export async function loadConversationsPage(container) {
             <!-- Agent Assigned Section -->
             ${thread.agent ? `
             <div class="space-y-1.5">
-              <span class="text-[10px] font-bold text-muted uppercase tracking-wider">Assigned AI Agent</span>
+              <span class="text-[12px] font-bold text-muted uppercase tracking-wider">Assigned AI Agent</span>
               <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-1.5">
                 <div class="flex items-center gap-2">
                   <div class="w-6 h-6 rounded-lg bg-brand/10 text-brand flex items-center justify-center flex-shrink-0">
                     <i data-lucide="bot" class="w-3.5 h-3.5"></i>
                   </div>
                   <div>
-                    <div class="font-bold text-xs text-main">${escapeHtml(thread.agent.name)}</div>
-                    <div class="text-[10px] text-muted font-mono">${escapeHtml(thread.agent.slug)}</div>
+                    <div class="font-bold text-[14px] text-main">${escapeHtml(thread.agent.name)}</div>
+                    <div class="text-[12px] text-muted font-mono">${escapeHtml(thread.agent.slug)}</div>
                   </div>
                 </div>
               </div>
@@ -403,7 +403,7 @@ export async function loadConversationsPage(container) {
             <!-- Session Details Section -->
             <div class="space-y-1.5">
               <span class="text-[10px] font-bold text-muted uppercase tracking-wider">Session State</span>
-              <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-2 text-xs">
+              <div class="p-3 bg-surface-elevated rounded-xl border border-subtle/50 space-y-2 text-[12px]">
                 <div class="flex justify-between items-center">
                   <span class="text-muted">Channel</span>
                   <span class="font-semibold text-main uppercase">${escapeHtml(thread.channel || 'N/A')}</span>

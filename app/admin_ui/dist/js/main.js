@@ -324,21 +324,21 @@ function renderAdminShell(container, currentPath) {
         </div>
 
         <!-- Grouped Navigation Menu -->
-        <div class="flex-1 overflow-y-auto py-2.5 px-2 space-y-3">
+        <div class="flex-1 overflow-y-auto py-3.5 px-2.5 space-y-4">
           ${navSections.map(section => {
             const visibleItems = section.items.filter(item => !item.adminOnly || isAdmin);
             if (!visibleItems.length) return '';
             return `
               <div>
                 ${!state.sidebarCollapsed ? `
-                  <div class="px-2 pb-1 text-[12px] font-bold text-muted uppercase tracking-wider">${section.title}</div>
+                  <div class="px-2.5 pb-1.5 text-[12px] font-bold text-muted uppercase tracking-wider">${section.title}</div>
                 ` : ''}
-                <nav class="flex flex-col gap-0.5">
+                <nav class="flex flex-col gap-1">
                   ${visibleItems.map(item => {
                     const isActive = currentPath === item.path;
                     return `
-                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-2.5'} px-2.5 py-1.5 rounded-md text-[14px] transition-all group ${isActive ? 'bg-sky-500/10 text-sky-500 dark:text-sky-400 font-bold border-l-2 border-sky-500' : 'text-muted hover:bg-surface-hover hover:text-main font-medium'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
-                        <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${isActive ? 'text-sky-500 dark:text-sky-400' : 'text-faint group-hover:text-main transition-colors'}"></i>
+                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-[14px] font-medium transition-colors group ${isActive ? 'bg-surface-hover text-main' : 'text-muted hover:bg-surface-hover hover:text-main'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
+                        <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${isActive ? 'text-main' : 'text-muted group-hover:text-main transition-colors'}"></i>
                         ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
                       </a>
                     `;
