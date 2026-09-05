@@ -2,7 +2,7 @@ import os
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select
@@ -113,6 +113,15 @@ async def root(request: Request):
         "health": "/health",
         "admin_url": "/_/admin",
     }
+
+
+@app.get("/favicon.ico", include_in_schema=False)
+async def favicon():
+    """Returns empty 204 No Content for favicon requests if no icon file exists."""
+    icon_path = os.path.join(ADMIN_DIST_DIR, "favicon.ico")
+    if os.path.isfile(icon_path):
+        return FileResponse(icon_path)
+    return Response(status_code=204)
 
 
 
