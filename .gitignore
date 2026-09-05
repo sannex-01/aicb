@@ -1,10 +1,56 @@
+# Python & Virtual Environments
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.Python
 .venv/
 env/
 venv/
-.env
-aicb.db
+ENV/
+
+# Distribution & Build Artifacts
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Testing & Coverage
 .pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Node & Widget
+widget/node_modules/
+widget/dist/
+widget/.npm/
+
+# Environment, Secrets & Local DBs
+.env
+*.env
+aicb.db
+*.db
+*.sqlite
+*.sqlite3
+test_*.db
+
+# Logs & OS
+*.log
+.DS_Store
+Thumbs.db
+
+# Ideas / Scratch
 ideas/
