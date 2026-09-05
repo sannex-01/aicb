@@ -51,6 +51,7 @@ test_*.db
 *.log
 .DS_Store
 Thumbs.db
+.instance_id
 
 # Ideas / Scratch
 ideas/

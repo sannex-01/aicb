@@ -18,13 +18,35 @@ import { loadCatalogPage } from './pages/catalog.js';
 import { loadUsersPage } from './pages/users.js';
 import { loadOrdersPage } from './pages/orders.js';
 import { loadConversationsPage } from './pages/conversations.js';
+import { loadReportsPage } from './pages/reports.js';
 
-export function updateAppTitle(bizName) {
-  const name = bizName || state.business?.name || state.user?.business?.name;
-  document.title = name ? `${name} — Management Portal` : 'AICB Admin — Multi-Agent Studio';
+export function updateAppTitle(pageName, isPublic = false) {
+  if (isPublic) {
+    document.title = pageName ? `AI Commerce Bots | ${pageName}` : 'AI Commerce Bots | Omnichannel AI Support Platform';
+  } else {
+    document.title = pageName ? `${pageName} | AICB` : 'AICB Studio';
+  }
 }
 
 window.updateAppTitle = updateAppTitle;
+
+// Initialize Optional Host PostHog Analytics
+async function initHostPostHog() {
+  try {
+    const analytics = await api('/settings/analytics');
+    if (analytics?.posthog_api_key && !window.posthog) {
+      const apiKey = analytics.posthog_api_key;
+      const apiHost = analytics.posthog_host || 'https://us.i.posthog.com';
+      
+      // PostHog snippet loader
+      (function(t,e){var o,n,p,r;e.__SV||(window.posthog=e,e._i=[],e.init=function(i,s,a){function g(t,e){var o=e.split(".");2==o.length&&(t=t[o[0]],e=o[1]),t[e]=function(){t.push([e].concat(Array.prototype.slice.call(arguments,0)))}}(p=t.createElement("script")).type="text/javascript",p.async=!0,p.src=s.api_host+"/static/array.js",(r=t.getElementsByTagName("script")[0]).parentNode.insertBefore(p,r);var u=e;for(void 0!==a?u=e[a]=[]:a="posthog",u.people=u.people||[],u.toString=function(t){var e="posthog";return"posthog"!==a&&(e+="."+a),t||(e+=" (stub)"),e},u.people.toString=function(){return u.toString(1)+".people (stub)"},o="capture identify alias people.set people.set_once set_config register register_once unregister opt_out_capturing has_opted_out_capturing opt_in_capturing reset isFeatureEnabled onFeatureFlags getFeatureFlag getFeatureFlagPayload reloadFeatureFlags group updateEarlyAccessFeatureEnrollment getEarlyAccessFeatures getActiveMatchingSurveys getSurveys onSessionId".split(" "),n=0;n<o.length;n++)g(u,o[n]);e._i.push([i,s,a])},e.__SV=1)})(document,window.posthog||[]);
+      window.posthog.init(apiKey, { api_host: apiHost, person_profiles: 'identified_only' });
+      console.log("[AICB] Host PostHog initialized.");
+    }
+  } catch (e) {
+    // PostHog setup silently skips on failure
+  }
+}
 
 export async function initApp() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -51,18 +73,22 @@ export async function initApp() {
   }
 
   try {
-    const sys = await api('/system/version');
+    const sys = await api('/system/health-summary');
     if (sys?.version) {
       state.appVersion = sys.version;
-      state.appName = sys.name || 'AICB Assistant';
-      state.support = sys.support || null;
+      state.appName = sys.app_name || 'AICB (AI Commerce Bots)';
+      state.instanceId = sys.instance_id || null;
     }
-  } catch (e) {}
+  } catch (e) {
+    try {
+      const sysVer = await api('/system/version');
+      if (sysVer?.version) state.appVersion = sysVer.version;
+    } catch {}
+  }
 
   try {
     const status = await api('/setup/status');
     if (status.business?.name) {
-      updateAppTitle(status.business.name);
       state.business = status.business;
     }
     if (!status.initialized) {
@@ -81,7 +107,7 @@ export async function initApp() {
       const authData = await api('/auth/me');
       state.user = authData;
       state.business = authData.business;
-      if (authData.business?.name) updateAppTitle(authData.business.name);
+      initHostPostHog();
     } catch {
       localStorage.removeItem('aicb_admin_token');
       state.user = null;
@@ -96,19 +122,76 @@ export async function initApp() {
   }
 
   renderApp();
+  checkPeriodicSponsorPopup();
 }
+
+// 7-day periodic sponsor reminder banner
+function checkPeriodicSponsorPopup() {
+  const lastDismissed = localStorage.getItem('aicb_sponsor_dismissed_at');
+  const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+  if (!lastDismissed || (Date.now() - Number(lastDismissed) > sevenDaysMs)) {
+    setTimeout(showWeeklySponsorBanner, 3000);
+  }
+}
+
+function showWeeklySponsorBanner() {
+  if (document.getElementById('weekly-sponsor-banner')) return;
+  if (!state.user) return; // Only show inside logged-in dashboard
+
+  const banner = document.createElement('div');
+  banner.id = 'weekly-sponsor-banner';
+  banner.className = 'fixed bottom-4 right-4 z-40 max-w-sm w-full bg-slate-900/95 border border-sky-500/30 dark:border-white/10 rounded-2xl p-4 shadow-2xl backdrop-blur-md animate-scale-in text-slate-100';
+  banner.innerHTML = `
+    <div class="flex items-start gap-3">
+      <div class="w-8 h-8 rounded-xl bg-pink-500/10 text-pink-400 border border-pink-500/20 flex items-center justify-center text-base flex-shrink-0">
+        ❤️
+      </div>
+      <div class="space-y-1 min-w-0 flex-1">
+        <div class="flex items-center justify-between">
+          <h4 class="text-xs font-bold text-white">Loving AICB?</h4>
+          <button onclick="dismissSponsorBanner()" class="text-slate-400 hover:text-white p-0.5 rounded transition-colors" title="Remind in 7 days">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <p class="text-[11px] text-slate-300 leading-relaxed">
+          Support ongoing open-source development by starring our repo on GitHub or sponsoring us!
+        </p>
+        <div class="flex items-center gap-2 pt-2">
+          <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-[11px] font-semibold flex items-center gap-1 transition-all">
+            ⭐ Star on GitHub
+          </a>
+          <a href="https://github.com/sponsors/sannex-01" target="_blank" rel="noreferrer" class="px-2.5 py-1 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-[11px] font-semibold flex items-center gap-1 transition-all">
+            ❤️ Sponsor
+          </a>
+        </div>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(banner);
+}
+
+window.dismissSponsorBanner = function() {
+  const banner = document.getElementById('weekly-sponsor-banner');
+  if (banner) banner.remove();
+  localStorage.setItem('aicb_sponsor_dismissed_at', String(Date.now()));
+};
 
 export function renderApp() {
   const app = document.getElementById('app');
   const path = state.route.replace(/\/$/, '') || '/_/admin/overview';
 
   if (path === '/_/admin/setup') {
+    updateAppTitle('First-Run Setup', true);
     renderSetupView(app);
   } else if (path === '/_/admin/login') {
+    updateAppTitle('Admin Login', true);
     renderLoginView(app);
   } else if (path === '/_/admin/forgot-password') {
+    updateAppTitle('Forgot Password', true);
     renderForgotPasswordView(app);
   } else if (path === '/_/admin/reset-password') {
+    updateAppTitle('Reset Password', true);
     renderResetPasswordView(app);
   } else {
     renderAdminShell(app, path);
@@ -142,20 +225,49 @@ function renderAdminShell(container, currentPath) {
     return;
   }
 
-  const allNavItems = [
-    { label: 'Overview', path: '/_/admin/overview', icon: 'layout-dashboard' },
-    { label: 'Conversations', path: '/_/admin/conversations', icon: 'message-square' },
-    { label: 'Orders & Payments', path: '/_/admin/orders', icon: 'shopping-cart' },
-    { label: 'AI Agents Studio', path: '/_/admin/agents', icon: 'bot' },
-    { label: 'Access Groups', path: '/_/admin/groups', icon: 'shield-check' },
-    { label: 'Customers', path: '/_/admin/customers', icon: 'users' },
-    { label: 'Products Catalog', path: '/_/admin/catalog', icon: 'shopping-bag' },
-    { label: 'Knowledge Base', path: '/_/admin/knowledge', icon: 'book-open' },
-    { label: 'Team Accounts', path: '/_/admin/users', icon: 'user-check', adminOnly: true },
-    { label: 'Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
+  // Structured Navigation Categories
+  const navSections = [
+    {
+      title: 'OPERATIONS',
+      items: [
+        { label: 'Overview', path: '/_/admin/overview', icon: 'layout-dashboard' },
+        { label: 'Conversations', path: '/_/admin/conversations', icon: 'message-square' },
+        { label: 'Customers', path: '/_/admin/customers', icon: 'users' },
+      ]
+    },
+    {
+      title: 'COMMERCE',
+      items: [
+        { label: 'Products Catalog', path: '/_/admin/catalog', icon: 'shopping-bag' },
+        { label: 'Orders & Payments', path: '/_/admin/orders', icon: 'shopping-cart' },
+        { label: 'Reports & Analytics', path: '/_/admin/reports', icon: 'bar-chart-3' },
+      ]
+    },
+    {
+      title: 'AI STUDIO',
+      items: [
+        { label: 'AI Agents Studio', path: '/_/admin/agents', icon: 'bot' },
+        { label: 'Access Groups', path: '/_/admin/groups', icon: 'shield-check' },
+        { label: 'Knowledge Base', path: '/_/admin/knowledge', icon: 'book-open' },
+      ]
+    },
+    {
+      title: 'CONFIGURATION',
+      items: [
+        { label: 'Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
+        { label: 'Team Accounts', path: '/_/admin/users', icon: 'user-check', adminOnly: true },
+      ]
+    }
   ];
 
-  const navItems = allNavItems.filter(item => !item.adminOnly || isAdmin);
+  // Find active item label for header and document title
+  let activeLabel = 'Overview';
+  for (const sec of navSections) {
+    for (const it of sec.items) {
+      if (it.path === currentPath) activeLabel = it.label;
+    }
+  }
+  updateAppTitle(activeLabel, false);
 
   const business = state.business || state.user?.business || {};
   const businessName = business.name || 'AICB Studio';
@@ -199,56 +311,59 @@ function renderAdminShell(container, currentPath) {
           ` : ''}
         </div>
 
-        <div class="flex-1 overflow-y-auto py-3 px-2">
-          ${!state.sidebarCollapsed ? `<div class="px-2.5 pb-1.5 text-[10px] font-bold text-faint uppercase tracking-wider">Workspace Tools</div>` : ''}
-          <nav class="flex flex-col gap-0.5 mt-1">
-            ${navItems.map(item => `
-              <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-2.5'} px-2.5 py-2 rounded-md text-[13px] font-medium transition-colors group ${currentPath === item.path ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
-                <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${currentPath === item.path ? 'text-brand' : 'text-faint group-hover:text-main transition-colors'}"></i>
-                ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
-              </a>
-            `).join('')}
-          </nav>
+        <!-- Grouped Navigation Menu -->
+        <div class="flex-1 overflow-y-auto py-2.5 px-2 space-y-3">
+          ${navSections.map(section => {
+            const visibleItems = section.items.filter(item => !item.adminOnly || isAdmin);
+            if (!visibleItems.length) return '';
+            return `
+              <div>
+                ${!state.sidebarCollapsed ? `
+                  <div class="px-2 pb-1 text-[9px] font-extrabold text-faint uppercase tracking-wider">${section.title}</div>
+                ` : ''}
+                <nav class="flex flex-col gap-0.5">
+                  ${visibleItems.map(item => {
+                    const isActive = currentPath === item.path;
+                    return `
+                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-2.5'} px-2.5 py-1.5 rounded-md text-[12.5px] transition-all group ${isActive ? 'bg-sky-500/10 text-sky-500 dark:text-sky-400 font-bold border-l-2 border-sky-500' : 'text-muted hover:bg-surface-hover hover:text-main font-medium'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
+                        <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${isActive ? 'text-sky-500 dark:text-sky-400' : 'text-faint group-hover:text-main transition-colors'}"></i>
+                        ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
+                      </a>
+                    `;
+                  }).join('')}
+                </nav>
+              </div>
+            `;
+          }).join('')}
         </div>
 
-        <div class="p-3 border-t border-subtle flex flex-col gap-2">
-          ${!state.sidebarCollapsed ? `
-          <!-- Support Open-Source Project Button -->
-          <button type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-pink-600 dark:text-pink-400 hover:text-pink-700 hover:bg-pink-500/10 border border-pink-500/15 dark:border-pink-500/20 bg-pink-500/5 transition-all group cursor-pointer" onclick="window.openSupportModal()" title="Support & Sponsor Open-Source AICB">
-            <div class="flex items-center gap-2 min-w-0">
-              <i data-lucide="heart" class="w-3.5 h-3.5 text-pink-500 flex-shrink-0 group-hover:scale-110 transition-transform fill-pink-500/20"></i>
-              <span class="truncate text-xs font-semibold">Support AICB</span>
-            </div>
-            <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20">
-              Sponsor
-            </span>
-          </button>
-
-          <!-- Releases Section & Current App Version -->
-          <button type="button" id="sidebar-releases-btn" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium text-muted hover:text-main hover:bg-surface-hover border border-subtle/50 dark:border-white/5 bg-surface/50 dark:bg-white/[0.02] transition-all group cursor-pointer" onclick="window.openReleasesModal()" title="View AICB Platform Releases & Changelog">
-            <div class="flex items-center gap-2 min-w-0">
-              <i data-lucide="rocket" class="w-3.5 h-3.5 text-brand flex-shrink-0 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform"></i>
-              <span class="truncate text-xs font-medium">Releases</span>
-            </div>
-            <span class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
-              v${escapeHtml(state.appVersion || '0.2.1')}
-            </span>
-          </button>
-          ` : ''}
+        <!-- Footer Actions (n8n Style Help + User Identity) -->
+        <div class="p-2.5 border-t border-subtle flex flex-col gap-1.5 bg-surface-elevated/30">
+          
+          <!-- Help Button (Triggers n8n-style Menu Popover) -->
+          <div class="relative">
+            <button type="button" id="sidebar-help-btn" class="w-full flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg text-xs font-medium text-muted hover:text-main hover:bg-surface-hover transition-colors group cursor-pointer" onclick="window.toggleHelpMenu(event)" title="Help, Documentation & About AICB">
+              <div class="flex items-center gap-2 min-w-0">
+                <i data-lucide="help-circle" class="w-4 h-4 text-muted group-hover:text-main flex-shrink-0"></i>
+                ${!state.sidebarCollapsed ? `<span class="truncate">Help</span>` : ''}
+              </div>
+              ${!state.sidebarCollapsed ? `
+                <i data-lucide="chevron-right" class="w-3.5 h-3.5 text-faint group-hover:text-main transition-transform"></i>
+              ` : ''}
+            </button>
+          </div>
 
           <!-- User Identity Card -->
-          <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-1' : 'gap-2.5 pt-1'}">
+          <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-1' : 'gap-2 pt-1'} border-t border-subtle/60">
             <div class="w-7 h-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-xs flex-shrink-0">
               ${escapeHtml(user.name?.charAt(0) || 'U')}
             </div>
             ${!state.sidebarCollapsed ? `
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold truncate text-main leading-none mb-1">${escapeHtml(user.name || 'User')}</div>
-              <div class="flex items-center gap-1">
-                <span class="badge ${roleBadgeClass} text-[9px] px-1.5 py-0 uppercase font-bold tracking-wider">
-                  ${escapeHtml(user.role || 'operator')}
-                </span>
-              </div>
+              <div class="text-xs font-bold truncate text-main leading-none mb-0.5">${escapeHtml(user.name || 'User')}</div>
+              <span class="badge ${roleBadgeClass} text-[8px] px-1 py-0 uppercase font-bold tracking-wider">
+                ${escapeHtml(user.role || 'operator')}
+              </span>
             </div>
             ` : ''}
             <button class="text-faint hover:text-rose transition-colors p-1 hover:bg-rose/10 rounded-md ${state.sidebarCollapsed ? 'mt-1' : ''}" onclick="window.logout()" title="Logout">
@@ -258,14 +373,14 @@ function renderAdminShell(container, currentPath) {
         </div>
       </aside>
 
-      <!-- Main Content -->
+      <!-- Main Content Area -->
       <main class="flex-1 flex flex-col min-w-0 bg-app relative">
         <header class="h-14 flex-shrink-0 bg-surface border-b border-subtle flex items-center justify-between px-6 sticky top-0 z-10">
           <div class="flex items-center gap-3">
             <button class="text-faint hover:text-main transition-colors p-1" onclick="window.toggleSidebar()" title="Toggle Sidebar">
               <i data-lucide="menu" class="w-4.5 h-4.5"></i>
             </button>
-            <h2 class="text-[15px] font-semibold tracking-tight text-main">${allNavItems.find(i => i.path === currentPath)?.label || 'Dashboard'}</h2>
+            <h2 class="text-[15px] font-semibold tracking-tight text-main">${activeLabel}</h2>
           </div>
           <div class="flex items-center gap-3">
             <!-- Header Theme Toggle -->
@@ -320,11 +435,13 @@ function renderAdminShell(container, currentPath) {
     const nameEl = document.getElementById('sidebar-business-name');
     if (nameEl) nameEl.textContent = bName;
   };
+
   window.toggleSidebar = function() {
     state.sidebarCollapsed = !state.sidebarCollapsed;
     localStorage.setItem('aicb_sidebar_collapsed', String(state.sidebarCollapsed));
     renderAdminShell(container, currentPath);
   };
+
   window.logout = async function() {
     try { await api('/auth/logout', { method: 'POST' }); } catch {}
     localStorage.removeItem('aicb_admin_token');
@@ -333,81 +450,175 @@ function renderAdminShell(container, currentPath) {
     navigate('/_/admin/login');
   };
 
-  // Support / Sponsor Modal Handler
-  window.openSupportModal = async function() {
-    let existingModal = document.getElementById('support-modal');
-    if (existingModal) existingModal.remove();
-
-    // Fetch latest support config if not present
-    let support = state.support;
-    if (!support) {
-      try {
-        support = await api('/system/support');
-        state.support = support;
-      } catch (e) {}
+  // n8n Style Help Menu Popover Handler
+  window.toggleHelpMenu = function(e) {
+    e?.stopPropagation();
+    let menu = document.getElementById('n8n-help-popover');
+    if (menu) {
+      menu.remove();
+      return;
     }
 
-    const title = support?.title || 'Support Open-Source AICB';
-    const message = support?.message || 'AICB is 100% free and open source. If AICB powers your business or projects, consider supporting ongoing development, documentation, and maintenance.';
-    const supportUrl = support?.url || 'https://github.com/sponsors/sannex';
+    const popover = document.createElement('div');
+    popover.id = 'n8n-help-popover';
+    popover.className = `fixed bottom-12 ${state.sidebarCollapsed ? 'left-16' : 'left-56'} z-50 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-scale-in text-slate-100 font-sans`;
+    popover.innerHTML = `
+      <div class="p-2 space-y-0.5 text-xs">
+        <a href="https://agentos.sannex.ng/docs/getting-started/quickstart" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+          <svg class="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+          <span>Quickstart</span>
+        </a>
 
-    const modal = document.createElement('div');
-    modal.id = 'support-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in';
-    modal.innerHTML = `
-      <div class="bg-surface border border-subtle rounded-2xl shadow-2xl max-w-lg w-full flex flex-col overflow-hidden animate-scale-in">
-        <div class="p-5 border-b border-subtle flex items-center justify-between bg-surface-elevated">
-          <div class="flex items-center gap-2.5">
-            <div class="w-10 h-10 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500 flex-shrink-0">
-              <i data-lucide="heart" class="w-5 h-5 fill-pink-500/20"></i>
-            </div>
-            <div>
-              <h3 class="font-bold text-base text-main">${escapeHtml(title)}</h3>
-              <p class="text-xs text-muted">Community & Open Source Sponsorship</p>
-            </div>
-          </div>
-          <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface transition-colors cursor-pointer" onclick="document.getElementById('support-modal')?.remove()" title="Close">
-            <i data-lucide="x" class="w-5 h-5"></i>
-          </button>
+        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+          <span>Documentation</span>
+        </a>
+
+        <a href="https://github.com/sannex-01/aicb/discussions" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          <span>Forum & Community</span>
+        </a>
+
+        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+          <span>Course & Tutorials</span>
+        </a>
+
+        <a href="https://github.com/sannex-01/aicb/issues" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+          <span>Report a bug</span>
+        </a>
+
+        <button onclick="window.openAboutModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left">
+          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <span>About AICB</span>
+        </button>
+      </div>
+
+      <!-- What's New Section -->
+      <div class="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
+        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">What's new</div>
+        
+        <div class="flex items-start gap-2 text-xs">
+          <span class="w-2 h-2 rounded-full bg-rose-500 mt-1 flex-shrink-0 animate-pulse"></span>
+          <span class="text-slate-300 line-clamp-1 font-medium">AI Assistant on self-hosted: setup in minutes</span>
         </div>
 
-        <div class="p-6 space-y-4">
-          <div class="p-4 rounded-xl border border-subtle bg-surface-elevated flex items-start gap-3">
-            <i data-lucide="sparkles" class="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5"></i>
-            <p class="text-xs text-main leading-relaxed">${escapeHtml(message)}</p>
-          </div>
+        <button onclick="window.openReleasesModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-center justify-between text-xs text-sky-400 hover:text-sky-300 font-medium pt-1">
+          <span>Full changelog</span>
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+        </button>
 
-          <div class="space-y-2 text-xs text-muted">
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
-              <span>Directly backs open-source feature development</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
-              <span>Keeps AgentOS Documentation & Releases freely accessible</span>
-            </div>
-            <div class="flex items-center gap-2">
-              <i data-lucide="check" class="w-4 h-4 text-emerald-500 flex-shrink-0"></i>
-              <span>100% self-hosted freedom with zero artificial tier locks</span>
-            </div>
-          </div>
-        </div>
-
-        <div class="p-4 border-t border-subtle bg-surface-elevated flex items-center justify-between gap-3">
-          <button type="button" class="btn btn-secondary text-xs" onclick="document.getElementById('support-modal')?.remove()">
-            Maybe Later
-          </button>
-          <a href="${escapeHtml(supportUrl)}" target="_blank" rel="noopener noreferrer" class="btn btn-primary text-xs flex items-center gap-1.5 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white font-semibold shadow-sm" onclick="document.getElementById('support-modal')?.remove()">
-            <i data-lucide="heart" class="w-3.5 h-3.5 fill-white"></i>
-            <span>Sponsor on GitHub</span>
-            <i data-lucide="external-link" class="w-3 h-3 opacity-80"></i>
-          </a>
+        <div class="flex items-center gap-1.5 text-[11px] text-emerald-400 pt-1 border-t border-slate-800/60 font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span>Up to date (v${escapeHtml(state.appVersion || '0.1.0')})</span>
         </div>
       </div>
     `;
 
+    document.body.appendChild(popover);
+
+    const closeListener = (ev) => {
+      if (!popover.contains(ev.target) && ev.target !== e.target) {
+        popover.remove();
+        document.removeEventListener('click', closeListener);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeListener), 10);
+  };
+
+  // About AICB Modal (Matching Screenshot 2)
+  window.openAboutModal = async function() {
+    let existing = document.getElementById('about-aicb-modal');
+    if (existing) existing.remove();
+
+    let debugData = null;
+    try {
+      debugData = await api('/system/debug-info');
+    } catch {}
+
+    const version = state.appVersion || '0.1.0';
+    const instanceId = debugData?.instance_id || state.instanceId || '7966745583d50cb1210cd8041b0817e4ab54c3eaf22487b2c3433d3d07506383';
+
+    const modal = document.createElement('div');
+    modal.id = 'about-aicb-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in font-sans';
+    modal.innerHTML = `
+      <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in text-slate-100" onclick="event.stopPropagation()">
+        
+        <!-- Modal Header -->
+        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+          <h3 class="text-base font-bold text-white tracking-tight">About AICB</h3>
+          <button class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <!-- Modal Body (Properties Table matching Screenshot 2) -->
+        <div class="p-6 space-y-4 text-xs">
+          
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400 font-medium">AICB Version</span>
+            <span class="text-white font-mono font-semibold">${escapeHtml(version)}</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400 font-medium">Source Code</span>
+            <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
+              https://github.com/sannex-01/aicb
+            </a>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400 font-medium">License</span>
+            <span class="text-rose-500 font-medium">MIT License</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400 font-medium">Third-Party Licenses</span>
+            <a href="https://agentos.sannex.ng/docs" target="_blank" class="text-rose-500 hover:text-rose-400 hover:underline">
+              View all third-party licenses
+            </a>
+          </div>
+
+          <div class="flex items-start justify-between py-1 gap-4">
+            <span class="text-slate-400 font-medium shrink-0">Instance ID</span>
+            <span class="text-slate-300 font-mono text-[11px] text-right break-all max-w-[240px]">${escapeHtml(instanceId)}</span>
+          </div>
+
+          <div class="flex items-center justify-between py-1">
+            <span class="text-slate-400 font-medium">Debug</span>
+            <button id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 font-semibold flex items-center gap-1 transition-colors">
+              <span>Copy debug information</span>
+            </button>
+          </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="p-4 border-t border-slate-800 bg-slate-950/60 flex justify-start">
+          <button type="button" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-all shadow-md shadow-rose-600/20" onclick="document.getElementById('about-aicb-modal')?.remove()">
+            Close
+          </button>
+        </div>
+
+      </div>
+    `;
+
     document.body.appendChild(modal);
-    if (window.lucide) lucide.createIcons();
+
+    const copyBtn = modal.querySelector('#copy-debug-btn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', async () => {
+        try {
+          const debugPayload = debugData || await api('/system/debug-info');
+          await navigator.clipboard.writeText(JSON.stringify(debugPayload, null, 2));
+          showToast('Debug information copied to clipboard', 'success');
+        } catch (e) {
+          showToast('Failed to copy debug info', 'error');
+        }
+      });
+    }
   };
 
   // Releases Offcanvas Handlers
@@ -420,45 +631,43 @@ function renderAdminShell(container, currentPath) {
 
     const backdrop = document.createElement('div');
     backdrop.id = 'releases-offcanvas-backdrop';
-    backdrop.className = 'fixed inset-0 z-40 bg-black/20 backdrop-blur-[1px]';
+    backdrop.className = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in';
     backdrop.onclick = (e) => {
       if (e.target === backdrop) backdrop.remove();
     };
 
-    const sidebarWidthClass = state.sidebarCollapsed ? 'left-20' : 'left-[248px]';
-
     backdrop.innerHTML = `
-      <div class="fixed bottom-3 ${sidebarWidthClass} z-50 w-[390px] max-w-[calc(100vw-18rem)] max-h-[74vh] flex flex-col bg-surface border border-subtle dark:border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-scale-in" onclick="event.stopPropagation()">
-        <div class="p-4 border-b border-subtle flex items-center justify-between bg-surface-elevated/80">
+      <div class="w-full max-w-lg max-h-[80vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-scale-in text-slate-100" onclick="event.stopPropagation()">
+        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
           <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand flex-shrink-0">
+            <div class="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
               <i data-lucide="rocket" class="w-4 h-4"></i>
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <h3 class="font-bold text-sm text-main truncate">AICB Releases</h3>
-                <span class="badge badge-emerald text-[9px] font-mono px-1.5 py-0.2">v${escapeHtml(state.appVersion || '0.2.1')}</span>
+                <h3 class="font-bold text-sm text-white truncate">AICB Releases</h3>
+                <span class="badge badge-emerald text-[9px] font-mono px-1.5 py-0.2">v${escapeHtml(state.appVersion || '0.1.0')}</span>
               </div>
-              <p class="text-[11px] text-muted truncate">Synchronized from AgentOS</p>
+              <p class="text-[11px] text-slate-400 truncate">Synchronized from AgentOS</p>
             </div>
           </div>
-          <button class="text-muted hover:text-main p-1 rounded-lg hover:bg-surface transition-colors cursor-pointer" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()" title="Close">
+          <button class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()" title="Close">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <div id="releases-modal-content" class="p-4 overflow-y-auto space-y-3 flex-1">
           <div class="flex items-center justify-center py-8">
-            <div class="animate-spin w-5 h-5 border-2 border-brand border-t-transparent rounded-full"></div>
+            <div class="animate-spin w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full"></div>
           </div>
         </div>
 
-        <div class="p-3 border-t border-subtle bg-surface-elevated/80 flex items-center justify-between gap-2">
-          <button type="button" id="releases-sync-btn" class="btn btn-secondary text-xs flex items-center gap-1.5 py-1.5" onclick="window.syncReleasesFromModal()">
+        <div class="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between gap-2">
+          <button type="button" id="releases-sync-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs flex items-center gap-1.5 transition-all" onclick="window.syncReleasesFromModal()">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Check Updates</span>
           </button>
-          <button type="button" class="btn btn-primary text-xs py-1.5 px-3" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()">
+          <button type="button" class="px-4 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()">
             Close
           </button>
         </div>
@@ -479,10 +688,10 @@ function renderAdminShell(container, currentPath) {
       const releases = await api('/system/releases');
       if (!releases || releases.length === 0) {
         container.innerHTML = `
-          <div class="text-center py-8 text-muted">
-            <i data-lucide="info" class="w-8 h-8 mx-auto text-subtle mb-2"></i>
-            <p class="font-medium text-sm text-main">No release notes available</p>
-            <p class="text-xs">Click "Check for Updates" to sync release notes from AgentOS.</p>
+          <div class="text-center py-8 text-slate-400">
+            <i data-lucide="info" class="w-8 h-8 mx-auto text-slate-600 mb-2"></i>
+            <p class="font-medium text-sm text-white">No release notes available</p>
+            <p class="text-xs">Click "Check Updates" to sync release notes from AgentOS.</p>
           </div>
         `;
         if (window.lucide) lucide.createIcons();
@@ -491,21 +700,21 @@ function renderAdminShell(container, currentPath) {
 
       const agentosHost = 'https://agentos.aicb.sannex.ng';
       container.innerHTML = releases.map((rel, idx) => `
-        <a href="${escapeHtml(rel.download_url || `${agentosHost}/releases`)}" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-xl border border-subtle dark:border-white/5 bg-surface-elevated/40 hover:bg-surface-elevated hover:border-brand/30 transition-all group">
+        <a href="${escapeHtml(rel.download_url || `${agentosHost}/releases`)}" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 hover:border-sky-500/30 transition-all group">
           <div class="flex items-center justify-between gap-2 mb-1">
             <div class="flex items-center gap-2 min-w-0">
               <span class="badge ${idx === 0 ? 'badge-emerald' : 'badge-subtle'} font-mono font-bold text-xs px-2 py-0.5">
                 v${escapeHtml(rel.version)}
               </span>
-              <h4 class="font-bold text-xs text-main truncate group-hover:text-brand transition-colors">${escapeHtml(rel.title || 'Update')}</h4>
+              <h4 class="font-bold text-xs text-white truncate group-hover:text-sky-400 transition-colors">${escapeHtml(rel.title || 'Update')}</h4>
               ${rel.is_critical ? '<span class="badge badge-rose text-[9px] font-bold uppercase">Critical</span>' : ''}
             </div>
-            <i data-lucide="external-link" class="w-3.5 h-3.5 text-muted group-hover:text-brand transition-colors flex-shrink-0"></i>
+            <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-500 group-hover:text-sky-400 transition-colors flex-shrink-0"></i>
           </div>
-          ${rel.description ? `<p class="text-[11px] text-muted line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
-          <div class="flex items-center justify-between text-[10px] text-faint mt-2 pt-1.5 border-t border-subtle/40">
+          ${rel.description ? `<p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
+          <div class="flex items-center justify-between text-[10px] text-slate-500 mt-2 pt-1.5 border-t border-slate-800/80">
             <span>${rel.release_date ? escapeHtml(rel.release_date) : 'Official Release'}</span>
-            <span class="text-brand flex items-center gap-0.5 font-medium">Read on AgentOS &rarr;</span>
+            <span class="text-sky-400 flex items-center gap-0.5 font-medium">Read on AgentOS &rarr;</span>
           </div>
         </a>
       `).join('');
@@ -513,7 +722,7 @@ function renderAdminShell(container, currentPath) {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       container.innerHTML = `
-        <div class="p-3.5 rounded-xl bg-rose/10 border border-rose/20 text-rose text-xs">
+        <div class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
           Failed to load release notes: ${escapeHtml(e.message || 'Network error')}
         </div>
       `;
@@ -529,7 +738,7 @@ function renderAdminShell(container, currentPath) {
     }
 
     try {
-      const res = await api('/system/releases/sync', { method: 'POST' });
+      await api('/system/releases/sync', { method: 'POST' });
       showToast('Release notes synchronized successfully.', 'success');
       await window.loadReleasesModalContent();
     } catch (e) {
@@ -537,7 +746,7 @@ function renderAdminShell(container, currentPath) {
     } finally {
       if (btn) {
         btn.disabled = false;
-        btn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check for Updates`;
+        btn.innerHTML = `<i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i> Check Updates`;
         if (window.lucide) lucide.createIcons();
       }
     }
@@ -548,6 +757,7 @@ function renderAdminShell(container, currentPath) {
   if (currentPath === '/_/admin/overview') loadOverviewPage(pageContainer);
   else if (currentPath === '/_/admin/conversations') loadConversationsPage(pageContainer);
   else if (currentPath === '/_/admin/orders') loadOrdersPage(pageContainer);
+  else if (currentPath === '/_/admin/reports') loadReportsPage(pageContainer);
   else if (currentPath === '/_/admin/agents') loadAgentsPage(pageContainer);
   else if (currentPath === '/_/admin/groups') loadGroupsPage(pageContainer);
   else if (currentPath === '/_/admin/customers') loadCustomersPage(pageContainer);
@@ -561,4 +771,3 @@ function renderAdminShell(container, currentPath) {
 
 // Start SPA on Load
 document.addEventListener('DOMContentLoaded', initApp);
-

@@ -1,6 +1,6 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from slowapi import _rate_limit_exceeded_handler
@@ -41,6 +41,7 @@ from app.api.catalog import router as admin_catalog_router
 from app.api.knowledge import router as admin_knowledge_router
 from app.api.conversations import router as conversations_router
 from app.api.system import router as system_router
+from app.api.reports import router as reports_router
 
 WIDGET_BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "..", "widget", "dist", "widget.js")
 ADMIN_DIST_DIR = os.path.join(os.path.dirname(__file__), "admin_ui", "dist")
@@ -69,6 +70,8 @@ app = FastAPI(
     description="Modular Plug-and-Play AI & Interactive Chatbot Engine for WhatsApp, Telegram, Payments & Commerce",
     version="1.0.0",
     lifespan=lifespan,
+    docs_url="/docs",
+    redoc_url=None,
 )
 
 app.state.limiter = limiter
@@ -95,13 +98,22 @@ async def health_check():
 
 
 @app.get("/", tags=["Health"])
-async def root():
+async def root(request: Request):
+    """Serves the interactive System Health Status page or JSON API summary."""
+    accept_header = request.headers.get("accept", "")
+    if "text/html" in accept_header or "*/*" in accept_header:
+        health_file = os.path.join(ADMIN_DIST_DIR, "health.html")
+        if os.path.isfile(health_file):
+            return FileResponse(health_file, media_type="text/html")
+
     return {
         "message": f"Welcome to {settings.APP_NAME}",
-        "docs_url": "/docs",
+        "version": settings.APP_VERSION,
+        "docs_url": "https://agentos.sannex.ng/docs",
         "health": "/health",
         "admin_url": "/_/admin",
     }
+
 
 
 def _mask_key(key: str | None) -> str | None:
@@ -212,6 +224,8 @@ app.include_router(admin_catalog_router, prefix="/api/v1")
 app.include_router(admin_knowledge_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")
 app.include_router(system_router, prefix="/api/v1")
+app.include_router(reports_router, prefix="/api/v1")
+
 
 
 @app.get("/widget.js", tags=["Website Widget"])

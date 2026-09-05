@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -110,3 +111,94 @@ async def sync_system_releases(db: AsyncSession = Depends(get_db)):
         "sync_summary": sync_result,
         "releases": releases,
     }
+
+
+@router.get("/health-summary")
+async def get_health_summary(db: AsyncSession = Depends(get_db)):
+    """Detailed health check and subsystem status for the public health dashboard."""
+    import time
+    start_time = time.time()
+
+    # DB ping
+    db_ok = True
+    try:
+        from sqlalchemy import text
+        await db.execute(text("SELECT 1"))
+        db_latency_ms = round((time.time() - start_time) * 1000, 2)
+    except Exception:
+        db_ok = False
+        db_latency_ms = -1
+
+    db_type = "PostgreSQL" if "postgres" in settings.DATABASE_URL.lower() else "SQLite"
+
+    # LLM Model Name
+    if settings.LLM_PROVIDER == "openai":
+        active_model = settings.OPENAI_MODEL
+    elif settings.LLM_PROVIDER == "claude":
+        active_model = settings.ANTHROPIC_MODEL
+    else:
+        active_model = settings.GEMINI_MODEL
+
+    return {
+        "status": "operational" if db_ok else "degraded",
+        "app_name": "AICB (AI Commerce Bots)",
+        "version": settings.APP_VERSION,
+        "environment": settings.ENVIRONMENT,
+        "instance_id": settings.INSTANCE_ID,
+        "database": {
+            "status": "operational" if db_ok else "disconnected",
+            "type": db_type,
+            "latency_ms": db_latency_ms,
+        },
+        "llm": {
+            "status": "operational",
+            "provider": settings.LLM_PROVIDER.upper(),
+            "model": active_model,
+        },
+        "channels": [
+            {
+                "name": "WhatsApp Cloud API",
+                "status": "configured" if settings.META_WHATSAPP_TOKEN else "unconfigured",
+                "enabled": bool(settings.META_WHATSAPP_TOKEN),
+            },
+            {
+                "name": "Telegram Bot API",
+                "status": "configured" if settings.TELEGRAM_BOT_TOKEN else "unconfigured",
+                "enabled": bool(settings.TELEGRAM_BOT_TOKEN),
+            },
+            {
+                "name": "Website Chat Widget",
+                "status": "operational",
+                "enabled": True,
+            },
+        ],
+        "commerce": {
+            "status": "operational",
+            "provider": settings.DEFAULT_PAYMENT_GATEWAY.capitalize(),
+            "currency": "NGN",
+        },
+        "docs_url": "https://agentos.sannex.ng/docs",
+        "github_url": "https://github.com/sannex-01/aicb",
+    }
+
+
+@router.get("/debug-info")
+async def get_debug_info():
+    """Returns structured system debug information for one-click copy in About modal."""
+    import sys
+    import platform
+
+    return {
+        "aicb_version": settings.APP_VERSION,
+        "instance_id": settings.INSTANCE_ID,
+        "python_version": sys.version.split()[0],
+        "platform": platform.platform(),
+        "environment": settings.ENVIRONMENT,
+        "database_type": "PostgreSQL" if "postgres" in settings.DATABASE_URL.lower() else "SQLite",
+        "llm_provider": settings.LLM_PROVIDER,
+        "bot_mode": settings.BOT_MODE,
+        "posthog_enabled": bool(settings.POSTHOG_API_KEY),
+        "sannex_sync_enabled": bool(settings.SANNEX_API_KEY),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+

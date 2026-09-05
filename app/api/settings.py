@@ -393,6 +393,48 @@ async def test_and_set_telegram_webhook(
     return result
 
 
+class UpdateAnalyticsConfigRequest(BaseModel):
+    posthog_api_key: Optional[str] = None
+    posthog_host: Optional[str] = "https://us.i.posthog.com"
+
+
+@router.get("/analytics")
+async def get_analytics_settings(
+    current_user: AdminUser = Depends(get_current_admin_user),
+):
+    """Returns host analytics and PostHog configuration."""
+    from app.core.config import settings
+    return {
+        "posthog_api_key": settings.POSTHOG_API_KEY,
+        "posthog_host": settings.POSTHOG_HOST or "https://us.i.posthog.com",
+        "posthog_configured": bool(settings.POSTHOG_API_KEY),
+    }
+
+
+@router.put("/analytics")
+async def update_analytics_settings(
+    req: UpdateAnalyticsConfigRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+):
+    """Updates host PostHog analytics configuration."""
+    from app.core.config import settings
+    if req.posthog_api_key is not None:
+        key_val = req.posthog_api_key.strip()
+        settings.POSTHOG_API_KEY = key_val or None
+    if req.posthog_host is not None:
+        host_val = req.posthog_host.strip()
+        settings.POSTHOG_HOST = host_val or "https://us.i.posthog.com"
+
+    return {
+        "status": "ok",
+        "message": "Analytics settings updated successfully.",
+        "posthog_api_key": settings.POSTHOG_API_KEY,
+        "posthog_host": settings.POSTHOG_HOST,
+        "posthog_configured": bool(settings.POSTHOG_API_KEY),
+    }
+
+
+
 
 
 

@@ -128,10 +128,35 @@ class Settings(BaseSettings):
     SYNC_INTERVAL_HOURS: Optional[int] = None
     ENABLE_TELEMETRY: bool = True
 
+    # Host PostHog Analytics (Optional)
+    POSTHOG_API_KEY: Optional[str] = None
+    POSTHOG_HOST: str = "https://us.i.posthog.com"
+
+    # Instance Identity
+    INSTANCE_ID: Optional[str] = None
+
     def model_post_init(self, __context) -> None:
         domain = self.AICB_DOMAIN or self.BOT_DOMAIN or "https://aicb.sannex.ng"
         self.AICB_DOMAIN = domain
         self.BOT_DOMAIN = domain
+
+        if not self.INSTANCE_ID:
+            instance_file = os.path.join(os.path.dirname(__file__), "..", "..", ".instance_id")
+            if os.path.exists(instance_file):
+                try:
+                    with open(instance_file, "r") as f:
+                        self.INSTANCE_ID = f.read().strip()
+                except Exception:
+                    pass
+            if not self.INSTANCE_ID:
+                import uuid
+                new_id = uuid.uuid4().hex
+                self.INSTANCE_ID = new_id
+                try:
+                    with open(instance_file, "w") as f:
+                        f.write(new_id)
+                except Exception:
+                    pass
 
 
 settings = Settings()
@@ -139,3 +164,4 @@ settings = Settings()
 
 def get_settings() -> Settings:
     return settings
+
