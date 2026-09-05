@@ -68,8 +68,8 @@ aicb = "app.cli:main"
 [project.urls]
 Homepage = "https://aicb.sannex.ng"
 Documentation = "https://docs.aicb.sannex.ng"
-Repository = "https://github.com/sannex-tech/aicb"
-Issues = "https://github.com/sannex-tech/aicb/issues"
+Repository = "https://github.com/sannex-01/aicb"
+Issues = "https://github.com/sannex-01/aicb/issues"
 
 [tool.setuptools.packages.find]
 where = ["."]
