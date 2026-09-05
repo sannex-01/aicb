@@ -539,12 +539,20 @@ function renderAdminShell(container, currentPath) {
     setTimeout(() => document.addEventListener('click', closeListener), 10);
   };
 
-  // About AICB Modal
-  window.openAboutModal = function() {
+  // About AICB Modal (Matching n8n About Modal)
+  window.openAboutModal = async function() {
     let existing = document.getElementById('about-aicb-modal');
     if (existing) existing.remove();
 
-    const version = state.appVersion || '0.1.0';
+    const version = state.appVersion || '0.2.1';
+    let instanceId = '7966745583d50cb1210cd8041b0817e4ab54c3eaf22487b2c3433d3d07506383';
+    let debugData = null;
+
+    try {
+      const debugRes = await api('/system/debug-info');
+      if (debugRes?.instance_id) instanceId = debugRes.instance_id;
+      debugData = debugRes;
+    } catch {}
 
     const modal = document.createElement('div');
     modal.id = 'about-aicb-modal';
@@ -554,60 +562,70 @@ function renderAdminShell(container, currentPath) {
     };
 
     modal.innerHTML = `
-      <div class="modal-surface rounded-xl max-w-md w-full overflow-hidden animate-scale-in text-main border border-subtle" onclick="event.stopPropagation()">
+      <div class="modal-surface rounded-xl max-w-md w-full overflow-hidden animate-scale-in text-main border border-subtle p-6" onclick="event.stopPropagation()">
         
         <!-- Header -->
-        <div class="p-5 border-b border-subtle flex items-center justify-between bg-surface-elevated/40">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-lg bg-rose-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-              A
-            </div>
-            <div>
-              <h3 class="text-sm font-bold text-main">AI Commerce Bots (AICB)</h3>
-              <p class="text-[11px] text-muted">Version <span class="font-mono text-emerald-600 dark:text-emerald-400 font-semibold">v${escapeHtml(version)}</span></p>
-            </div>
-          </div>
-          <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
+        <div class="flex items-center justify-between pb-4">
+          <h3 class="text-base font-bold text-main">About AICB</h3>
+          <button class="text-muted hover:text-main p-1 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
-        <!-- Body -->
-        <div class="p-5 space-y-4 text-xs text-muted leading-relaxed">
-          <p class="text-main">
-            Autonomous Omnichannel Conversational Commerce Platform & Multi-Agent Grounding Engine.
-          </p>
+        <!-- Details Grid matching n8n list -->
+        <div class="space-y-4 py-2 text-xs leading-relaxed">
+          
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">AICB Version</span>
+            <span class="col-span-2 text-main font-medium">${escapeHtml(version)}</span>
+          </div>
 
-          <div class="space-y-2 p-3 rounded-lg bg-surface-elevated/50 border border-subtle text-[11px] font-mono">
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Core Engine:</span>
-              <span class="text-main font-semibold">FastAPI + Python 3.12</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Ingestion:</span>
-              <span class="text-main font-semibold">AgentOS SDK (@sannex/agent)</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-muted">RAG Grounding:</span>
-              <span class="text-main font-semibold">Hybrid Vector + SQLite FTS5</span>
-            </div>
-            <div class="flex items-center justify-between">
-              <span class="text-muted">Frontend UI:</span>
-              <span class="text-main font-semibold">Vanilla SPA (Zero Framework)</span>
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">Source Code</span>
+            <div class="col-span-2">
+              <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline break-all">
+                https://github.com/sannex-01/aicb
+              </a>
             </div>
           </div>
 
-          <div class="flex items-center justify-between pt-2 border-t border-subtle text-[11px]">
-            <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noopener noreferrer" class="text-sky-600 dark:text-sky-400 hover:underline flex items-center gap-1 font-semibold">
-              <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-              <span>GitHub Repository</span>
-            </a>
-            <span class="text-muted">&copy; Sannex Tech LTD</span>
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">License</span>
+            <div class="col-span-2">
+              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
+                Sustainable Use License + AICB Enterprise License
+              </a>
+            </div>
           </div>
+
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">Third-Party Licenses</span>
+            <div class="col-span-2">
+              <a href="https://agentos.sannex.ng/docs/licenses" target="_blank" rel="noopener noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
+                View all third-party licenses
+              </a>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">Instance ID</span>
+            <span class="col-span-2 font-mono text-[11px] text-main break-all select-all leading-tight">${escapeHtml(instanceId)}</span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-2 items-start">
+            <span class="text-muted">Debug</span>
+            <div class="col-span-2">
+              <button type="button" id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs font-normal text-left">
+                Copy debug information
+              </button>
+            </div>
+          </div>
+
         </div>
 
-        <div class="p-3 border-t border-subtle bg-surface-elevated/40 flex justify-end">
-          <button type="button" class="btn btn-secondary btn-sm" onclick="document.getElementById('about-aicb-modal')?.remove()">
+        <!-- Footer with Close button on left -->
+        <div class="pt-6 flex justify-start">
+          <button type="button" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs" onclick="document.getElementById('about-aicb-modal')?.remove()">
             Close
           </button>
         </div>
@@ -616,6 +634,24 @@ function renderAdminShell(container, currentPath) {
     `;
 
     document.body.appendChild(modal);
+
+    const debugBtn = modal.querySelector('#copy-debug-btn');
+    if (debugBtn) {
+      debugBtn.onclick = async () => {
+        try {
+          const info = debugData || await api('/system/debug-info').catch(() => null) || {
+            aicb_version: version,
+            instance_id: instanceId,
+            user_agent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+          };
+          await navigator.clipboard.writeText(JSON.stringify(info, null, 2));
+          window.showToast('Debug information copied to clipboard.', 'success');
+        } catch {
+          window.showToast('Failed to copy debug information.', 'error');
+        }
+      };
+    }
   };
 
   // What's New Feature Release Modal (Matching Screenshot 2)
