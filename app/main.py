@@ -304,10 +304,18 @@ async def serve_admin_spa(full_path: str = ""):
                 media_type = "text/html"
             elif candidate.endswith(".svg"):
                 media_type = "image/svg+xml"
-            return FileResponse(candidate, media_type=media_type)
+            return FileResponse(
+                candidate,
+                media_type=media_type,
+                headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+            )
 
     index_file = os.path.join(ADMIN_DIST_DIR, "index.html")
     if not os.path.isfile(index_file):
         raise HTTPException(status_code=404, detail="Admin UI bundle not found.")
-    return FileResponse(index_file, media_type="text/html")
+    return FileResponse(
+        index_file,
+        media_type="text/html",
+        headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+    )
 
