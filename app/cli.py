@@ -68,7 +68,7 @@ def main():
     """Main CLI entrypoint for `aicb` command."""
     parser = argparse.ArgumentParser(
         prog="aicb",
-        description="AICB - Open-Source AI Commerce Bot & Omnichannel Customer Support Platform",
+        description="AICB - Open-Source AI Commerce Bots & Omnichannel Customer Support Platform",
     )
     parser.add_argument(
         "-v", "--version",

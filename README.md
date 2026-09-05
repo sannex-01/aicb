@@ -1,4 +1,4 @@
-# AICB (AI Conversational Business Bot Engine)
+# AICB (AI Commerce Bots)
 
 A modular, lightweight, and production-ready AI & Interactive Step Chatbot engine designed for WhatsApp Cloud API, Telegram, and an embeddable Website Widget, with Conversational Commerce powered by Paystack and Bumpa.
 

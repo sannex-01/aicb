@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "aicb"
 version = "0.1.0"
-description = "Open-Source AI Commerce Bot & Omnichannel Customer Service Platform"
+description = "Open-Source AI Commerce Bots & Omnichannel Customer Service Platform"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
