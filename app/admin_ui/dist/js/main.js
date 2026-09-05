@@ -461,57 +461,64 @@ function renderAdminShell(container, currentPath) {
 
     const popover = document.createElement('div');
     popover.id = 'n8n-help-popover';
-    popover.className = `fixed bottom-12 ${state.sidebarCollapsed ? 'left-16' : 'left-56'} z-50 w-72 bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-scale-in text-slate-100 font-sans`;
+    const leftOffset = state.sidebarCollapsed ? '76px' : '236px';
+    popover.className = 'fixed z-50 w-72 popover-surface rounded-2xl shadow-2xl overflow-hidden animate-scale-in text-main font-sans text-xs';
+    popover.style.left = leftOffset;
+    popover.style.bottom = '16px';
+    
     popover.innerHTML = `
       <div class="p-2 space-y-0.5 text-xs">
-        <a href="https://agentos.sannex.ng/docs/getting-started/quickstart" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
-          <svg class="w-4 h-4 text-sky-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+        <a href="https://agentos.sannex.ng/docs/getting-started/quickstart" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors">
+          <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
           <span>Quickstart</span>
         </a>
 
-        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
-          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors">
+          <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
           <span>Documentation</span>
         </a>
 
-        <a href="https://github.com/sannex-01/aicb/discussions" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
-          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+        <a href="https://github.com/sannex-01/aicb/discussions" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors">
+          <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
           <span>Forum & Community</span>
         </a>
 
-        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
-          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
+        <a href="https://agentos.sannex.ng/docs" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors">
+          <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" /></svg>
           <span>Course & Tutorials</span>
         </a>
 
-        <a href="https://github.com/sannex-01/aicb/issues" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors">
-          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        <a href="https://github.com/sannex-01/aicb/issues" target="_blank" class="flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors">
+          <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
           <span>Report a bug</span>
         </a>
 
-        <button onclick="window.openAboutModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors text-left">
-          <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <button onclick="window.openAboutModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-muted hover:text-main hover:bg-surface-hover transition-colors text-left cursor-pointer">
+          <svg class="w-4 h-4 text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <span>About AICB</span>
         </button>
       </div>
 
       <!-- What's New Section -->
-      <div class="p-3 border-t border-slate-800 bg-slate-950/60 space-y-2">
-        <div class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">What's new</div>
+      <div class="p-3 border-t border-subtle bg-surface-elevated/50 space-y-2">
+        <div class="text-[10px] font-bold text-muted uppercase tracking-wider">What's new</div>
         
-        <div class="flex items-start gap-2 text-xs">
+        <!-- One Highlight Item (Clickable to open What's New modal) -->
+        <button onclick="window.openWhatsNewModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-start gap-2.5 text-left p-1.5 rounded-xl hover:bg-surface-hover transition-colors group cursor-pointer">
           <span class="w-2 h-2 rounded-full bg-rose-500 mt-1 flex-shrink-0 animate-pulse"></span>
-          <span class="text-slate-300 line-clamp-1 font-medium">AI Assistant on self-hosted: setup in minutes</span>
-        </div>
-
-        <button onclick="window.openReleasesModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-center justify-between text-xs text-sky-400 hover:text-sky-300 font-medium pt-1">
-          <span>Full changelog</span>
-          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+          <span class="text-main group-hover:text-rose-500 line-clamp-1 font-semibold text-xs">AI Assistant on self-hosted: setup in minutes</span>
         </button>
 
-        <div class="flex items-center gap-1.5 text-[11px] text-emerald-400 pt-1 border-t border-slate-800/60 font-mono">
-          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-          <span>Up to date (v${escapeHtml(state.appVersion || '0.1.0')})</span>
+        <!-- Full Changelog Link (Opens Blog Site Directly) -->
+        <a href="https://agentos.sannex.ng/blog" target="_blank" rel="noopener noreferrer" class="w-full flex items-center justify-between text-xs text-sky-600 dark:text-sky-400 hover:underline font-semibold pt-1">
+          <span>Full changelog</span>
+          <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+        </a>
+
+        <!-- Version Status -->
+        <div class="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 pt-1 border-t border-subtle font-mono">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span>v${escapeHtml(state.appVersion || '0.1.0')} (Latest)</span>
         </div>
       </div>
     `;
@@ -527,100 +534,93 @@ function renderAdminShell(container, currentPath) {
     setTimeout(() => document.addEventListener('click', closeListener), 10);
   };
 
-  // About AICB Modal (Matching Screenshot 2)
-  window.openAboutModal = async function() {
-    let existing = document.getElementById('about-aicb-modal');
+  // What's New Feature Release Modal (Matching Screenshot 2)
+  window.openWhatsNewModal = function() {
+    let existing = document.getElementById('whats-new-modal');
     if (existing) existing.remove();
 
-    let debugData = null;
-    try {
-      debugData = await api('/system/debug-info');
-    } catch {}
-
     const version = state.appVersion || '0.1.0';
-    const instanceId = debugData?.instance_id || state.instanceId || '7966745583d50cb1210cd8041b0817e4ab54c3eaf22487b2c3433d3d07506383';
 
     const modal = document.createElement('div');
-    modal.id = 'about-aicb-modal';
-    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in font-sans';
+    modal.id = 'whats-new-modal';
+    modal.className = 'fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in font-sans';
+    modal.onclick = (e) => {
+      if (e.target === modal) modal.remove();
+    };
+
     modal.innerHTML = `
-      <div class="bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-scale-in text-slate-100" onclick="event.stopPropagation()">
+      <div class="modal-surface rounded-2xl max-w-xl w-full overflow-hidden animate-scale-in text-main" onclick="event.stopPropagation()">
         
-        <!-- Modal Header -->
-        <div class="p-5 border-b border-slate-800 flex items-center justify-between">
-          <h3 class="text-base font-bold text-white tracking-tight">About AICB</h3>
-          <button class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
-          </button>
+        <!-- Header -->
+        <div class="p-5 border-b border-subtle flex items-center justify-between gap-3 bg-surface-elevated/40">
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-9 h-9 rounded-xl bg-rose-500/10 text-rose-500 border border-rose-500/20 flex items-center justify-center flex-shrink-0">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+            </div>
+            <div class="min-w-0">
+              <h3 class="text-sm font-bold text-main truncate">AI Assistant on self-hosted</h3>
+              <p class="text-[11px] text-muted font-medium">4 September, 2026 &bull; <span class="text-emerald-600 dark:text-emerald-400 font-mono">v${escapeHtml(version)} (Latest)</span></p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2.5">
+            <a href="https://agentos.sannex.ng/docs" target="_blank" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-all shadow-sm">
+              Update
+            </a>
+            <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('whats-new-modal')?.remove()" title="Close">
+              <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
         </div>
 
-        <!-- Modal Body (Properties Table matching Screenshot 2) -->
-        <div class="p-6 space-y-4 text-xs">
+        <!-- Warning / Update Notice Callout -->
+        <div class="p-3.5 mx-6 mt-5 rounded-xl callout-amber flex items-start gap-3 text-xs leading-relaxed">
+          <span class="text-base flex-shrink-0">⚠️</span>
+          <div>
+            You're currently on version <strong class="font-mono font-bold">${escapeHtml(version)}</strong>. Update to get all new features, improvements, and fixes. See what changed <a href="https://agentos.sannex.ng/blog" target="_blank" class="underline font-bold">in the full changelog</a>.
+          </div>
+        </div>
+
+        <!-- Modal Body Content -->
+        <div class="p-6 space-y-3.5 text-xs text-muted leading-relaxed max-h-[60vh] overflow-y-auto">
+          <h4 class="text-sm font-bold text-main">AI Assistant on self-hosted: setup in minutes</h4>
           
-          <div class="flex items-center justify-between py-1">
-            <span class="text-slate-400 font-medium">AICB Version</span>
-            <span class="text-white font-mono font-semibold">${escapeHtml(version)}</span>
-          </div>
+          <p>
+            Setting up the <strong class="text-main font-semibold">AI Assistant</strong> on self-hosted AICB enables automated conversational checkouts, unified multi-agent grounding (RAG), and zero-latency webhook routing across WhatsApp Cloud, Telegram, and the Website Widget.
+          </p>
 
-          <div class="flex items-center justify-between py-1">
-            <span class="text-slate-400 font-medium">Source Code</span>
-            <a href="https://github.com/sannex-01/aicb" target="_blank" rel="noreferrer" class="text-rose-500 hover:text-rose-400 hover:underline">
-              https://github.com/sannex-01/aicb
-            </a>
-          </div>
+          <p class="font-medium text-main">New instance? Run the following in your terminal:</p>
 
-          <div class="flex items-center justify-between py-1">
-            <span class="text-slate-400 font-medium">License</span>
-            <span class="text-rose-500 font-medium">MIT License</span>
-          </div>
-
-          <div class="flex items-center justify-between py-1">
-            <span class="text-slate-400 font-medium">Third-Party Licenses</span>
-            <a href="https://agentos.sannex.ng/docs" target="_blank" class="text-rose-500 hover:text-rose-400 hover:underline">
-              View all third-party licenses
-            </a>
-          </div>
-
-          <div class="flex items-start justify-between py-1 gap-4">
-            <span class="text-slate-400 font-medium shrink-0">Instance ID</span>
-            <span class="text-slate-300 font-mono text-[11px] text-right break-all max-w-[240px]">${escapeHtml(instanceId)}</span>
-          </div>
-
-          <div class="flex items-center justify-between py-1">
-            <span class="text-slate-400 font-medium">Debug</span>
-            <button id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 font-semibold flex items-center gap-1 transition-colors">
-              <span>Copy debug information</span>
+          <div class="terminal-snippet p-3.5 rounded-xl flex items-center justify-between text-xs my-2 font-mono">
+            <span class="select-all">curl -fsSL https://get.aicb.sannex.ng | sh</span>
+            <button onclick="navigator.clipboard.writeText('curl -fsSL https://get.aicb.sannex.ng | sh'); showToast('Copied to clipboard', 'success');" class="text-slate-400 hover:text-white px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-md transition-colors text-[11px] shrink-0 font-sans cursor-pointer">
+              Copy
             </button>
           </div>
 
-        </div>
+          <p>
+            Pick Anthropic, OpenAI, or Google Gemini, or any OpenAI-compatible endpoint and paste your API key in Settings.
+          </p>
 
-        <!-- Modal Footer -->
-        <div class="p-4 border-t border-slate-800 bg-slate-950/60 flex justify-start">
-          <button type="button" class="px-5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-all shadow-md shadow-rose-600/20" onclick="document.getElementById('about-aicb-modal')?.remove()">
-            Close
-          </button>
+          <p>
+            Already on Docker? Pull the latest container <code class="text-main font-mono bg-surface-elevated px-1.5 py-0.5 rounded border border-subtle">sannex/aicb:latest</code> and follow the setup docs to add payments and web search.
+          </p>
+
+          <p>
+            The assistant's generated code and conversational checkout runs on your isolated self-hosted instance. After that, the experience matches the Cloud dashboard: configure your catalog, review transcripts, and monitor sales in real-time.
+          </p>
+
+          <div class="pt-2">
+            <a href="https://agentos.sannex.ng/docs" target="_blank" class="text-rose-500 hover:text-rose-400 font-semibold inline-flex items-center gap-1 hover:underline">
+              <span>Learn more here</span>
+              <span>&rarr;</span>
+            </a>
+          </div>
         </div>
 
       </div>
     `;
 
     document.body.appendChild(modal);
-
-    const copyBtn = modal.querySelector('#copy-debug-btn');
-    if (copyBtn) {
-      copyBtn.addEventListener('click', async () => {
-        try {
-          const debugPayload = debugData || await api('/system/debug-info');
-          await navigator.clipboard.writeText(JSON.stringify(debugPayload, null, 2));
-          showToast('Debug information copied to clipboard', 'success');
-        } catch (e) {
-          showToast('Failed to copy debug info', 'error');
-        }
-      });
-    }
-  };
-
   // Releases Offcanvas Handlers
   window.openReleasesModal = async function() {
     let existingModal = document.getElementById('releases-offcanvas-backdrop');
@@ -631,43 +631,43 @@ function renderAdminShell(container, currentPath) {
 
     const backdrop = document.createElement('div');
     backdrop.id = 'releases-offcanvas-backdrop';
-    backdrop.className = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in';
+    backdrop.className = 'fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in font-sans';
     backdrop.onclick = (e) => {
       if (e.target === backdrop) backdrop.remove();
     };
 
     backdrop.innerHTML = `
-      <div class="w-full max-w-lg max-h-[80vh] flex flex-col bg-slate-900 border border-slate-700/80 rounded-2xl shadow-2xl overflow-hidden animate-scale-in text-slate-100" onclick="event.stopPropagation()">
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-950/80">
+      <div class="modal-surface rounded-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden animate-scale-in text-main" onclick="event.stopPropagation()">
+        <div class="p-4 border-b border-subtle flex items-center justify-between bg-surface-elevated/40">
           <div class="flex items-center gap-2.5 min-w-0">
-            <div class="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 flex-shrink-0">
+            <div class="w-8 h-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 flex-shrink-0">
               <i data-lucide="rocket" class="w-4 h-4"></i>
             </div>
             <div class="min-w-0">
               <div class="flex items-center gap-2">
-                <h3 class="font-bold text-sm text-white truncate">AICB Releases</h3>
+                <h3 class="font-bold text-sm text-main truncate">AICB Releases</h3>
                 <span class="badge badge-emerald text-[9px] font-mono px-1.5 py-0.2">v${escapeHtml(state.appVersion || '0.1.0')}</span>
               </div>
-              <p class="text-[11px] text-slate-400 truncate">Synchronized from AgentOS</p>
+              <p class="text-[11px] text-muted truncate">Synchronized from AgentOS</p>
             </div>
           </div>
-          <button class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()" title="Close">
+          <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()" title="Close">
             <i data-lucide="x" class="w-4 h-4"></i>
           </button>
         </div>
 
         <div id="releases-modal-content" class="p-4 overflow-y-auto space-y-3 flex-1">
           <div class="flex items-center justify-center py-8">
-            <div class="animate-spin w-5 h-5 border-2 border-sky-400 border-t-transparent rounded-full"></div>
+            <div class="animate-spin w-5 h-5 border-2 border-sky-500 border-t-transparent rounded-full"></div>
           </div>
         </div>
 
-        <div class="p-3 border-t border-slate-800 bg-slate-950/80 flex items-center justify-between gap-2">
-          <button type="button" id="releases-sync-btn" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs flex items-center gap-1.5 transition-all" onclick="window.syncReleasesFromModal()">
+        <div class="p-3 border-t border-subtle bg-surface-elevated/40 flex items-center justify-between gap-2">
+          <button type="button" id="releases-sync-btn" class="btn btn-secondary btn-sm flex items-center gap-1.5" onclick="window.syncReleasesFromModal()">
             <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
             <span>Check Updates</span>
           </button>
-          <button type="button" class="px-4 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold text-xs transition-all" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()">
+          <button type="button" class="btn btn-primary btn-sm" onclick="document.getElementById('releases-offcanvas-backdrop')?.remove()">
             Close
           </button>
         </div>
@@ -688,9 +688,9 @@ function renderAdminShell(container, currentPath) {
       const releases = await api('/system/releases');
       if (!releases || releases.length === 0) {
         container.innerHTML = `
-          <div class="text-center py-8 text-slate-400">
-            <i data-lucide="info" class="w-8 h-8 mx-auto text-slate-600 mb-2"></i>
-            <p class="font-medium text-sm text-white">No release notes available</p>
+          <div class="text-center py-8 text-muted">
+            <i data-lucide="info" class="w-8 h-8 mx-auto text-muted mb-2"></i>
+            <p class="font-medium text-sm text-main">No release notes available</p>
             <p class="text-xs">Click "Check Updates" to sync release notes from AgentOS.</p>
           </div>
         `;
@@ -698,23 +698,23 @@ function renderAdminShell(container, currentPath) {
         return;
       }
 
-      const agentosHost = 'https://agentos.aicb.sannex.ng';
+      const agentosHost = 'https://agentos.sannex.ng';
       container.innerHTML = releases.map((rel, idx) => `
-        <a href="${escapeHtml(rel.download_url || `${agentosHost}/releases`)}" target="_blank" rel="noopener noreferrer" class="block p-3 rounded-xl border border-slate-800 bg-slate-900/60 hover:bg-slate-800 hover:border-sky-500/30 transition-all group">
+        <a href="${escapeHtml(rel.download_url || `${agentosHost}/blog`)}" target="_blank" rel="noopener noreferrer" class="block p-3.5 rounded-xl border border-subtle bg-surface-elevated/50 hover:bg-surface-hover transition-all group">
           <div class="flex items-center justify-between gap-2 mb-1">
             <div class="flex items-center gap-2 min-w-0">
               <span class="badge ${idx === 0 ? 'badge-emerald' : 'badge-subtle'} font-mono font-bold text-xs px-2 py-0.5">
                 v${escapeHtml(rel.version)}
               </span>
-              <h4 class="font-bold text-xs text-white truncate group-hover:text-sky-400 transition-colors">${escapeHtml(rel.title || 'Update')}</h4>
+              <h4 class="font-bold text-xs text-main truncate group-hover:text-rose-500 transition-colors">${escapeHtml(rel.title || 'Update')}</h4>
               ${rel.is_critical ? '<span class="badge badge-rose text-[9px] font-bold uppercase">Critical</span>' : ''}
             </div>
-            <i data-lucide="external-link" class="w-3.5 h-3.5 text-slate-500 group-hover:text-sky-400 transition-colors flex-shrink-0"></i>
+            <i data-lucide="external-link" class="w-3.5 h-3.5 text-muted group-hover:text-rose-500 transition-colors flex-shrink-0"></i>
           </div>
-          ${rel.description ? `<p class="text-[11px] text-slate-400 line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
-          <div class="flex items-center justify-between text-[10px] text-slate-500 mt-2 pt-1.5 border-t border-slate-800/80">
+          ${rel.description ? `<p class="text-[11px] text-muted line-clamp-2 leading-relaxed mt-1">${escapeHtml(rel.description)}</p>` : ''}
+          <div class="flex items-center justify-between text-[10px] text-muted mt-2 pt-1.5 border-t border-subtle/50">
             <span>${rel.release_date ? escapeHtml(rel.release_date) : 'Official Release'}</span>
-            <span class="text-sky-400 flex items-center gap-0.5 font-medium">Read on AgentOS &rarr;</span>
+            <span class="text-rose-500 flex items-center gap-0.5 font-semibold">Read on AgentOS &rarr;</span>
           </div>
         </a>
       `).join('');
@@ -722,7 +722,7 @@ function renderAdminShell(container, currentPath) {
       if (window.lucide) lucide.createIcons();
     } catch (e) {
       container.innerHTML = `
-        <div class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+        <div class="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs">
           Failed to load release notes: ${escapeHtml(e.message || 'Network error')}
         </div>
       `;
