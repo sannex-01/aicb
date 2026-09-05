@@ -7,3 +7,4 @@ venv/
 .env
 aicb.db
 .pytest_cache/
+ideas/
