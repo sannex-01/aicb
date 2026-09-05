@@ -295,7 +295,7 @@ function renderAdminShell(container, currentPath) {
       : 'badge-subtle';
 
   container.innerHTML = `
-    <div class="flex h-screen bg-app overflow-hidden text-[13px]">
+    <div class="flex h-screen bg-app overflow-hidden text-[14px]">
       <!-- Sidebar -->
       <aside class="${state.sidebarCollapsed ? 'w-16' : 'w-60'} bg-sidebar border-r border-subtle flex flex-col flex-shrink-0 z-20 relative transition-all duration-200">
 
@@ -307,10 +307,10 @@ function renderAdminShell(container, currentPath) {
             </div>
             ${!state.sidebarCollapsed ? `
             <div class="min-w-0 flex-1">
-              <p class="font-bold text-xs text-main truncate">AICB Studio</p>
+              <p class="font-bold text-[14px] text-main truncate">AICB Studio</p>
               <div class="flex items-center gap-1 mt-0.5">
                 <span class="w-1.5 h-1.5 rounded-full bg-brand flex-shrink-0 animate-pulse"></span>
-                <p class="text-[10px] text-muted truncate" id="sidebar-business-name">${escapeHtml(businessName)}</p>
+                <p class="text-[12px] text-muted truncate" id="sidebar-business-name">${escapeHtml(businessName)}</p>
               </div>
             </div>
             ` : ''}
@@ -331,13 +331,13 @@ function renderAdminShell(container, currentPath) {
             return `
               <div>
                 ${!state.sidebarCollapsed ? `
-                  <div class="px-2 pb-1 text-[9px] font-extrabold text-faint uppercase tracking-wider">${section.title}</div>
+                  <div class="px-2 pb-1 text-[12px] font-bold text-muted uppercase tracking-wider">${section.title}</div>
                 ` : ''}
                 <nav class="flex flex-col gap-0.5">
                   ${visibleItems.map(item => {
                     const isActive = currentPath === item.path;
                     return `
-                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-2.5'} px-2.5 py-1.5 rounded-md text-[12.5px] transition-all group ${isActive ? 'bg-sky-500/10 text-sky-500 dark:text-sky-400 font-bold border-l-2 border-sky-500' : 'text-muted hover:bg-surface-hover hover:text-main font-medium'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
+                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-2.5'} px-2.5 py-1.5 rounded-md text-[14px] transition-all group ${isActive ? 'bg-sky-500/10 text-sky-500 dark:text-sky-400 font-bold border-l-2 border-sky-500' : 'text-muted hover:bg-surface-hover hover:text-main font-medium'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
                         <i data-lucide="${item.icon}" class="w-4 h-4 flex-shrink-0 ${isActive ? 'text-sky-500 dark:text-sky-400' : 'text-faint group-hover:text-main transition-colors'}"></i>
                         ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
                       </a>
@@ -354,7 +354,7 @@ function renderAdminShell(container, currentPath) {
           
           <!-- Help Button (Triggers n8n-style Menu Popover) -->
           <div class="relative">
-            <button type="button" id="sidebar-help-btn" class="w-full flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg text-xs font-medium text-muted hover:text-main hover:bg-surface-hover transition-colors group cursor-pointer" onclick="window.toggleHelpMenu(event)" title="Help, Documentation & About AICB">
+            <button type="button" id="sidebar-help-btn" class="w-full flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'justify-between'} px-2 py-1.5 rounded-lg text-[14px] font-medium text-muted hover:text-main hover:bg-surface-hover transition-colors group cursor-pointer" onclick="window.toggleHelpMenu(event)" title="Help, Documentation & About AICB">
               <div class="flex items-center gap-2 min-w-0">
                 <i data-lucide="help-circle" class="w-4 h-4 text-muted group-hover:text-main flex-shrink-0"></i>
                 ${!state.sidebarCollapsed ? `<span class="truncate">Help</span>` : ''}
@@ -367,10 +367,10 @@ function renderAdminShell(container, currentPath) {
 
           <!-- Theme Switcher in Sidebar -->
           ${!state.sidebarCollapsed ? `
-          <div class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-surface-elevated/50 border border-subtle text-xs text-muted">
+          <div class="flex items-center justify-between px-2 py-1.5 rounded-lg bg-surface-elevated/50 border border-subtle text-[14px] text-muted">
             <div class="flex items-center gap-2">
               <i data-lucide="${state.theme === 'dark' ? 'moon' : 'sun'}" class="w-4 h-4 text-brand flex-shrink-0"></i>
-              <span class="text-[11px] font-medium text-main">${state.theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
+              <span class="text-[14px] font-medium text-main">${state.theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
             </div>
             <button type="button" class="p-1 rounded-md hover:bg-surface-hover text-muted hover:text-main transition-colors cursor-pointer" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
               <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-3.5 h-3.5"></i>
@@ -384,13 +384,13 @@ function renderAdminShell(container, currentPath) {
 
           <!-- User Identity Card -->
           <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-1' : 'gap-2 pt-1'} border-t border-subtle/60">
-            <div class="w-7 h-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-xs flex-shrink-0">
+            <div class="w-7 h-7 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand font-bold text-[12px] flex-shrink-0">
               ${escapeHtml(user.name?.charAt(0) || 'U')}
             </div>
             ${!state.sidebarCollapsed ? `
             <div class="flex-1 min-w-0">
-              <div class="text-xs font-bold truncate text-main leading-none mb-0.5">${escapeHtml(user.name || 'User')}</div>
-              <span class="badge ${roleBadgeClass} text-[8px] px-1 py-0 uppercase font-bold tracking-wider">
+              <div class="text-[14px] font-bold truncate text-main leading-none mb-0.5">${escapeHtml(user.name || 'User')}</div>
+              <span class="badge ${roleBadgeClass} text-[10px] px-1 py-0 uppercase font-bold tracking-wider">
                 ${escapeHtml(user.role || 'operator')}
               </span>
             </div>
@@ -429,10 +429,10 @@ function renderAdminShell(container, currentPath) {
     if (logoContainer) {
       logoContainer.innerHTML = bLogo ? `
         <div class="w-8 h-8 rounded-lg bg-surface-elevated border border-subtle flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
-          <img src="${escapeHtml(bLogo)}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-sm\\'>${escapeHtml(bInit)}</div>';" />
+          <img src="${escapeHtml(bLogo)}" class="w-full h-full object-cover" onerror="this.parentElement.innerHTML='<div class=\\'w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-[14px]\\'>${escapeHtml(bInit)}</div>';" />
         </div>
       ` : `
-        <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-sm flex-shrink-0 shadow-sm">
+        <div class="w-8 h-8 rounded-lg bg-brand flex items-center justify-center text-white font-bold text-[14px] flex-shrink-0 shadow-sm">
           ${escapeHtml(bInit)}
         </div>
       `;
@@ -467,12 +467,12 @@ function renderAdminShell(container, currentPath) {
     const popover = document.createElement('div');
     popover.id = 'n8n-help-popover';
     const leftOffset = state.sidebarCollapsed ? '72px' : '248px';
-    popover.className = 'fixed z-50 w-72 popover-surface rounded-xl border border-subtle overflow-hidden animate-scale-in text-main font-sans text-xs';
+    popover.className = 'fixed z-50 w-72 popover-surface rounded-xl border border-subtle overflow-hidden animate-scale-in text-main font-sans text-[14px]';
     popover.style.left = leftOffset;
     popover.style.bottom = '16px';
     
     popover.innerHTML = `
-      <div class="p-1.5 space-y-0.5 text-xs">
+      <div class="p-1.5 space-y-0.5 text-[14px]">
         <a href="https://agentos.sannex.ng/docs/getting-started/quickstart" target="_blank" rel="noopener noreferrer" class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-muted hover:text-main hover:bg-surface-hover transition-colors">
           <svg class="w-4 h-4 text-sky-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
           <span>Quickstart</span>
@@ -506,22 +506,22 @@ function renderAdminShell(container, currentPath) {
 
       <!-- What's New Section -->
       <div class="p-3 border-t border-subtle bg-surface-elevated/50 space-y-2">
-        <div class="text-[10px] font-bold text-muted uppercase tracking-wider">What's new</div>
+        <div class="text-[12px] font-bold text-muted uppercase tracking-wider">What's new</div>
         
         <!-- One Highlight Item (Clickable to open What's New modal) -->
         <button onclick="window.openWhatsNewModal(); document.getElementById('n8n-help-popover')?.remove();" class="w-full flex items-start gap-2 text-left p-1.5 rounded-lg hover:bg-surface-hover transition-colors group cursor-pointer">
           <span class="w-2 h-2 rounded-full bg-rose-500 mt-1 flex-shrink-0 animate-pulse"></span>
-          <span class="text-main group-hover:text-rose-500 line-clamp-1 font-semibold text-xs">AI Assistant on self-hosted: setup in minutes</span>
+          <span class="text-main group-hover:text-rose-500 line-clamp-1 font-semibold text-[13px]">AI Assistant on self-hosted: setup in minutes</span>
         </button>
 
         <!-- Full Changelog Link (Opens Blog Site Directly) -->
-        <a href="https://agentos.sannex.ng/blog" target="_blank" rel="noopener noreferrer" class="w-full flex items-center justify-between text-xs text-sky-600 dark:text-sky-400 hover:underline font-semibold pt-1">
+        <a href="https://agentos.sannex.ng/blog" target="_blank" rel="noopener noreferrer" class="w-full flex items-center justify-between text-[13px] text-sky-600 dark:text-sky-400 hover:underline font-semibold pt-1">
           <span>Full changelog</span>
           <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
         </a>
 
         <!-- Version Status -->
-        <div class="flex items-center gap-1.5 text-[11px] text-emerald-600 dark:text-emerald-400 pt-1 border-t border-subtle font-mono">
+        <div class="flex items-center gap-1.5 text-[12px] text-emerald-600 dark:text-emerald-400 pt-1 border-t border-subtle font-mono">
           <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
           <span>v${escapeHtml(state.appVersion || '0.1.0')} (Latest)</span>
         </div>
@@ -566,14 +566,14 @@ function renderAdminShell(container, currentPath) {
         
         <!-- Header -->
         <div class="flex items-center justify-between pb-4">
-          <h3 class="text-base font-bold text-main">About AICB</h3>
+          <h3 class="text-[20px] font-bold text-main">About AICB</h3>
           <button class="text-muted hover:text-main p-1 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('about-aicb-modal')?.remove()" title="Close">
             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
           </button>
         </div>
 
         <!-- Details Grid matching n8n list -->
-        <div class="space-y-4 py-2 text-xs leading-relaxed">
+        <div class="space-y-4 py-2 text-[14px] leading-relaxed">
           
           <div class="grid grid-cols-3 gap-2 items-start">
             <span class="text-muted">AICB Version</span>
@@ -609,13 +609,13 @@ function renderAdminShell(container, currentPath) {
 
           <div class="grid grid-cols-3 gap-2 items-start">
             <span class="text-muted">Instance ID</span>
-            <span class="col-span-2 font-mono text-[11px] text-main break-all select-all leading-tight">${escapeHtml(instanceId)}</span>
+            <span class="col-span-2 font-mono text-[12px] text-main break-all select-all leading-tight">${escapeHtml(instanceId)}</span>
           </div>
 
           <div class="grid grid-cols-3 gap-2 items-start">
             <span class="text-muted">Debug</span>
             <div class="col-span-2">
-              <button type="button" id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-xs font-normal text-left">
+              <button type="button" id="copy-debug-btn" class="text-rose-500 hover:text-rose-400 hover:underline cursor-pointer bg-transparent border-0 p-0 text-[14px] font-normal text-left">
                 Copy debug information
               </button>
             </div>
@@ -625,7 +625,7 @@ function renderAdminShell(container, currentPath) {
 
         <!-- Footer with Close button on left -->
         <div class="pt-6 flex justify-start">
-          <button type="button" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-colors cursor-pointer shadow-xs" onclick="document.getElementById('about-aicb-modal')?.remove()">
+          <button type="button" class="px-5 py-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[14px] transition-colors cursor-pointer shadow-xs" onclick="document.getElementById('about-aicb-modal')?.remove()">
             Close
           </button>
         </div>
@@ -678,12 +678,12 @@ function renderAdminShell(container, currentPath) {
               <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
             </div>
             <div class="min-w-0">
-              <h3 class="text-sm font-bold text-main truncate">AI Assistant on self-hosted</h3>
-              <p class="text-[11px] text-muted font-medium">4 September, 2026 &bull; <span class="text-emerald-600 dark:text-emerald-400 font-mono">v${escapeHtml(version)} (Latest)</span></p>
+              <h3 class="text-[20px] font-bold text-main truncate">AI Assistant on self-hosted</h3>
+              <p class="text-[12px] text-muted font-medium">4 September, 2026 &bull; <span class="text-emerald-600 dark:text-emerald-400 font-mono">v${escapeHtml(version)} (Latest)</span></p>
             </div>
           </div>
           <div class="flex items-center gap-2.5">
-            <a href="https://agentos.sannex.ng/docs" target="_blank" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-xs transition-all shadow-sm">
+            <a href="https://agentos.sannex.ng/docs" target="_blank" class="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold text-[14px] transition-all shadow-sm">
               Update
             </a>
             <button class="text-muted hover:text-main p-1.5 rounded-lg hover:bg-surface-hover transition-colors cursor-pointer" onclick="document.getElementById('whats-new-modal')?.remove()" title="Close">
@@ -693,7 +693,7 @@ function renderAdminShell(container, currentPath) {
         </div>
 
         <!-- Warning / Update Notice Callout -->
-        <div class="p-3.5 mx-6 mt-5 rounded-xl callout-amber flex items-start gap-3 text-xs leading-relaxed">
+        <div class="p-3.5 mx-6 mt-5 rounded-xl callout-amber flex items-start gap-3 text-[14px] leading-relaxed">
           <span class="text-base flex-shrink-0">⚠️</span>
           <div>
             You're currently on version <strong class="font-mono font-bold">${escapeHtml(version)}</strong>. Update to get all new features, improvements, and fixes. See what changed <a href="https://agentos.sannex.ng/blog" target="_blank" class="underline font-bold">in the full changelog</a>.
@@ -701,8 +701,8 @@ function renderAdminShell(container, currentPath) {
         </div>
 
         <!-- Modal Body Content -->
-        <div class="p-6 space-y-3.5 text-xs text-muted leading-relaxed max-h-[60vh] overflow-y-auto">
-          <h4 class="text-sm font-bold text-main">AI Assistant on self-hosted: setup in minutes</h4>
+        <div class="p-6 space-y-3.5 text-[14px] text-muted leading-relaxed max-h-[60vh] overflow-y-auto">
+          <h4 class="text-[16px] font-bold text-main">AI Assistant on self-hosted: setup in minutes</h4>
           
           <p>
             Setting up the <strong class="text-main font-semibold">AI Assistant</strong> on self-hosted AICB enables automated conversational checkouts, unified multi-agent grounding (RAG), and zero-latency webhook routing across WhatsApp Cloud, Telegram, and the Website Widget.
@@ -710,9 +710,9 @@ function renderAdminShell(container, currentPath) {
 
           <p class="font-medium text-main">New instance? Run the following in your terminal:</p>
 
-          <div class="terminal-snippet p-3.5 rounded-xl flex items-center justify-between text-xs my-2 font-mono">
+          <div class="terminal-snippet p-3.5 rounded-xl flex items-center justify-between text-[12px] my-2 font-mono">
             <span class="select-all">curl -fsSL https://get.aicb.sannex.ng | sh</span>
-            <button onclick="navigator.clipboard.writeText('curl -fsSL https://get.aicb.sannex.ng | sh'); window.showToast('Copied to clipboard', 'success');" class="text-slate-400 hover:text-white px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-md transition-colors text-[11px] shrink-0 font-sans cursor-pointer">
+            <button onclick="navigator.clipboard.writeText('curl -fsSL https://get.aicb.sannex.ng | sh'); window.showToast('Copied to clipboard', 'success');" class="text-slate-400 hover:text-white px-2.5 py-1 bg-slate-800 hover:bg-slate-700 rounded-md transition-colors text-[12px] shrink-0 font-sans cursor-pointer">
               Copy
             </button>
           </div>
@@ -722,7 +722,7 @@ function renderAdminShell(container, currentPath) {
           </p>
 
           <p>
-            Already on Docker? Pull the latest container <code class="text-main font-mono bg-surface-elevated px-1.5 py-0.5 rounded border border-subtle">sannex/aicb:latest</code> and follow the setup docs to add payments and web search.
+            Already on Docker? Pull the latest container <code class="text-main font-mono bg-surface-elevated px-1.5 py-0.5 rounded border border-subtle text-[12px]">sannex/aicb:latest</code> and follow the setup docs to add payments and web search.
           </p>
 
           <p>
@@ -730,7 +730,7 @@ function renderAdminShell(container, currentPath) {
           </p>
 
           <div class="pt-2">
-            <a href="https://agentos.sannex.ng/docs" target="_blank" class="text-rose-500 hover:text-rose-400 font-semibold inline-flex items-center gap-1 hover:underline">
+            <a href="https://agentos.sannex.ng/docs" target="_blank" class="text-rose-500 hover:text-rose-400 font-semibold inline-flex items-center gap-1 hover:underline text-[14px]">
               <span>Learn more here</span>
               <span>&rarr;</span>
             </a>
