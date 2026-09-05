@@ -137,7 +137,14 @@ class ChannelService:
         url = f"https://api.telegram.org/bot{token}/setWebhook"
         payload = {
             "url": webhook_url,
-            "allowed_updates": ["message", "edited_message", "callback_query"],
+            "allowed_updates": [
+                "message",
+                "edited_message",
+                "callback_query",
+                "inline_query",
+                "chosen_inline_result",
+                "pre_checkout_query",
+            ],
         }
         if secret_token:
             payload["secret_token"] = secret_token

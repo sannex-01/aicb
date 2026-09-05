@@ -85,9 +85,10 @@ async def handle_telegram_webhook(
         iq = update["inline_query"]
         iq_id = iq.get("id")
         query_text = (iq.get("query") or "").strip()
+        from_user = iq.get("from", {})
+        logger.info(f"Incoming Telegram inline query from {from_user.get('id')} (@{from_user.get('username')}): '{query_text}'")
 
         from app.commerce.catalog_provider import CatalogManager
-        from app.commerce.storage.manager import StorageManager
         from app.schemas.bot_response import ProductCard
 
         if not query_text:
@@ -95,7 +96,6 @@ async def handle_telegram_webhook(
         else:
             products = await CatalogManager.search_products(db, query=query_text, limit=10)
 
-        storage_ok = StorageManager.is_configured()
         cards = [
             ProductCard(
                 id=p.id,
@@ -103,13 +103,14 @@ async def handle_telegram_webhook(
                 description=p.description,
                 price=p.price,
                 currency=p.currency,
-                image_url=p.image_url if storage_ok else None,
+                image_url=p.image_url or None,
                 buy_action_id=f"cart_add_{p.id}",
             )
             for p in products
         ]
         results = TelegramRenderer.inline_query_results(cards)
-        await tg_client.answer_inline_query(iq_id, results=results)
+        res = await tg_client.answer_inline_query(iq_id, results=results)
+        logger.info(f"Telegram answerInlineQuery response ({len(results)} items): {res}")
 
         return {"ok": True}
 
