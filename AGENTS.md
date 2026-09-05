@@ -116,7 +116,7 @@ python -m twine upload dist/*
 
 ### B. Publish Docker Image
 ```bash
-docker build -t sannex/aicb:vX.Y.Z -t sannex/aicb:latest .
-docker push sannex/aicb:vX.Y.Z
-docker push sannex/aicb:latest
+docker build -t samakins/aicb:vX.Y.Z -t samakins/aicb:latest .
+docker push samakins/aicb:vX.Y.Z
+docker push samakins/aicb:latest
 ```
