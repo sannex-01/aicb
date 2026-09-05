@@ -55,6 +55,13 @@ def _sync_columns(sync_conn) -> None:
 
     migrations = [
         # (table_name, column_name, column_type_sql, default_sql)
+        ("conversation_sessions", "agent_id", "INTEGER", "NULL"),
+        ("conversation_sessions", "bot_mode", "VARCHAR(50)", "'hybrid'"),
+        ("customers", "total_orders", "INTEGER", "0"),
+        ("customers", "total_spent", "FLOAT", "0.0"),
+        ("customers", "last_seen_at", "TIMESTAMP WITH TIME ZONE", "NULL"),
+        ("customers", "metadata_json", "TEXT", "'{}'"),
+        ("customers", "updated_at", "TIMESTAMP WITH TIME ZONE", "NULL"),
         ("agents", "group_ids_json", "TEXT", "'[]'"),
         ("agents", "access_tags_json", "TEXT", "'[]'"),
         ("agents", "api_key_override", "VARCHAR(255)", "NULL"),
