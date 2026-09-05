@@ -4,6 +4,7 @@ MAIN_MENU_BUTTONS = [
     {"id": "flow_browse_catalog", "title": "🛍️ Browse Products"},
     {"id": "flow_view_cart", "title": "🛒 View Cart"},
     {"id": "flow_track_order", "title": "📦 Track Order"},
+    {"id": "flow_my_purchases", "title": "🧾 My Purchases"},
     {"id": "flow_my_profile", "title": "👤 My Profile"},
 ]
 

@@ -164,7 +164,8 @@ async def handle_telegram_webhook(
         # Handle Fast-Path System Handlers (0 LLM Tokens)
         fast_path_triggers = [
             "/start", "start", "menu", "/menu", "help", "/cart", "cart", "checkout",
-            "clear cart", "profile", "my profile", "create profile", "update profile", "edit profile"
+            "clear cart", "profile", "my profile", "create profile", "update profile", "edit profile",
+            "my purchases", "my orders",
         ]
         is_fast_path = (
             text.lower().strip() in fast_path_triggers

@@ -468,6 +468,50 @@ class FlowEngine:
                 text="📦 Please reply with your *Order Reference* (e.g. `ORD-AB12CD34`) to check your order status.",
             )
 
+        # 8b. My Purchases — this customer's own order history, no reference
+        # needed (unlike Track Order, which requires already knowing/typing
+        # a specific ORD-xxxx code). Looked up by customer_identifier.
+        elif action in ["flow_my_purchases", "my purchases", "my_purchases", "my orders"]:
+            await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
+            ORDER_LIST_LIMIT = 8
+            PENDING_BUTTON_LIMIT = 4  # keep the button count comfortably under WhatsApp's list-row cap
+
+            stmt = (
+                select(Order)
+                .where(Order.customer_identifier == session.customer_identifier)
+                .order_by(Order.created_at.desc())
+                .limit(ORDER_LIST_LIMIT)
+            )
+            res = await db.execute(stmt)
+            orders = res.scalars().all()
+
+            if not orders:
+                return BotResponse(
+                    text="🧾 *My Purchases*\n\nYou haven't placed any orders with us yet. Browse our catalog to get started!",
+                    buttons=_buttons(MAIN_MENU_BUTTONS),
+                )
+
+            status_emoji = {"paid": "✅", "pending": "⏳", "processing": "⚙️", "completed": "✅", "cancelled": "❌"}
+            lines = ["🧾 *My Purchases* — your recent orders:\n"]
+            buttons: List[Dict[str, str]] = []
+            pending_shown = 0
+            for order in orders:
+                emoji = status_emoji.get(order.status, "📦")
+                date_str = order.created_at.strftime("%Y-%m-%d") if order.created_at else "Recent"
+                lines.append(
+                    f"{emoji} *#{order.order_reference}* — {order.total_amount:,.2f} {order.currency} "
+                    f"({order.status.upper()}, {date_str})"
+                )
+                if order.status == "pending" and pending_shown < PENDING_BUTTON_LIMIT:
+                    buttons.append({"id": f"flow_confirm_payment_{order.order_reference}", "title": f"✅ Pay {order.order_reference}"})
+                    pending_shown += 1
+
+            if len(orders) == ORDER_LIST_LIMIT:
+                lines.append(f"\n_Showing your {ORDER_LIST_LIMIT} most recent orders._")
+
+            buttons.append({"id": "flow_main_menu", "title": "🏠 Main Menu"})
+            return BotResponse(text="\n".join(lines), buttons=_buttons(buttons))
+
         # 9. Talk to Human / Contact Support
         elif action == "flow_contact_support":
             support_msg = get_support_contact_message()

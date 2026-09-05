@@ -116,7 +116,8 @@ async def handle_whatsapp_message(
                 # Determine Routing: Fast-Path System Handlers (0 LLM Tokens) vs AI Orchestration
                 fast_path_triggers = [
                     "menu", "start", "/start", "help", "cart", "/cart", "checkout",
-                    "clear cart", "profile", "my profile", "create profile", "update profile", "edit profile"
+                    "clear cart", "profile", "my profile", "create profile", "update profile", "edit profile",
+                    "my purchases", "my orders",
                 ]
                 is_fast_path = (
                     action_id
