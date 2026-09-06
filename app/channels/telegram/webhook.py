@@ -46,13 +46,20 @@ async def handle_telegram_webhook(
 ):
     """Processes incoming updates from Telegram Bot API."""
     if not verify_telegram_secret(x_telegram_bot_api_secret_token):
+        logger.warning(
+            f"Telegram webhook auth rejected: Secret token mismatch or missing. "
+            f"Received header: '{x_telegram_bot_api_secret_token}'"
+        )
         raise HTTPException(status_code=401, detail="Invalid Telegram secret token")
 
     raw_body = await request.body()
     try:
         update = json.loads(raw_body.decode("utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.error(f"Failed to parse Telegram webhook body as JSON: {e}")
         return {"ok": True}
+
+    logger.info(f"=== TELEGRAM INCOMING UPDATE ===\n{json.dumps(update, indent=2)}")
 
     from app.models.agent import Agent
     agent = None
@@ -76,17 +83,15 @@ async def handle_telegram_webhook(
 
     tg_client = TelegramClient(token=agent.telegram_bot_token if agent and agent.telegram_bot_token else None)
 
-    # 0. Handle Inline Mode Search Queries (bots/inline) — "@botname <query>",
-    # either from another chat or via a switch_inline_query_current_chat
-    # button in this same chat. No session/flow state involved: this is a
-    # stateless search-and-pick, independent of the normal message/callback
-    # flow below.
+    # 0. Handle Inline Mode Search Queries (bots/inline) — "@botname <query>"
     if "inline_query" in update:
         iq = update["inline_query"]
         iq_id = iq.get("id")
         query_text = (iq.get("query") or "").strip()
         from_user = iq.get("from", {})
-        logger.info(f"Incoming Telegram inline query from {from_user.get('id')} (@{from_user.get('username')}): '{query_text}'")
+
+        logger.info(f"=== TELEGRAM INLINE QUERY RECEIVED ===")
+        logger.info(f"Query ID: {iq_id} | User: {from_user.get('id')} (@{from_user.get('username')}) | Query: '{query_text}'")
 
         from app.commerce.catalog_provider import CatalogManager
         from app.schemas.bot_response import ProductCard
@@ -95,6 +100,8 @@ async def handle_telegram_webhook(
             products = await CatalogManager.get_featured_products(db, limit=10)
         else:
             products = await CatalogManager.search_products(db, query=query_text, limit=10)
+
+        logger.info(f"Found {len(products)} matching products for inline query '{query_text}'")
 
         cards = [
             ProductCard(
@@ -109,9 +116,17 @@ async def handle_telegram_webhook(
             for p in products
         ]
         results = TelegramRenderer.inline_query_results(cards)
-        res = await tg_client.answer_inline_query(iq_id, results=results)
-        logger.info(f"Telegram answerInlineQuery response ({len(results)} items): {res}")
+        logger.info(f"Generated {len(results)} inline article cards to return to Telegram:\n{json.dumps(results, indent=2)}")
 
+        res = await tg_client.answer_inline_query(iq_id, results=results)
+        logger.info(f"Telegram answerInlineQuery response: {res}")
+
+        return {"ok": True}
+
+    # 0b. Handle Chosen Inline Result (when user taps an inline item)
+    if "chosen_inline_result" in update:
+        cir = update["chosen_inline_result"]
+        logger.info(f"=== TELEGRAM CHOSEN INLINE RESULT ===\n{json.dumps(cir, indent=2)}")
         return {"ok": True}
 
     # 1. Handle Inline Button Clicks (callback_query)
