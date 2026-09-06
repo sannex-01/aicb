@@ -20,8 +20,9 @@ def _mask_secret(val: Optional[str]) -> str:
 
 
 def generate_webhook_secret() -> str:
-    """Generates a cryptographically secure random token for webhook signatures."""
-    return f"whsec_{secrets.token_urlsafe(24)}"
+    """Generates a Telegram-compliant secret token (A-Z, a-z, 0-9, _, -)."""
+    # Using token_hex guarantees only standard alphanumeric characters (no '=' padding)
+    return f"whsec_{secrets.token_hex(20)}"
 
 
 def generate_verify_token() -> str:
@@ -35,12 +36,12 @@ class ChannelService:
         """Returns the current messaging channels configuration and webhook URLs."""
         res = await db.execute(select(BusinessProfile).limit(1))
         biz = res.scalar_one_or_none()
-        
+
         meta = json.loads(biz.metadata_json or "{}") if biz else {}
         channels_data = meta.get("channels", {})
-        
+
         domain = (settings.AICB_DOMAIN or settings.BOT_DOMAIN or "https://aicb.sannex.ng").rstrip("/")
-        
+
         wa_data = channels_data.get("whatsapp", {})
         wa_verify_token = wa_data.get("verify_token") or settings.META_VERIFY_TOKEN or "aicb_webhook_verification_token_secret"
         wa_app_secret = wa_data.get("app_secret") or settings.META_APP_SECRET or ""
@@ -49,7 +50,6 @@ class ChannelService:
         tg_secret = tg_data.get("webhook_secret") or settings.TELEGRAM_WEBHOOK_SECRET
         if not tg_secret:
             tg_secret = generate_webhook_secret()
-            # Persist default generated secret if not set
             if biz:
                 if "channels" not in meta:
                     meta["channels"] = {}
@@ -75,7 +75,7 @@ class ChannelService:
 
     @staticmethod
     async def save_config(db: AsyncSession, config: Dict[str, Any]) -> Dict[str, Any]:
-        """Saves messaging channel settings into business metadata."""
+        """Saves messaging channel settings and automatically synchronizes webhooks."""
         res = await db.execute(select(BusinessProfile).limit(1))
         biz = res.scalar_one_or_none()
         if not biz:
@@ -121,10 +121,20 @@ class ChannelService:
         await db.refresh(biz)
 
         logger.info("Updated global messaging channels settings.")
+
+        # Auto-sync with Telegram if bot_token was supplied in payload
+        bot_token = new_tg.get("bot_token")
+        if bot_token:
+            await ChannelService.set_telegram_webhook(bot_token=bot_token, db=db, drop_pending_updates=True)
+
         return await ChannelService.get_config(db)
 
     @staticmethod
-    async def set_telegram_webhook(bot_token: str, db: AsyncSession) -> Dict[str, Any]:
+    async def set_telegram_webhook(
+        bot_token: str, 
+        db: AsyncSession, 
+        drop_pending_updates: bool = False
+    ) -> Dict[str, Any]:
         """Registers or refreshes the Telegram webhook URL and secret token with Telegram Bot API."""
         if not bot_token or not bot_token.strip():
             return {"ok": False, "description": "No Telegram bot token provided."}
@@ -135,8 +145,9 @@ class ChannelService:
         secret_token = cfg["telegram"].get("webhook_secret") or settings.TELEGRAM_WEBHOOK_SECRET or ""
 
         url = f"https://api.telegram.org/bot{token}/setWebhook"
-        payload = {
+        payload: Dict[str, Any] = {
             "url": webhook_url,
+            "drop_pending_updates": drop_pending_updates,
             "allowed_updates": [
                 "message",
                 "edited_message",
@@ -146,14 +157,18 @@ class ChannelService:
                 "pre_checkout_query",
             ],
         }
+
         if secret_token:
             payload["secret_token"] = secret_token
 
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
+            async with httpx.AsyncClient(timeout=15.0) as client:
                 res = await client.post(url, json=payload)
                 data = res.json()
-                logger.info(f"Telegram setWebhook response: {data}")
+                if not data.get("ok"):
+                    logger.error(f"Telegram setWebhook failed: {data.get('description')}")
+                else:
+                    logger.info(f"Telegram setWebhook succeeded: {data}")
                 return data
         except Exception as e:
             logger.error(f"Failed to set Telegram webhook: {e}")
