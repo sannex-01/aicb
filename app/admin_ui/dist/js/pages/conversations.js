@@ -111,16 +111,6 @@ export async function loadConversationsPage(container) {
         sessions = res.items || [];
         renderSessionList(sessions);
 
-    // Auto-select session if present in URL hash
-    const hashMatch = window.location.hash.match(/^#(\d+)$/);
-    if (hashMatch) {
-      const parsedId = parseInt(hashMatch[1], 10);
-      if (!isNaN(parsedId)) {
-        window.loadConversationThread(parsedId);
-      }
-    }
-
-    if (window.lucide) lucide.createIcons();
   } catch (err) {
         if (listContainer) {
           listContainer.innerHTML = `<div class="p-6 text-center text-rose-500 text-[14px]">Failed to filter conversations: ${escapeHtml(err.message)}</div>`;
