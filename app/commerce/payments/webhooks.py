@@ -22,7 +22,7 @@ router = APIRouter(prefix="/webhooks/payments", tags=["Payment Webhooks"])
 
 
 async def _notify_customer_payment_success(db: AsyncSession, order: Order) -> None:
-    """Sends payment confirmation message to the customer over WhatsApp or Telegram."""
+    """Sends payment confirmation message to the customer over WhatsApp or Telegram, and triggers fulfillment."""
     msg = (
         f"🎉 *Payment Successful!*\n\n"
         f"We have received your payment of *{order.total_amount:,.2f} {order.currency}* for Order *{order.order_reference}*.\n\n"
@@ -35,6 +35,12 @@ async def _notify_customer_payment_success(db: AsyncSession, order: Order) -> No
             await TelegramClient().send_message(chat_id=order.customer_identifier, text=msg)
     except Exception as e:
         logger.error(f"Failed to send payment receipt to customer: {e}")
+
+    try:
+        from app.commerce.fulfillment import FulfillmentManager
+        await FulfillmentManager.dispatch_order(db, order)
+    except Exception as e:
+        logger.error(f"Failed to dispatch fulfillment for order {order.order_reference}: {e}")
 
 
 # ==============================================================================

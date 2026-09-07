@@ -235,6 +235,7 @@ class FlowEngine:
                     price=product.price,
                     quantity=1,
                     currency=product.currency,
+                    external_id=product.external_id,
                 )
 
                 # Get current quantity of this item
