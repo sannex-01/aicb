@@ -134,7 +134,8 @@ class TelegramRenderer:
             else:
                 caption += "\n\n👉 Tap below to buy:"
                 if bot_username:
-                    deep_link_url = f"https://t.me/{bot_username}?start={card.buy_action_id}"
+                    clean_username = bot_username.lstrip("@")
+                    deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
                     buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
                 else:
                     buttons = [{"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id}]
