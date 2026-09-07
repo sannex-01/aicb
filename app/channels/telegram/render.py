@@ -123,10 +123,6 @@ class TelegramRenderer:
         results = []
         is_bot_dm = (chat_type == "sender")
 
-        # External chats require a valid bot username to build deep links properly
-        if not is_bot_dm and not bot_username:
-            return []
-
         for card in cards[:50]:
             caption = f"🛍️ *{card.title}* — {card.price:,.2f} {card.currency}"
             if card.description:
@@ -140,9 +136,14 @@ class TelegramRenderer:
                 ]
             else:
                 caption += "\n\n👉 Tap below to buy:"
-                clean_username = bot_username.lstrip("@")
-                deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
-                buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
+                # If there's no bot_username configured (e.g. token-only setup), fall back
+                # to inline callback buttons instead of returning empty results.
+                if bot_username:
+                    clean_username = bot_username.lstrip("@")
+                    deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
+                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
+                else:
+                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id}]
 
             # Configure the message content dropped into chat
             input_content: Dict[str, Any] = {

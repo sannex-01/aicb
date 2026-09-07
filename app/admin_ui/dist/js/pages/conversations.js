@@ -83,7 +83,6 @@ export async function loadConversationsPage(container) {
           </div>
         `;
       }).join('');
-
       if (window.lucide) lucide.createIcons();
     }
 
@@ -120,7 +119,9 @@ export async function loadConversationsPage(container) {
         window.loadConversationThread(parsedId);
       }
     }
-      } catch (err) {
+
+    if (window.lucide) lucide.createIcons();
+  } catch (err) {
         if (listContainer) {
           listContainer.innerHTML = `<div class="p-6 text-center text-rose-500 text-[14px]">Failed to filter conversations: ${escapeHtml(err.message)}</div>`;
         }
@@ -203,14 +204,7 @@ export async function loadConversationsPage(container) {
 
     renderSessionList(sessions);
 
-    // Auto-select session if present in URL hash
-    const hashMatch = window.location.hash.match(/^#(\d+)$/);
-    if (hashMatch) {
-      const parsedId = parseInt(hashMatch[1], 10);
-      if (!isNaN(parsedId)) {
-        window.loadConversationThread(parsedId);
-      }
-    }
+
 
     // Initialize Custom Selects
     const agentOptions = [
@@ -466,9 +460,8 @@ export async function loadConversationsPage(container) {
             </div>
           `;
         }
-
-        if (window.lucide) lucide.createIcons();
         
+        if (window.lucide) lucide.createIcons();
         // Auto scroll chat to bottom
         const scrollArea = tc.querySelector('.flex-1.overflow-y-auto');
         if (scrollArea) scrollArea.scrollTop = scrollArea.scrollHeight;
@@ -477,6 +470,15 @@ export async function loadConversationsPage(container) {
         tc.innerHTML = `<div class="flex-1 flex items-center justify-center text-rose text-sm">${escapeHtml(e.message)}</div>`;
       }
     };
+
+    // Auto-select session if present in URL hash
+    const hashMatch = window.location.hash.match(/^#(\d+)$/);
+    if (hashMatch) {
+      const parsedId = parseInt(hashMatch[1], 10);
+      if (!isNaN(parsedId)) {
+        window.loadConversationThread(parsedId);
+      }
+    }
 
     if (window.lucide) lucide.createIcons();
   } catch (err) {
