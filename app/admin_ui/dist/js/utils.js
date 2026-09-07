@@ -650,7 +650,7 @@ export function checkPasswordStrength(password = '') {
   const lengthValid = p.length >= 8;
   const upperValid = /[A-Z]/.test(p);
   const lowerValid = /[a-z]/.test(p);
-  const numOrSymbolValid = /[0-9!@#$%^&*(),.?":{}|<>]/.test(p);
+  const numOrSymbolValid = /[0-9]/.test(p);
 
   let score = 0;
   if (p.length >= 6) score += 1;
