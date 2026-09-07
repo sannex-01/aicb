@@ -173,13 +173,19 @@ async def handle_telegram_webhook(
             # When no photos are present, edit the existing message in-place for a clean single-message UI
             edit_success = False
 
-            # For inline messages, we DO NOT want to edit the inline message itself
-            # because that replaces the user's sent message instead of the bot sending a response.
-            if message_id and chat_id and not inline_message_id:
+            # If it's a standard message in a chat, edit it.
+            # If it's an inline message, we normally DO NOT edit it (so we send a fresh reply to the DM).
+            # However, if it's an inline message AND we don't have a valid bot username configured
+            # (which means we fell back to callback_data in external chats), sending a fresh message
+            # to the user's DM will fail if they haven't started the bot. Thus, we must edit the inline message.
+            should_edit_inline = inline_message_id and not agent.telegram_username
+
+            if (message_id and chat_id and not inline_message_id) or should_edit_inline:
                 try:
                     res = await tg_client.edit_inline_buttons(
-                        chat_id=chat_id,
-                        message_id=message_id,
+                        chat_id=chat_id if not should_edit_inline else None,
+                        message_id=message_id if not should_edit_inline else None,
+                        inline_message_id=inline_message_id if should_edit_inline else None,
                         text=rendered["text"],
                         buttons=rendered["inline_keyboard"],
                     )
@@ -189,10 +195,20 @@ async def handle_telegram_webhook(
                     logger.warning(f"In-place message edit failed, will send fresh message: {e}")
 
             if not edit_success and chat_id:
-                if rendered["inline_keyboard"]:
-                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
-                else:
-                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+                try:
+                    if rendered["inline_keyboard"]:
+                        await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                    else:
+                        await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+                except Exception as e:
+                    logger.warning(f"Fallback send_message failed (user may not have started bot): {e}")
+                    # If we absolutely cannot send a message, try editing the inline message as a last resort
+                    if inline_message_id and not edit_success:
+                        await tg_client.edit_inline_buttons(
+                            inline_message_id=inline_message_id,
+                            text=rendered["text"],
+                            buttons=rendered["inline_keyboard"],
+                        )
 
         # Track interactive button action telemetry
         telemetry_client.track(

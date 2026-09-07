@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from app.core.rate_limit import limiter
 from app.core.security import verify_dashboard_auth
 from app.commerce.storage.manager import StorageManager
+from app.commerce.image_utils import optimize_image
 from app.core.logger import logger
 
 router = APIRouter(prefix="/catalog", tags=["Catalog"])
@@ -36,11 +37,20 @@ async def upload_product_image(
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Empty file.")
 
+    # Optimize the image for mobile customers (resizes and compresses)
+    optimized_bytes = optimize_image(file_bytes)
+
+    # After optimization, it is converted to JPEG, so let's update content_type and extension
+    content_type = "image/jpeg"
     safe_filename = (file.filename or "product-image").replace("/", "_").replace("\\", "_")
+    if "." in safe_filename:
+        safe_filename = safe_filename.rsplit(".", 1)[0] + ".jpg"
+    else:
+        safe_filename += ".jpg"
 
     try:
         result = await StorageManager.upload_image(
-            file_bytes=file_bytes,
+            file_bytes=optimized_bytes,
             filename=safe_filename,
             content_type=content_type,
             folder="products",
