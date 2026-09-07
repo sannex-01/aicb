@@ -2,6 +2,7 @@ import { state } from '../state.js';
 import { api } from '../api.js';
 import { navigate } from '../router.js';
 import { showToast, escapeHtml, formatDate, skeletonPage } from '../utils.js';
+import { parseMarkdown } from '../markdown.js';
 import { createCustomSelect } from '../components/custom-select.js';
 
 let currentThreadData = null;
@@ -110,6 +111,15 @@ export async function loadConversationsPage(container) {
         const res = await api(`/conversations?${params.toString()}`);
         sessions = res.items || [];
         renderSessionList(sessions);
+
+    // Auto-select session if present in URL hash
+    const hashMatch = window.location.hash.match(/^#(\d+)$/);
+    if (hashMatch) {
+      const parsedId = parseInt(hashMatch[1], 10);
+      if (!isNaN(parsedId)) {
+        window.loadConversationThread(parsedId);
+      }
+    }
       } catch (err) {
         if (listContainer) {
           listContainer.innerHTML = `<div class="p-6 text-center text-rose-500 text-[14px]">Failed to filter conversations: ${escapeHtml(err.message)}</div>`;
@@ -192,6 +202,15 @@ export async function loadConversationsPage(container) {
     `;
 
     renderSessionList(sessions);
+
+    // Auto-select session if present in URL hash
+    const hashMatch = window.location.hash.match(/^#(\d+)$/);
+    if (hashMatch) {
+      const parsedId = parseInt(hashMatch[1], 10);
+      if (!isNaN(parsedId)) {
+        window.loadConversationThread(parsedId);
+      }
+    }
 
     // Initialize Custom Selects
     const agentOptions = [
@@ -300,6 +319,7 @@ export async function loadConversationsPage(container) {
       try {
         const thread = await api(`/conversations/${sessionId}`);
         currentThreadData = thread;
+        window.history.replaceState(null, null, `/_/admin/conversations#${sessionId}`);
 
         const displayName = thread.customer?.name || thread.customer_identifier || 'Customer';
         const channelBadgeClass = thread.channel === 'whatsapp' 
@@ -345,14 +365,14 @@ export async function loadConversationsPage(container) {
             ${thread.messages.map(m => {
               const isUser = m.role === 'user';
               return `
-                <div class="flex flex-col ${isUser ? 'items-end' : 'items-start'} group">
+                <div class="flex flex-col ${isUser ? 'items-start' : 'items-start'} group">
                   <div class="flex items-center gap-1.5 mb-1 px-1 text-[12px] text-muted">
                     <span class="font-semibold ${isUser ? 'text-main' : 'text-brand'}">${isUser ? 'Customer' : (thread.agent?.name || 'Assistant')}</span>
                     <span>•</span>
                     <span>${formatDate(m.created_at)}</span>
                   </div>
-                  <div class="${isUser ? 'bg-brand text-white shadow-sm' : 'bg-surface border border-subtle text-main shadow-xs'} rounded-2xl px-4 py-2.5 text-[14px] max-w-[80%] whitespace-pre-wrap leading-relaxed">
-                    ${escapeHtml(m.content)}
+                  <div class="${isUser ? 'bg-surface-elevated text-main shadow-xs border border-subtle' : 'bg-surface border border-subtle text-main shadow-xs'} rounded-2xl px-4 py-2.5 text-[14px] max-w-[80%] whitespace-pre-wrap leading-relaxed markdown-body">
+                    ${isUser ? escapeHtml(m.content) : parseMarkdown(m.content)}
                   </div>
                 </div>
               `;
