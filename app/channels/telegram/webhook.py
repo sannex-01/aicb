@@ -172,14 +172,16 @@ async def handle_telegram_webhook(
         else:
             # When no photos are present, edit the existing message in-place for a clean single-message UI
             edit_success = False
-            if (message_id and chat_id) or inline_message_id:
+
+            # For inline messages, we DO NOT want to edit the inline message itself
+            # because that replaces the user's sent message instead of the bot sending a response.
+            if message_id and chat_id and not inline_message_id:
                 try:
                     res = await tg_client.edit_inline_buttons(
                         chat_id=chat_id,
                         message_id=message_id,
                         text=rendered["text"],
                         buttons=rendered["inline_keyboard"],
-                        inline_message_id=inline_message_id,
                     )
                     if res.get("ok"):
                         edit_success = True
