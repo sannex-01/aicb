@@ -38,15 +38,17 @@ async def upload_product_image(
         raise HTTPException(status_code=400, detail="Empty file.")
 
     # Optimize the image for mobile customers (resizes and compresses)
-    optimized_bytes = optimize_image(file_bytes)
+    optimized_bytes, is_optimized = optimize_image(file_bytes)
 
-    # After optimization, it is converted to JPEG, so let's update content_type and extension
-    content_type = "image/jpeg"
     safe_filename = (file.filename or "product-image").replace("/", "_").replace("\\", "_")
-    if "." in safe_filename:
-        safe_filename = safe_filename.rsplit(".", 1)[0] + ".jpg"
-    else:
-        safe_filename += ".jpg"
+
+    if is_optimized:
+        # After successful optimization, it is converted to JPEG, so let's update content_type and extension
+        content_type = "image/jpeg"
+        if "." in safe_filename:
+            safe_filename = safe_filename.rsplit(".", 1)[0] + ".jpg"
+        else:
+            safe_filename += ".jpg"
 
     try:
         result = await StorageManager.upload_image(
