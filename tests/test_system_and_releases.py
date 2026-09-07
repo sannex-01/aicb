@@ -74,14 +74,15 @@ async def test_perform_sannex_sync_ingests_release_notes(async_session: AsyncSes
         mock_instance.get_config = AsyncMock(return_value=SannexConfigResponse(status="success", releases=[mock_release]))
         mock_instance.get_releases = AsyncMock(return_value=[mock_release])
         mock_client_cls.return_value = mock_instance
+        with patch("app.telemetry.sync_worker.settings.SANNEX_API_KEY", "dummy_key"):
 
-        summary = await perform_sannex_sync(async_session)
-        assert summary["status"] == "success"
-        assert summary["releases_synced"] == 1
+            summary = await perform_sannex_sync(async_session)
+            assert summary["status"] == "success"
+            assert summary["releases_synced"] == 1
 
-        # Check DB
-        rel = await async_session.scalar(select(ReleaseNote).where(ReleaseNote.version == "0.1.0"))
-        assert rel is not None
-        assert rel.title == "AgentOS Dynamic Release Sync"
-        assert "Read-only config" in rel.changelog_json
+            # Check DB
+            rel = await async_session.scalar(select(ReleaseNote).where(ReleaseNote.version == "0.1.0"))
+            assert rel is not None
+            assert rel.title == "AgentOS Dynamic Release Sync"
+            assert "Read-only config" in rel.changelog_json
 
