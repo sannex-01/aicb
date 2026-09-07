@@ -65,6 +65,41 @@ class FlowEngine:
         action = action_id.lower().strip()
         logger.info(f"Flow engine processing action: {action}")
 
+        # Log the user's action into memory to ensure it appears in the conversation UI
+        await MemoryManager.add_message(
+            db=db,
+            session=session,
+            role="user",
+            content=user_input or action_id,
+        )
+
+        response = await FlowEngine._process_action(
+            db, session, action, user_input, prefill_name
+        )
+
+        # Log the bot's response into memory
+        await MemoryManager.add_message(
+            db=db,
+            session=session,
+            role="assistant",
+            content=response.text,
+        )
+
+        return response
+
+    @staticmethod
+    async def _process_action(
+        db: AsyncSession,
+        session: ConversationSession,
+        action: str,
+        user_input: Optional[str] = None,
+        prefill_name: Optional[str] = None,
+    ) -> BotResponse:
+
+        # `action` is the normalized lowercase string, but we need `action_id`
+        # which is the original user input text for ORD- checking in track_order.
+        action_id = user_input or action
+
         # 0. Profile Collection Flow (interrupts any other action while active)
         if session.active_flow == "profile_collect":
             timed_out = False

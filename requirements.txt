@@ -16,3 +16,4 @@ python-multipart>=0.0.9
 pytest>=8.3.0
 pytest-asyncio>=0.23.0
 sannex-agent>=0.1.4
+Pillow>=10.0.0

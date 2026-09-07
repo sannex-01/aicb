@@ -139,6 +139,19 @@ class StorageService:
     @staticmethod
     async def upload_file(db: AsyncSession, file_bytes: bytes, filename: str, content_type: str) -> str:
         """Uploads a file to the active storage provider and returns public URL."""
+        from app.commerce.image_utils import optimize_image
+
+        # Optimize if it's an image (excluding SVG)
+        if content_type.startswith("image/") and "svg" not in content_type.lower():
+            file_bytes, is_optimized = optimize_image(file_bytes)
+            if is_optimized:
+                # Ensure proper extension for optimized jpeg
+                content_type = "image/jpeg"
+                if "." in filename:
+                    filename = filename.rsplit(".", 1)[0] + ".jpg"
+                else:
+                    filename += ".jpg"
+
         res = await db.execute(select(BusinessProfile).limit(1))
         biz = res.scalar_one_or_none()
         if not biz:

@@ -52,6 +52,7 @@ dependencies = [
     "slowapi>=0.1.9",
     "python-multipart>=0.0.9",
     "sannex-agent>=0.1.4",
+    "Pillow>=10.0.0",
 ]
 
 [project.optional-dependencies]
