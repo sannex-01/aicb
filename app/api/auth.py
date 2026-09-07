@@ -1,10 +1,12 @@
 from datetime import datetime, timezone
+import re
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
+from app.core.rate_limit import limiter
 from app.core.security import verify_password, hash_password, create_admin_jwt, get_current_admin_user, create_password_reset_jwt, decode_password_reset_jwt
 from app.models.user import AdminUser
 from app.models.business import BusinessProfile
@@ -27,7 +29,8 @@ class ResetPasswordRequest(BaseModel):
 
 
 @router.post("/login")
-async def admin_login(req: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+@limiter.limit("20/minute")
+async def admin_login(req: LoginRequest, request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Logs in an admin/operator user and issues a signed JWT token & cookie."""
     res = await db.execute(select(AdminUser).where(AdminUser.email == req.email.lower().strip()))
     user = res.scalar_one_or_none()
@@ -117,6 +120,7 @@ async def admin_logout(response: Response):
 
 
 @router.post("/forgot-password")
+@limiter.limit("10/minute")
 async def forgot_password(req: ForgotPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Sends a password reset email if the user exists and email service is configured."""
     email_clean = req.email.lower().strip()
@@ -167,7 +171,8 @@ async def forgot_password(req: ForgotPasswordRequest, request: Request, db: Asyn
 
 
 @router.post("/reset-password")
-async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute")
+async def reset_password(req: ResetPasswordRequest, request: Request, db: AsyncSession = Depends(get_db)):
     """Validates password reset token and updates the user's password."""
     payload = decode_password_reset_jwt(req.token)
     if not payload or not payload.get("sub"):
@@ -176,10 +181,10 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
             detail="Invalid or expired password reset link. Please request a new one.",
         )
 
-    if len(req.password) < 6:
+    if len(req.password) < 8 or not re.search(r"[a-z]", req.password) or not re.search(r"[A-Z]", req.password) or not re.search(r"[0-9]", req.password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Password must be at least 6 characters long.",
+            detail="Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.",
         )
 
     user_id = int(payload["sub"])
@@ -229,10 +234,10 @@ async def change_password(
             detail="Current password is incorrect.",
         )
 
-    if len(req.new_password) < 6:
+    if len(req.new_password) < 8 or not re.search(r"[a-z]", req.new_password) or not re.search(r"[A-Z]", req.new_password) or not re.search(r"[0-9]", req.new_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="New password must be at least 6 characters long.",
+            detail="New password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.",
         )
 
     current_user.password_hash = hash_password(req.new_password)

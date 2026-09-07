@@ -1,3 +1,4 @@
+import re
 import secrets
 from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -83,10 +84,10 @@ async def create_user(
 
     invited = False
     if req.password and req.password.strip():
-        if len(req.password.strip()) < 6:
+        if len(req.password.strip()) < 8 or not re.search(r"[a-z]", req.password.strip()) or not re.search(r"[A-Z]", req.password.strip()) or not re.search(r"[0-9]", req.password.strip()):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Password must be at least 6 characters.",
+                detail="Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.",
             )
         pwd_hash = hash_password(req.password.strip())
     else:
@@ -180,8 +181,8 @@ async def update_user(
     if req.email is not None:
         user.email = req.email.lower().strip()
     if req.password is not None and req.password.strip():
-        if len(req.password.strip()) < 6:
-            raise HTTPException(status_code=400, detail="Password must be at least 6 characters.")
+        if len(req.password.strip()) < 8 or not re.search(r"[a-z]", req.password.strip()) or not re.search(r"[A-Z]", req.password.strip()) or not re.search(r"[0-9]", req.password.strip()):
+            raise HTTPException(status_code=400, detail="Password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.")
         user.password_hash = hash_password(req.password.strip())
     if req.role is not None and current_user.role in ["super_admin", "admin"]:
         user.role = req.role

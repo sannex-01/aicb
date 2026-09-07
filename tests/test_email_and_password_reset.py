@@ -81,7 +81,7 @@ async def test_setup_status_includes_branding(client: AsyncClient):
     setup_res = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Brand Master",
         "admin_email": "brand@example.com",
-        "admin_password": "superpassword123",
+        "admin_password": "SuperPassword123!",
         "business_name": "Luxury Silk Ltd",
         "currency": "NGN",
         "logo_url": "https://images.example.com/logo.png",
@@ -112,7 +112,7 @@ async def test_forgot_password_and_reset_password_flow(client: AsyncClient, db_s
     await client.post("/api/v1/setup/initialize", json={
         "admin_name": "John Doe",
         "admin_email": "john@example.com",
-        "admin_password": "originalpassword123",
+        "admin_password": "OriginalPassword123!",
         "business_name": "Apex NG",
         "email_provider": "resend",
         "email_config": {
@@ -142,14 +142,14 @@ async def test_forgot_password_and_reset_password_flow(client: AsyncClient, db_s
     
     reset_res = await client.post("/api/v1/auth/reset-password", json={
         "token": token,
-        "password": "brandnewpassword456",
+        "password": "BrandNewPassword456!",
     })
     assert reset_res.status_code == 200
 
     # 4. Attempting to use the SAME token again must FAIL (token expired upon use)
     reuse_res = await client.post("/api/v1/auth/reset-password", json={
         "token": token,
-        "password": "anotherpassword789",
+        "password": "AnotherPassword789!",
     })
     assert reuse_res.status_code == 400
     assert "already been used" in reuse_res.json()["detail"]
@@ -157,14 +157,14 @@ async def test_forgot_password_and_reset_password_flow(client: AsyncClient, db_s
     # 5. Old password should fail
     old_login = await client.post("/api/v1/auth/login", json={
         "email": "john@example.com",
-        "password": "originalpassword123",
+        "password": "OriginalPassword123!",
     })
     assert old_login.status_code == 401
 
     # 6. New password should succeed
     new_login = await client.post("/api/v1/auth/login", json={
         "email": "john@example.com",
-        "password": "brandnewpassword456",
+        "password": "BrandNewPassword456!",
     })
     assert new_login.status_code == 200
     assert "access_token" in new_login.json()
@@ -176,7 +176,7 @@ async def test_settings_email_crud_and_test_send(client: AsyncClient):
     setup = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Admin Tester",
         "admin_email": "admin@example.com",
-        "admin_password": "supersecretpassword123",
+        "admin_password": "SuperSecretPassword123!",
         "business_name": "Test Hub",
     })
     token = setup.json()["access_token"]
@@ -217,7 +217,7 @@ async def test_settings_payments_crud(client: AsyncClient):
     setup = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Admin Tester",
         "admin_email": "admin@example.com",
-        "admin_password": "supersecretpassword123",
+        "admin_password": "SuperSecretPassword123!",
         "business_name": "Test Hub",
     })
     token = setup.json()["access_token"]

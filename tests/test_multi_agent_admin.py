@@ -64,7 +64,7 @@ async def test_first_run_setup_and_idempotency_lockout(client: AsyncClient):
     setup_payload = {
         "admin_name": "Test Super Admin",
         "admin_email": "admin@example.com",
-        "admin_password": "supersecretpassword123",
+        "admin_password": "SuperSecretPassword123!",
         "business_name": "Apex Retail NG",
         "currency": "NGN",
         "contact_email": "hello@apexretail.ng",
@@ -92,7 +92,7 @@ async def test_first_run_setup_and_idempotency_lockout(client: AsyncClient):
     # 5. Test Admin Login with the newly created credentials
     login_res = await client.post("/api/v1/auth/login", json={
         "email": "admin@example.com",
-        "password": "supersecretpassword123",
+        "password": "SuperSecretPassword123!",
     })
     assert login_res.status_code == 200
     assert "access_token" in login_res.json()
@@ -121,7 +121,7 @@ async def test_access_groups_and_multi_agent_crud(client: AsyncClient, db_sessio
     setup_res = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Admin",
         "admin_email": "admin2@example.com",
-        "admin_password": "password12345",
+        "admin_password": "Password12345!",
         "business_name": "Multi Agent Store",
     })
     token = setup_res.json()["access_token"]
@@ -266,7 +266,7 @@ async def test_customers_directory_and_overview(client: AsyncClient, db_session:
     setup_res = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Admin",
         "admin_email": "admin3@example.com",
-        "admin_password": "password12345",
+        "admin_password": "Password12345!",
         "business_name": "Apex Store",
     })
     token = setup_res.json()["access_token"]
@@ -352,7 +352,7 @@ async def test_operator_rbac_permissions(client: AsyncClient):
     await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Super Admin",
         "admin_email": "admin@example.com",
-        "admin_password": "supersecretpassword123",
+        "admin_password": "SuperSecretPassword123!",
         "business_name": "Apex Retail NG",
         "currency": "NGN",
     })
@@ -360,7 +360,7 @@ async def test_operator_rbac_permissions(client: AsyncClient):
     # Login as admin to create operator
     login_admin = await client.post("/api/v1/auth/login", json={
         "email": "admin@example.com",
-        "password": "supersecretpassword123",
+        "password": "SuperSecretPassword123!",
     })
     admin_token = login_admin.json()["access_token"]
     admin_headers = {"Authorization": f"Bearer {admin_token}"}
@@ -369,7 +369,7 @@ async def test_operator_rbac_permissions(client: AsyncClient):
     create_op_res = await client.post("/api/v1/users", headers=admin_headers, json={
         "name": "Operator Sam",
         "email": "sam@example.com",
-        "password": "operatorsamsecret123",
+        "password": "OperatorSamSecret123!",
         "role": "operator",
     })
     assert create_op_res.status_code in [200, 201]
@@ -377,7 +377,7 @@ async def test_operator_rbac_permissions(client: AsyncClient):
     # Login as operator
     login_op = await client.post("/api/v1/auth/login", json={
         "email": "sam@example.com",
-        "password": "operatorsamsecret123",
+        "password": "OperatorSamSecret123!",
     })
     assert login_op.status_code == 200
     op_token = login_op.json()["access_token"]
@@ -405,7 +405,7 @@ async def test_access_groups_llm_keys_multi_agent_and_product_scoping(client: As
     setup_res = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Multi Group Admin",
         "admin_email": "admin_multigroup@example.com",
-        "admin_password": "multigrouppassword123",
+        "admin_password": "MultiGroupPassword123!",
         "business_name": "Omni Brand Store",
     })
     token = setup_res.json()["access_token"]
@@ -486,7 +486,7 @@ async def test_conversations_filter_by_channel_agent_and_search(client: AsyncCli
     setup_res = await client.post("/api/v1/setup/initialize", json={
         "admin_name": "Conv Admin",
         "admin_email": "convadmin@example.com",
-        "admin_password": "supersecretpassword123",
+        "admin_password": "SuperSecretPassword123!",
         "business_name": "Conv Testing Corp",
     })
     token = setup_res.json()["access_token"]

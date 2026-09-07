@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import re
 from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
@@ -64,10 +65,10 @@ async def initialize_instance(req: SetupInitRequest, db: AsyncSession = Depends(
             detail="Instance is already initialized. Please log in at /_/admin/login.",
         )
 
-    if len(req.admin_password) < 6:
+    if len(req.admin_password) < 8 or not re.search(r"[a-z]", req.admin_password) or not re.search(r"[A-Z]", req.admin_password) or not re.search(r"[0-9]", req.admin_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Admin password must be at least 6 characters.",
+            detail="Admin password must be at least 8 characters long and contain at least one uppercase letter, one lowercase letter, and one number.",
         )
 
     # 2. Create Super Admin User
