@@ -12,16 +12,19 @@ class FulfillmentManager:
     @staticmethod
     async def dispatch_order(db: AsyncSession, order: Order) -> None:
         """Analyzes order items and routes them to their upstream fulfillment systems."""
+
+        # Idempotency check: Skip if already fulfilled
+        import json
+        metadata = json.loads(order.metadata_json or "{}")
+        if metadata.get("fulfillment_status") == "dispatched":
+            logger.info(f"Order {order.order_reference} already dispatched for fulfillment. Skipping.")
+            return
+
         try:
             items = json.loads(order.items_json)
         except Exception as e:
             logger.error(f"Failed to parse items for fulfillment on order {order.order_reference}: {e}")
             return
-
-        # Group items by source
-        # Note: the items_json from Cart usually doesn't store 'source' directly unless we populate it.
-        # But we know if the system CATALOG_SOURCE is bumpa, all items are Bumpa.
-        # Let's handle the simple case first: if the system uses Bumpa, push to Bumpa.
 
         if settings.CATALOG_SOURCE.lower() == "bumpa":
             # Push order to bumpa
@@ -58,10 +61,26 @@ class FulfillmentManager:
 
                 res = await bumpa_client.create_order(order_data)
                 logger.info(f"Pushed order {order.order_reference} to Bumpa: {res}")
+
+                # Mark as dispatched
+                metadata["fulfillment_status"] = "dispatched"
+                metadata["bumpa_response"] = res
+                order.metadata_json = json.dumps(metadata)
+                await db.commit()
+
             except Exception as e:
                 logger.error(f"Failed to push order {order.order_reference} to Bumpa: {e}")
+                # Record failure for retry
+                metadata["fulfillment_status"] = "failed"
+                metadata["fulfillment_error"] = str(e)
+                order.metadata_json = json.dumps(metadata)
+                await db.commit()
         elif settings.CATALOG_SOURCE.lower() in ("paystack", "local"):
             # For pure digital or local products without native fulfillment APIs (like Paystack storefronts
             # or manual DB entries), trigger the internal fallback logic.
             logger.info(f"Order {order.order_reference} requires internal/manual fulfillment dispatch.")
-            # We can notify an internal slack channel, webhook, or trigger digital asset delivery if configured.
+
+            metadata["fulfillment_status"] = "dispatched"
+            metadata["fulfillment_method"] = "manual"
+            order.metadata_json = json.dumps(metadata)
+            await db.commit()

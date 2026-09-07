@@ -28,6 +28,7 @@ class CartManager:
         price: float,
         quantity: int = 1,
         currency: str = "NGN",
+        external_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         state = MemoryManager.get_flow_state_data(session)
         cart = state.get("cart", [])
@@ -44,6 +45,7 @@ class CartManager:
         else:
             cart.append({
                 "item_id": item_id,
+                "external_id": external_id,
                 "title": title,
                 "price": float(price),
                 "quantity": int(quantity),
