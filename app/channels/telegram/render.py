@@ -114,11 +114,18 @@ class TelegramRenderer:
     @staticmethod
     def inline_query_results(cards: List[ProductCard], chat_type: str = "", bot_username: Optional[str] = None) -> List[Dict[str, Any]]:
         """Renders ProductCards as Telegram inline-query results (bots/inline)
-        for @botname <search> product search. Works reliably for all products
-        (whether images exist or not) using Telegram's article format with
-        rich inline Buy Now & View Cart buttons."""
+        for @botname <search> product search.
+
+        Always uses type: 'article' for a clean vertical product search picker,
+        and uses link_preview_options so the product image appears above the
+        description once sent to the chat.
+        """
         results = []
         is_bot_dm = (chat_type == "sender")
+
+        # External chats require a valid bot username to build deep links properly
+        if not is_bot_dm and not bot_username:
+            return []
 
         for card in cards[:50]:
             caption = f"🛍️ *{card.title}* — {card.price:,.2f} {card.currency}"
@@ -133,30 +140,40 @@ class TelegramRenderer:
                 ]
             else:
                 caption += "\n\n👉 Tap below to buy:"
-                if bot_username:
-                    clean_username = bot_username.lstrip("@")
-                    deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
-                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
-                else:
-                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id}]
+                clean_username = bot_username.lstrip("@")
+                deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
+                buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
 
+            # Configure the message content dropped into chat
+            input_content: Dict[str, Any] = {
+                "message_text": caption,
+                "parse_mode": "Markdown",
+            }
+
+            has_image = bool(card.image_url and card.image_url.startswith(("http://", "https://")))
+            if has_image:
+                input_content["link_preview_options"] = {
+                    "is_disabled": False,
+                    "url": card.image_url,
+                    "prefer_large_media": True,
+                    "show_above_text": True,
+                }
+
+            # Always emit type: 'article' for consistent e-commerce search layout
             item_dict: Dict[str, Any] = {
                 "type": "article",
                 "id": f"prod_{card.id}",
                 "title": f"{card.title} — {card.price:,.2f} {card.currency}",
-                "description": card.description or f"Price: {card.price:,.2f} {card.currency}",
-                "input_message_content": {
-                    "message_text": caption,
-                    "parse_mode": "Markdown",
-                },
+                "description": (card.description or f"Price: {card.price:,.2f} {card.currency}")[:100],
+                "input_message_content": input_content,
                 "reply_markup": {
                     "inline_keyboard": [buttons]
                 },
             }
-            if card.image_url:
+
+            if has_image:
                 item_dict["thumbnail_url"] = card.image_url
-                item_dict["thumb_width"] = 64
-                item_dict["thumb_height"] = 64
 
             results.append(item_dict)
+
         return results
