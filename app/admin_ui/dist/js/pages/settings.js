@@ -51,9 +51,15 @@ export async function loadSettingsPage(container) {
 
     container.innerHTML = `
       <div class="space-y-6">
-        <div>
-          <h1 class="text-2xl font-bold">Settings & Platform Security</h1>
-          <p class="text-sm text-muted">Manage business identity, payment gateways, email delivery (Resend/Brevo) & API keys</p>
+        <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold">Settings & Platform Security</h1>
+            <p class="text-sm text-muted">Manage business identity, payment gateways, email delivery (Resend/Brevo) & API keys</p>
+          </div>
+          <button class="btn btn-secondary flex items-center gap-2" onclick="window.toggleTheme()" title="Switch Theme">
+            <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-4 h-4 text-brand"></i>
+            <span>${state.theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
+          </button>
         </div>
 
         <div class="flex flex-col md:flex-row gap-6 items-start">

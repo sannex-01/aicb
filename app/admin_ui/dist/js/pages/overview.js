@@ -82,7 +82,7 @@ export async function loadOverviewPage(container) {
             <h1 class="text-2xl font-bold">Instance Overview</h1>
             <p class="text-sm text-muted">Real-time status for <strong>${escapeHtml(data.business.name)}</strong></p>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="navigate('/_/admin/agents')">
+          <button class="btn btn-primary btn-sm shadow-[0_0_15px_rgba(20,184,166,0.5)] dark:shadow-[0_0_15px_rgba(45,212,191,0.4)] animate-pulse" onclick="navigate('/_/admin/agents'); setTimeout(() => { if (window.openAgentModal) window.openAgentModal(); }, 100);">
             <i data-lucide="plus" class="w-4 h-4"></i> New Agent
           </button>
         </div>

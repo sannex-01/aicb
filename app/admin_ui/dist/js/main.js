@@ -258,8 +258,8 @@ function renderAdminShell(container, currentPath) {
     {
       title: 'CONFIGURATION',
       items: [
-        { label: 'Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
         { label: 'Team Accounts', path: '/_/admin/users', icon: 'user-check', adminOnly: true },
+        { label: 'Business Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
       ]
     }
   ];
@@ -336,9 +336,25 @@ function renderAdminShell(container, currentPath) {
                 <nav class="flex flex-col gap-1">
                   ${visibleItems.map(item => {
                     const isActive = currentPath === item.path;
+                    // Apply special glowing styles for Agents tab per user request
+                    const isAgentTab = item.path === '/_/admin/agents';
+                    let linkClass = isActive
+                      ? 'bg-surface-hover text-main'
+                      : 'text-muted hover:bg-surface-hover hover:text-main';
+                    let iconClass = isActive
+                      ? 'text-main'
+                      : 'text-muted group-hover:text-main transition-colors';
+
+                    if (isAgentTab) {
+                      linkClass = isActive
+                        ? 'bg-surface-elevated text-main shadow-[0_0_15px_rgba(20,184,166,0.5)] dark:shadow-[0_0_15px_rgba(45,212,191,0.4)] border border-subtle'
+                        : 'text-muted hover:bg-surface-hover hover:text-main border border-transparent shadow-[0_0_8px_rgba(20,184,166,0.2)] dark:shadow-[0_0_8px_rgba(45,212,191,0.15)]';
+                      iconClass = isActive ? 'text-brand' : 'text-faint group-hover:text-main transition-colors';
+                    }
+
                     return `
-                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-[14px] font-medium transition-colors group ${isActive ? 'bg-surface-hover text-main' : 'text-muted hover:bg-surface-hover hover:text-main'}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
-                        <i data-lucide="${item.icon}" class="${state.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} flex-shrink-0 ${isActive ? 'text-main' : 'text-muted group-hover:text-main transition-colors'}"></i>
+                      <a href="${item.path}" class="flex items-center ${state.sidebarCollapsed ? 'justify-center' : 'gap-3'} px-3 py-2 rounded-lg text-[14px] font-medium transition-colors group ${linkClass}" onclick="event.preventDefault(); navigate('${item.path}')" title="${item.label}">
+                        <i data-lucide="${item.icon}" class="${state.sidebarCollapsed ? 'w-[18px] h-[18px]' : 'w-4 h-4'} flex-shrink-0 ${iconClass}"></i>
                         ${!state.sidebarCollapsed ? `<span class="truncate">${item.label}</span>` : ''}
                       </a>
                     `;
@@ -365,22 +381,7 @@ function renderAdminShell(container, currentPath) {
             </button>
           </div>
 
-          <!-- Theme Switcher in Sidebar -->
-          ${!state.sidebarCollapsed ? `
-          <button type="button" class="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-surface-elevated/50 hover:bg-surface-hover border border-subtle text-[14px] text-muted hover:text-main transition-colors cursor-pointer text-left group" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
-            <div class="flex items-center gap-2">
-              <i data-lucide="${state.theme === 'dark' ? 'moon' : 'sun'}" class="w-4 h-4 text-brand flex-shrink-0"></i>
-              <span class="text-[14px] font-medium text-main">${state.theme === 'dark' ? 'Dark theme' : 'Light theme'}</span>
-            </div>
-            <div class="p-1 rounded-md text-muted group-hover:text-main">
-              <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-3.5 h-3.5"></i>
-            </div>
-          </button>
-          ` : `
-          <button type="button" class="w-full flex items-center justify-center p-2 rounded-lg text-muted hover:text-main hover:bg-surface-hover transition-colors cursor-pointer" onclick="window.toggleTheme()" title="Switch to ${state.theme === 'dark' ? 'light' : 'dark'} mode">
-            <i data-lucide="${state.theme === 'dark' ? 'sun' : 'moon'}" class="w-[18px] h-[18px] text-brand"></i>
-          </button>
-          `}
+
 
           <!-- User Identity Card -->
           <div class="flex items-center ${state.sidebarCollapsed ? 'justify-center flex-col pt-0.5' : 'gap-2 pt-0.5'}">
@@ -413,7 +414,22 @@ function renderAdminShell(container, currentPath) {
   window.navigate = navigate;
   window.setTheme = function(t) {
     applyTheme(t);
-    renderAdminShell(container, currentPath);
+    // Don't re-render the whole shell, just the active page content!
+    const pageContainer = document.getElementById('page-content');
+    if (currentPath === '/_/admin/overview') import('./pages/overview.js').then(m => m.loadOverviewPage(pageContainer));
+    else if (currentPath === '/_/admin/conversations') import('./pages/conversations.js').then(m => m.loadConversationsPage(pageContainer));
+    else if (currentPath === '/_/admin/orders') import('./pages/orders.js').then(m => m.loadOrdersPage(pageContainer));
+    else if (currentPath === '/_/admin/reports') import('./pages/reports.js').then(m => m.loadReportsPage(pageContainer));
+    else if (currentPath === '/_/admin/agents') import('./pages/agents.js').then(m => m.loadAgentsPage(pageContainer));
+    else if (currentPath === '/_/admin/groups') import('./pages/groups.js').then(m => m.loadGroupsPage(pageContainer));
+    else if (currentPath === '/_/admin/customers') import('./pages/customers.js').then(m => m.loadCustomersPage(pageContainer));
+    else if (currentPath === '/_/admin/catalog') import('./pages/catalog.js').then(m => m.loadCatalogPage(pageContainer));
+    else if (currentPath === '/_/admin/knowledge') import('./pages/knowledge.js').then(m => m.loadKnowledgePage(pageContainer));
+    else if (currentPath === '/_/admin/users') import('./pages/users.js').then(m => m.loadUsersPage(pageContainer));
+    else if (currentPath === '/_/admin/settings') import('./pages/settings.js').then(m => m.loadSettingsPage(pageContainer));
+    // We update the shell's active state icons where needed, but rendering the whole shell causes page flickers/resets.
+    // Instead we rely on CSS classes which CSS variables handle automatically!
+    // EXCEPT that the settings page toggles its own Lucide icon, so we must reload that specific page to swap the icon.
   };
   window.toggleTheme = function() {
     const next = state.theme === 'light' ? 'dark' : 'light';
