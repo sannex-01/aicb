@@ -213,18 +213,23 @@ class TelegramClient:
 
     async def edit_message_text(
         self,
-        chat_id: int | str,
-        message_id: int,
-        text: str,
+        chat_id: Optional[int | str] = None,
+        message_id: Optional[int] = None,
+        text: str = "",
         parse_mode: Optional[str] = "Markdown",
         reply_markup: Optional[Dict[str, Any]] = None,
+        inline_message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Edits an existing message text in-place on Telegram."""
         payload: Dict[str, Any] = {
-            "chat_id": chat_id,
-            "message_id": message_id,
             "text": text,
         }
+        if inline_message_id:
+            payload["inline_message_id"] = inline_message_id
+        else:
+            payload["chat_id"] = chat_id
+            payload["message_id"] = message_id
+
         if parse_mode:
             payload["parse_mode"] = parse_mode
         if reply_markup:
@@ -245,14 +250,15 @@ class TelegramClient:
 
     async def edit_inline_buttons(
         self,
-        chat_id: int | str,
-        message_id: int,
-        text: str,
+        chat_id: Optional[int | str] = None,
+        message_id: Optional[int] = None,
+        text: str = "",
         buttons: Optional[List[List[Dict[str, str]]]] = None,
+        inline_message_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Edits an existing message's text and its inline keyboard in-place."""
         markup = {"inline_keyboard": buttons} if buttons is not None else None
-        return await self.edit_message_text(chat_id, message_id, text, reply_markup=markup)
+        return await self.edit_message_text(chat_id, message_id, text, reply_markup=markup, inline_message_id=inline_message_id)
 
     async def send_invoice(
         self,

@@ -112,17 +112,32 @@ class TelegramRenderer:
         }
 
     @staticmethod
-    def inline_query_results(cards: List[ProductCard]) -> List[Dict[str, Any]]:
+    def inline_query_results(cards: List[ProductCard], chat_type: str = "", bot_username: Optional[str] = None) -> List[Dict[str, Any]]:
         """Renders ProductCards as Telegram inline-query results (bots/inline)
         for @botname <search> product search. Works reliably for all products
         (whether images exist or not) using Telegram's article format with
         rich inline Buy Now & View Cart buttons."""
         results = []
+        is_bot_dm = (chat_type == "sender")
+
         for card in cards[:50]:
             caption = f"🛍️ *{card.title}* — {card.price:,.2f} {card.currency}"
             if card.description:
                 caption += f"\n_{card.description}_"
-            caption += "\n\n👉 Tap below to buy or view your cart:"
+
+            if is_bot_dm:
+                caption += "\n\n👉 Tap below to buy or view your cart:"
+                buttons = [
+                    {"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id},
+                    {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
+                ]
+            else:
+                caption += "\n\n👉 Tap below to buy:"
+                if bot_username:
+                    deep_link_url = f"https://t.me/{bot_username}?start={card.buy_action_id}"
+                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
+                else:
+                    buttons = [{"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id}]
 
             item_dict: Dict[str, Any] = {
                 "type": "article",
@@ -134,12 +149,7 @@ class TelegramRenderer:
                     "parse_mode": "Markdown",
                 },
                 "reply_markup": {
-                    "inline_keyboard": [
-                        [
-                            {"text": f"🛒 Buy {card.title[:20]}", "callback_data": card.buy_action_id},
-                            {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
-                        ]
-                    ]
+                    "inline_keyboard": [buttons]
                 },
             }
             if card.image_url:

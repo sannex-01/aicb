@@ -89,9 +89,10 @@ async def handle_telegram_webhook(
         iq_id = iq.get("id")
         query_text = (iq.get("query") or "").strip()
         from_user = iq.get("from", {})
+        chat_type = iq.get("chat_type", "")
 
         logger.info(f"=== TELEGRAM INLINE QUERY RECEIVED ===")
-        logger.info(f"Query ID: {iq_id} | User: {from_user.get('id')} (@{from_user.get('username')}) | Query: '{query_text}'")
+        logger.info(f"Query ID: {iq_id} | User: {from_user.get('id')} (@{from_user.get('username')}) | Query: '{query_text}' | Chat Type: {chat_type}")
 
         from app.commerce.catalog_provider import CatalogManager
         from app.schemas.bot_response import ProductCard
@@ -115,7 +116,11 @@ async def handle_telegram_webhook(
             )
             for p in products
         ]
-        results = TelegramRenderer.inline_query_results(cards)
+        results = TelegramRenderer.inline_query_results(
+            cards=cards,
+            chat_type=chat_type,
+            bot_username=agent.telegram_username if agent else None,
+        )
         logger.info(f"Generated {len(results)} inline article cards to return to Telegram:\n{json.dumps(results, indent=2)}")
 
         res = await tg_client.answer_inline_query(iq_id, results=results)
@@ -137,8 +142,9 @@ async def handle_telegram_webhook(
         from_user = cb.get("from", {})
         user_id = str(from_user.get("id"))
         message_obj = cb.get("message", {})
-        chat_id = message_obj.get("chat", {}).get("id")
+        chat_id = message_obj.get("chat", {}).get("id") or from_user.get("id")
         message_id = message_obj.get("message_id")
+        inline_message_id = cb.get("inline_message_id")
 
         await tg_client.answer_callback_query(cb_id)
 
@@ -166,13 +172,14 @@ async def handle_telegram_webhook(
         else:
             # When no photos are present, edit the existing message in-place for a clean single-message UI
             edit_success = False
-            if message_id and chat_id:
+            if (message_id and chat_id) or inline_message_id:
                 try:
                     res = await tg_client.edit_inline_buttons(
                         chat_id=chat_id,
                         message_id=message_id,
                         text=rendered["text"],
                         buttons=rendered["inline_keyboard"],
+                        inline_message_id=inline_message_id,
                     )
                     if res.get("ok"):
                         edit_success = True
@@ -224,6 +231,10 @@ async def handle_telegram_webhook(
 
         if not text:
             return {"ok": True}
+
+        # Parse /start deep links
+        if text.startswith("/start ") and len(text.split(" ", 1)) > 1:
+            text = text.split(" ", 1)[1]
 
         logger.info(f"Incoming Telegram message from {user_id} (@{from_user.get('username')}): '{text}'")
 
