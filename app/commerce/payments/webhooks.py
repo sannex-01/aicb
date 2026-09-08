@@ -75,6 +75,12 @@ async def _notify_customer_payment_success(db: AsyncSession, order: Order) -> No
     except Exception as e:
         logger.error(f"Failed to dispatch fulfillment for order {order.order_reference}: {e}")
 
+    try:
+        from app.commerce.notifications import NotificationManager
+        await NotificationManager.notify_merchant_new_order(db, order)
+    except Exception as e:
+        logger.error(f"Failed to send merchant order alerts for order {order.order_reference}: {e}")
+
 
 # ==============================================================================
 # Paystack Webhook

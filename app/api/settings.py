@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Optional, List
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -391,6 +391,35 @@ async def send_test_telegram_alert(
         return {"status": "ok", "message": "Test alert sent successfully."}
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+class UpdateAlertRecipientsRequest(BaseModel):
+    emails: List[str] = []
+    phones: List[str] = []
+
+
+@router.get("/alerts/recipients")
+async def get_alert_recipients(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Who order alerts actually get sent to for Email/SMS (Telegram's
+    chat_id already IS the recipient, stored on its own config)."""
+    from app.services.alert_recipients import AlertRecipientsService
+    return await AlertRecipientsService.get_recipients(db)
+
+
+@router.put("/alerts/recipients")
+async def update_alert_recipients(
+    req: UpdateAlertRecipientsRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.alert_recipients import AlertRecipientsService
+    try:
+        return await AlertRecipientsService.save_recipients(db, req.emails, req.phones)
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 class UpdateBumpaConfigRequest(BaseModel):

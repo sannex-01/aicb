@@ -27,7 +27,7 @@ export async function loadIntegrationsPage(container) {
 
   container.innerHTML = skeletonPage({ stats: 0, rows: 4 });
   try {
-    const [storageInfo, emailInfo, paymentInfo, channelsInfo, bumpaInfo, paystackConnectionInfo, smsInfo, telegramAlertsInfo] = await Promise.all([
+    const [storageInfo, emailInfo, paymentInfo, channelsInfo, bumpaInfo, paystackConnectionInfo, smsInfo, telegramAlertsInfo, alertRecipientsInfo] = await Promise.all([
       api('/settings/storage'),
       api('/settings/email').catch(() => ({ provider: null, configured: false, config: {} })),
       api('/settings/payments').catch(() => ({ provider: null, configured: false, config: {}, available_currencies: [] })),
@@ -36,6 +36,7 @@ export async function loadIntegrationsPage(container) {
       api('/settings/store-connections/paystack').catch(() => ({ configured: false, config: {} })),
       api('/settings/sms').catch(() => ({ provider: null, configured: false, config: {} })),
       api('/settings/alerts/telegram').catch(() => ({ configured: false, config: {} })),
+      api('/settings/alerts/recipients').catch(() => ({ emails: [], phones: [] })),
     ]);
     state.storageInfo = storageInfo;
     state.emailInfo = emailInfo;
@@ -45,6 +46,7 @@ export async function loadIntegrationsPage(container) {
     state.paystackConnectionInfo = paystackConnectionInfo;
     state.smsInfo = smsInfo;
     state.telegramAlertsInfo = telegramAlertsInfo;
+    state.alertRecipientsInfo = alertRecipientsInfo;
 
     const tabs = [
       { id: 'store-connections', label: 'Store Connections', icon: 'store' },
@@ -480,6 +482,7 @@ export async function loadIntegrationsPage(container) {
       const smsCfg = sms.config || {};
       const tg = state.telegramAlertsInfo || {};
       const tgCfg = tg.config || {};
+      const recipients = state.alertRecipientsInfo || { emails: [], phones: [] };
 
       el.innerHTML = `
         <div class="space-y-6">
@@ -487,6 +490,29 @@ export async function loadIntegrationsPage(container) {
             <div>
               <h3 class="font-bold text-base text-main">Order Alerts</h3>
               <p class="text-xs text-muted mt-0.5">Get notified the moment a customer pays — pick as many channels as you like, using your own provider accounts</p>
+            </div>
+
+            <!-- Recipients (Email / SMS) -->
+            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-3">
+              <div class="flex items-center gap-2 text-xs font-semibold text-main">
+                <i data-lucide="users" class="w-4 h-4 text-brand"></i> Who Gets Notified
+              </div>
+              <p class="text-[12px] text-muted -mt-1">Email and SMS alerts go to these addresses/numbers (Telegram uses the chat set up below instead).</p>
+              <form id="alert-recipients-form" class="space-y-3">
+                <div class="form-group">
+                  <label class="form-label">Alert Email Addresses</label>
+                  <input type="text" id="alert-recipient-emails" class="form-control text-xs" value="${escapeHtml((recipients.emails || []).join(', '))}" placeholder="owner@example.com, manager@example.com" />
+                  <p class="text-[12px] text-muted mt-1">Comma-separated. Requires Email Delivery configured below.</p>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Alert Phone Numbers</label>
+                  <input type="text" id="alert-recipient-phones" class="form-control text-xs" value="${escapeHtml((recipients.phones || []).join(', '))}" placeholder="+2348012345678, +2348098765432" />
+                  <p class="text-[12px] text-muted mt-1">Comma-separated. Requires an SMS provider configured below.</p>
+                </div>
+                <div class="flex justify-end">
+                  <button type="submit" class="btn btn-primary btn-sm">Save Recipients</button>
+                </div>
+              </form>
             </div>
 
             <!-- SMS -->
@@ -617,6 +643,19 @@ export async function loadIntegrationsPage(container) {
           }
         });
       };
+
+      document.getElementById('alert-recipients-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const emails = document.getElementById('alert-recipient-emails').value.split(',').map(s => s.trim()).filter(Boolean);
+        const phones = document.getElementById('alert-recipient-phones').value.split(',').map(s => s.trim()).filter(Boolean);
+        try {
+          const res = await api('/settings/alerts/recipients', { method: 'PUT', body: JSON.stringify({ emails, phones }) });
+          state.alertRecipientsInfo = res;
+          showToast('Alert recipients saved successfully', 'success');
+        } catch (err) {
+          showToast(err.message || 'Failed to save alert recipients', 'error');
+        }
+      });
 
       document.getElementById('sms-settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
