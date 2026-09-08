@@ -27,12 +27,13 @@ export async function loadIntegrationsPage(container) {
 
   container.innerHTML = skeletonPage({ stats: 0, rows: 4 });
   try {
-    const [storageInfo, emailInfo, paymentInfo, channelsInfo, bumpaInfo, smsInfo, telegramAlertsInfo] = await Promise.all([
+    const [storageInfo, emailInfo, paymentInfo, channelsInfo, bumpaInfo, paystackConnectionInfo, smsInfo, telegramAlertsInfo] = await Promise.all([
       api('/settings/storage'),
       api('/settings/email').catch(() => ({ provider: null, configured: false, config: {} })),
       api('/settings/payments').catch(() => ({ provider: null, configured: false, config: {}, available_currencies: [] })),
       api('/settings/channels').catch(() => ({ whatsapp: {}, telegram: {}, widget: {} })),
       api('/settings/store-connections/bumpa').catch(() => ({ configured: false, config: {} })),
+      api('/settings/store-connections/paystack').catch(() => ({ configured: false, config: {} })),
       api('/settings/sms').catch(() => ({ provider: null, configured: false, config: {} })),
       api('/settings/alerts/telegram').catch(() => ({ configured: false, config: {} })),
     ]);
@@ -41,6 +42,7 @@ export async function loadIntegrationsPage(container) {
     state.paymentInfo = paymentInfo;
     state.channelsInfo = channelsInfo;
     state.bumpaInfo = bumpaInfo;
+    state.paystackConnectionInfo = paystackConnectionInfo;
     state.smsInfo = smsInfo;
     state.telegramAlertsInfo = telegramAlertsInfo;
 
@@ -90,71 +92,174 @@ export async function loadIntegrationsPage(container) {
     function renderStoreConnectionsTab() {
       const el = document.getElementById('integrations-tab-content');
       const bp = state.bumpaInfo || {};
-      const cfg = bp.config || {};
+      const bpCfg = bp.config || {};
+      const ps = state.paystackConnectionInfo || {};
+      const psCfg = ps.config || {};
+
+      // Mirrors Payment Gateways' own picker: pick which storefront to
+      // import from (or none) rather than showing every provider's card
+      // stacked on top of each other. Whichever was last configured (has a
+      // key saved) is pre-selected; "none" if neither does.
+      const current = state.storeConnectionProvider || (bp.configured ? 'bumpa' : (ps.configured ? 'paystack' : 'none'));
+      const isBumpa = current === 'bumpa';
+      const isPaystack = current === 'paystack';
+
+      const shareToggle = (idPrefix, cfg) => `
+        <div class="flex items-start gap-3 p-3 rounded-lg bg-surface border border-subtle">
+          <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
+            <input type="checkbox" id="${idPrefix}-share-payments" class="sr-only peer" ${cfg.share_for_payments ? 'checked' : ''} />
+            <div class="w-9 h-5 bg-surface-elevated peer-checked:bg-brand rounded-full peer transition-colors border border-subtle after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
+          </label>
+          <div class="text-xs">
+            <div class="font-semibold text-main">Share this credential for payments</div>
+            <div class="text-muted mt-0.5">
+              Lets this same key be used under Payment Gateways instead of pasting it twice. This does <strong>not</strong> make it your default gateway; you still choose that in Payment Gateways.
+            </div>
+          </div>
+        </div>
+      `;
 
       el.innerHTML = `
         <div class="card space-y-6">
           <div class="flex items-center justify-between">
             <div>
-              <h3 class="font-bold text-base text-main flex items-center gap-2">
-                <i data-lucide="store" class="w-5 h-5 text-brand"></i> Bumpa
-              </h3>
-              <p class="text-xs text-muted mt-0.5">Import your Bumpa catalog into AICB, and optionally use the same credential for checkout & fulfillment</p>
+              <h3 class="font-bold text-base text-main">Store Connection</h3>
+              <p class="text-xs text-muted mt-0.5">Import a product catalog from an external storefront, and optionally share the credential for checkout & fulfillment</p>
             </div>
-            <span class="badge ${bp.configured ? 'badge-emerald' : 'badge-subtle'}">
-              ${bp.configured ? 'Connected' : 'Not Connected'}
+            <span class="badge ${(isBumpa && bp.configured) || (isPaystack && ps.configured) ? 'badge-emerald' : 'badge-subtle'}">
+              ${(isBumpa && bp.configured) || (isPaystack && ps.configured) ? `Connected: ${current.charAt(0).toUpperCase() + current.slice(1)}` : 'Not Connected'}
             </span>
           </div>
 
-          <form id="bumpa-settings-form" class="space-y-4">
+          <div class="space-y-2">
+            <label class="form-label text-xs font-semibold text-main">Storefront</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="store-connection-provider-cards">
+              <label class="flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${isPaystack ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="store-connection-provider" value="paystack" ${isPaystack ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchStoreConnectionProviderUI('paystack')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Paystack</div>
+                  <div class="text-[12px] text-muted mt-0.5">Import products from your Paystack catalog</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${isBumpa ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="store-connection-provider" value="bumpa" ${isBumpa ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchStoreConnectionProviderUI('bumpa')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Bumpa</div>
+                  <div class="text-[12px] text-muted mt-0.5">Import your Bumpa catalog & optionally checkout through it</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all ${!isBumpa && !isPaystack ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="store-connection-provider" value="none" ${!isBumpa && !isPaystack ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchStoreConnectionProviderUI('none')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Disabled</div>
+                  <div class="text-[12px] text-muted mt-0.5">No external storefront connected</div>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <!-- Paystack Fields -->
+          <form id="store-connection-paystack-form" class="${isPaystack ? '' : 'hidden'} space-y-4">
+            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/30 space-y-4">
+              <div class="form-group">
+                <label class="form-label flex items-center justify-between">
+                  <span>Secret API Key</span>
+                  ${psCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(psCfg.api_key_masked || '')})</span>` : ''}
+                </label>
+                <input type="password" id="paystack-conn-api-key" class="form-control font-mono text-xs" placeholder="${psCfg.api_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'sk_live_...'}" />
+                <p class="text-[12px] text-muted mt-1">Used to fetch your Paystack product catalog for import.</p>
+              </div>
+              ${shareToggle('paystack-conn', psCfg)}
+            </div>
+            <div class="flex justify-end">
+              <button type="submit" class="btn btn-primary" id="btn-save-store-paystack">Save Paystack Connection</button>
+            </div>
+          </form>
+
+          <!-- Bumpa Fields -->
+          <form id="store-connection-bumpa-form" class="${isBumpa ? '' : 'hidden'} space-y-4">
             <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/30 space-y-4">
               <div class="grid grid-cols-2 gap-4">
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label flex items-center justify-between">
                     <span>Secret API Key</span>
-                    ${cfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(cfg.api_key_masked || '')})</span>` : ''}
+                    ${bpCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(bpCfg.api_key_masked || '')})</span>` : ''}
                   </label>
-                  <input type="password" id="bumpa-api-key" class="form-control font-mono text-xs" placeholder="${cfg.api_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'Bumpa secret API key'}" />
+                  <input type="password" id="bumpa-api-key" class="form-control font-mono text-xs" placeholder="${bpCfg.api_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'Bumpa secret API key'}" />
                   <p class="text-[12px] text-muted mt-1">Used for catalog import and order/analytics lookups.</p>
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label flex items-center justify-between">
                     <span>Public API Key</span>
-                    ${cfg.public_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(cfg.public_key_masked || '')})</span>` : ''}
+                    ${bpCfg.public_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(bpCfg.public_key_masked || '')})</span>` : ''}
                   </label>
-                  <input type="password" id="bumpa-public-key" class="form-control font-mono text-xs" placeholder="${cfg.public_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'Bumpa public API key'}" />
+                  <input type="password" id="bumpa-public-key" class="form-control font-mono text-xs" placeholder="${bpCfg.public_key_configured ? '•••••••••••••••• (Leave blank to keep saved key)' : 'Bumpa public API key'}" />
                   <p class="text-[12px] text-muted mt-1">Needed for real checkout via Bumpa (cart & payment-intent).</p>
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
                   <label class="form-label">Store / Location ID</label>
-                  <input type="text" id="bumpa-store-id" class="form-control text-xs" value="${escapeHtml(cfg.store_id || '')}" placeholder="Optional — defaults to your store's default location" />
+                  <input type="text" id="bumpa-store-id" class="form-control text-xs" value="${escapeHtml(bpCfg.store_id || '')}" placeholder="Optional — defaults to your store's default location" />
                 </div>
               </div>
-
-              <div class="flex items-start gap-3 p-3 rounded-lg bg-surface border border-subtle">
-                <label class="relative inline-flex items-center cursor-pointer flex-shrink-0 mt-0.5">
-                  <input type="checkbox" id="bumpa-share-payments" class="sr-only peer" ${cfg.share_for_payments ? 'checked' : ''} />
-                  <div class="w-9 h-5 bg-surface-elevated peer-checked:bg-brand rounded-full peer transition-colors border border-subtle after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4"></div>
-                </label>
-                <div class="text-xs">
-                  <div class="font-semibold text-main">Share this credential for payments</div>
-                  <div class="text-muted mt-0.5">
-                    Lets Bumpa be selected under Payment Gateways using this same key — Bumpa has its own checkout, so no separate payment key is needed there. This does <strong>not</strong> make Bumpa your default gateway; you still choose that in Payment Gateways.
-                  </div>
-                </div>
-              </div>
+              ${shareToggle('bumpa', bpCfg)}
             </div>
-
-            <div class="flex justify-end pt-2 border-t border-subtle">
-              <button type="submit" class="btn btn-primary" id="btn-save-bumpa">Save Bumpa Connection</button>
+            <div class="flex justify-end">
+              <button type="submit" class="btn btn-primary" id="btn-save-store-bumpa">Save Bumpa Connection</button>
             </div>
           </form>
+
+          <!-- Disabled State Info -->
+          <div id="store-connection-fields-none" class="${!isBumpa && !isPaystack ? '' : 'hidden'} p-4 rounded-xl border border-dashed border-subtle text-center text-xs text-muted">
+            No external storefront is connected. Products are managed directly in your Catalog.
+          </div>
         </div>
       `;
 
-      document.getElementById('bumpa-settings-form').addEventListener('submit', async (e) => {
+      window.switchStoreConnectionProviderUI = (provider) => {
+        state.storeConnectionProvider = provider;
+        document.getElementById('store-connection-paystack-form')?.classList.toggle('hidden', provider !== 'paystack');
+        document.getElementById('store-connection-bumpa-form')?.classList.toggle('hidden', provider !== 'bumpa');
+        document.getElementById('store-connection-fields-none')?.classList.toggle('hidden', provider !== 'none');
+
+        document.querySelectorAll('input[name="store-connection-provider"]').forEach(inp => {
+          const card = inp.closest('label');
+          if (card) {
+            card.className = inp.value === provider
+              ? 'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all border-brand bg-brand/5 shadow-sm'
+              : 'flex items-start gap-3 p-3.5 rounded-xl border cursor-pointer transition-all border-subtle bg-surface-elevated/40 hover:bg-surface-hover';
+          }
+        });
+      };
+
+      document.getElementById('store-connection-paystack-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.getElementById('btn-save-bumpa');
+        const btn = document.getElementById('btn-save-store-paystack');
+        const orig = btn.innerHTML;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin"></i> Saving...`;
+        btn.disabled = true;
+        if (window.lucide) lucide.createIcons();
+
+        const payload = {
+          api_key: document.getElementById('paystack-conn-api-key').value.trim() || undefined,
+          share_for_payments: document.getElementById('paystack-conn-share-payments').checked,
+        };
+
+        try {
+          const res = await api('/settings/store-connections/paystack', { method: 'PUT', body: JSON.stringify(payload) });
+          state.paystackConnectionInfo = res;
+          showToast('Paystack connection saved successfully', 'success');
+          renderStoreConnectionsTab();
+        } catch (err) {
+          showToast(err.message || 'Failed to save Paystack connection', 'error');
+          btn.innerHTML = orig;
+          btn.disabled = false;
+          if (window.lucide) lucide.createIcons();
+        }
+      });
+
+      document.getElementById('store-connection-bumpa-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById('btn-save-store-bumpa');
         const orig = btn.innerHTML;
         btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin"></i> Saving...`;
         btn.disabled = true;

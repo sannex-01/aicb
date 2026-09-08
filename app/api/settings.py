@@ -434,6 +434,42 @@ async def update_bumpa_settings(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
+class UpdatePaystackConnectionRequest(BaseModel):
+    api_key: Optional[str] = None
+    share_for_payments: Optional[bool] = None
+
+
+@router.get("/store-connections/paystack")
+async def get_paystack_connection_settings(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Paystack's Store Connection entry — same shape as Bumpa's, but a
+    single api_key (Paystack has no separate public/secret split for this
+    purpose) since it's already used elsewhere. Lets a business import
+    Paystack's product catalog without necessarily using Paystack as their
+    active Payment Gateway, and share_for_payments works the same way
+    Bumpa's does (see StoreConnectionService.get_shared_payment_key)."""
+    from app.services.store_connections import StoreConnectionService
+    return await StoreConnectionService.get_connection_config(db, "paystack")
+
+
+@router.put("/store-connections/paystack")
+async def update_paystack_connection_settings(
+    req: UpdatePaystackConnectionRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.store_connections import StoreConnectionService
+    try:
+        return await StoreConnectionService.save_connection_config(db, "paystack", {
+            "api_key": req.api_key,
+            "share_for_payments": req.share_for_payments,
+        })
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
 class UpdatePaymentConfigRequest(BaseModel):
     provider: Optional[str] = None  # "paystack", "bumpa", "flutterwave", "monnify", "stripe", or None
     config: Optional[dict] = {}
