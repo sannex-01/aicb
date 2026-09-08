@@ -6,10 +6,14 @@ import { showToast, openModal, closeModal, escapeHtml, formatCurrency, formatDat
 export async function loadOverviewPage(container) {
   container.innerHTML = skeletonPage({ stats: 4, rows: 5 });
   try {
-    const data = await api('/overview');
+    const [data, paymentInfo] = await Promise.all([
+      api('/overview'),
+      api('/settings/payments').catch(() => ({ configured: false })),
+    ]);
     state.business = data.business;
 
     const isBizConfigured = Boolean(data.business?.is_configured);
+    const isPaymentConfigured = Boolean(paymentInfo?.configured);
     const hasCatalog = Number(data.stats?.total_products || 0) > 0;
     const hasKnowledge = Number(data.stats?.total_docs || 0) > 0;
     const hasAgents = Number(data.stats?.total_agents || 0) > 0;
@@ -17,13 +21,23 @@ export async function loadOverviewPage(container) {
     const setupSteps = [
       {
         id: 'step-biz',
-        title: 'Business Profile & Paystack',
-        desc: 'Configure brand identity, store currency, and Paystack API credentials for payments',
-        icon: 'credit-card',
+        title: 'Business Profile',
+        desc: 'Configure brand identity, store currency, and contact details',
+        icon: 'store',
         route: '/_/admin/settings',
-        btnText: isBizConfigured ? 'Edit Settings' : 'Configure',
-        completed: isBizConfigured,
-        meta: isBizConfigured ? 'Configured' : 'Action Required',
+        btnText: 'Edit Settings',
+        completed: Boolean(data.business?.name),
+        meta: data.business?.name ? 'Configured' : 'Action Required',
+      },
+      {
+        id: 'step-payments',
+        title: 'Payment Gateway',
+        desc: 'Connect Paystack (or Bumpa) so checkout links can actually collect payment',
+        icon: 'credit-card',
+        route: '/_/admin/integrations',
+        btnText: isPaymentConfigured ? 'Edit Integrations' : 'Configure',
+        completed: isPaymentConfigured,
+        meta: isPaymentConfigured ? 'Configured' : 'Action Required',
       },
       {
         id: 'step-catalog',

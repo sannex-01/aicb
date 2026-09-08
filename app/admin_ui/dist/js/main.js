@@ -12,6 +12,7 @@ import { loadOverviewPage } from './pages/overview.js';
 import { loadAgentsPage } from './pages/agents.js';
 import { loadCustomersPage } from './pages/customers.js';
 import { loadSettingsPage } from './pages/settings.js';
+import { loadIntegrationsPage } from './pages/integrations.js';
 import { loadGroupsPage } from './pages/groups.js';
 import { loadKnowledgePage } from './pages/knowledge.js';
 import { loadCatalogPage } from './pages/catalog.js';
@@ -223,7 +224,7 @@ function renderAdminShell(container, currentPath) {
   const isAdmin = ['admin', 'super_admin'].includes(user.role);
 
   // Route protection: redirect unauthorized roles away from admin-only pages
-  if ((currentPath === '/_/admin/users' || currentPath === '/_/admin/settings') && !isAdmin) {
+  if ((currentPath === '/_/admin/users' || currentPath === '/_/admin/settings' || currentPath === '/_/admin/integrations') && !isAdmin) {
     showToast('Access restricted to administrators.', 'warning');
     navigate('/_/admin/overview');
     return;
@@ -258,8 +259,9 @@ function renderAdminShell(container, currentPath) {
     {
       title: 'CONFIGURATION',
       items: [
-        { label: 'Team Accounts', path: '/_/admin/users', icon: 'user-check', adminOnly: true },
-        { label: 'Business Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
+        { label: 'Integrations', path: '/_/admin/integrations', icon: 'plug-zap', adminOnly: true },
+        { label: 'Users', path: '/_/admin/users', icon: 'user-check', adminOnly: true },
+        { label: 'Settings', path: '/_/admin/settings', icon: 'settings', adminOnly: true },
       ]
     }
   ];
@@ -427,6 +429,7 @@ function renderAdminShell(container, currentPath) {
     else if (currentPath === '/_/admin/knowledge') import('./pages/knowledge.js').then(m => m.loadKnowledgePage(pageContainer));
     else if (currentPath === '/_/admin/users') import('./pages/users.js').then(m => m.loadUsersPage(pageContainer));
     else if (currentPath === '/_/admin/settings') import('./pages/settings.js').then(m => m.loadSettingsPage(pageContainer));
+    else if (currentPath === '/_/admin/integrations') import('./pages/integrations.js').then(m => m.loadIntegrationsPage(pageContainer));
     // We update the shell's active state icons where needed, but rendering the whole shell causes page flickers/resets.
     // Instead we rely on CSS classes which CSS variables handle automatically!
     // EXCEPT that the settings page toggles its own Lucide icon, so we must reload that specific page to swap the icon.
@@ -909,6 +912,7 @@ function renderAdminShell(container, currentPath) {
   else if (currentPath === '/_/admin/knowledge') loadKnowledgePage(pageContainer);
   else if (currentPath === '/_/admin/users') loadUsersPage(pageContainer);
   else if (currentPath === '/_/admin/settings') loadSettingsPage(pageContainer);
+  else if (currentPath === '/_/admin/integrations') loadIntegrationsPage(pageContainer);
 
   if (window.lucide) lucide.createIcons();
 }

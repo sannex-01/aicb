@@ -520,7 +520,7 @@ export function renderImageUploadField({
             <input type="text" id="${id}" class="form-control text-xs font-mono" placeholder="${escapeHtml(placeholder)}" value="${escapeHtml(value || '')}" oninput="window.updateImageUploadPreview('${id}', this.value)" />
             <div class="text-[12px] text-amber flex items-start gap-1.5 mt-1 leading-normal bg-amber/5 p-2 rounded-lg border border-amber/10">
               <i data-lucide="info" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5 text-amber"></i>
-              <span>To enable direct drag-and-drop file uploads, set up Cloudinary or Cloudflare R2 in <a href="/_/admin/settings" onclick="event.preventDefault(); closeModal(); navigate('/_/admin/settings')" class="font-semibold underline hover:text-amber-300">Settings &rarr; Storage</a>.</span>
+              <span>To enable direct drag-and-drop file uploads, set up Cloudinary or Cloudflare R2 in <a href="/_/admin/integrations" onclick="event.preventDefault(); closeModal(); navigate('/_/admin/integrations')" class="font-semibold underline hover:text-amber-300">Integrations &rarr; Storage & Media</a>.</span>
             </div>
           `}
         </div>
