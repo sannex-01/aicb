@@ -195,7 +195,7 @@ class CatalogManager:
         return result["imported"] + result["updated"]
 
     @staticmethod
-    async def sync_external_catalog_detailed(db: AsyncSession, source: Optional[str] = None, api_key: Optional[str] = None) -> Dict[str, int]:
+    async def sync_external_catalog_detailed(db: AsyncSession, source: Optional[str] = None, api_key: Optional[str] = None, public_key: Optional[str] = None, location_id: Optional[str] = None) -> Dict[str, int]:
         """Same sync as sync_external_catalog, but returns {"imported": int, "updated": int}
         separately — used by the dashboard's Import Catalog confirmation flow so a
         business can see "42 new, 3 updated" instead of just a single total.
@@ -205,7 +205,13 @@ class CatalogManager:
         database-saved key (via StoreConnectionService/PaymentService)
         before falling back to env. Existing callers (background sync
         worker, Bumpa's product webhook) don't pass this and keep reading
-        straight from env, unchanged."""
+        straight from env, unchanged.
+
+        public_key (Bumpa only): Bumpa's real API splits credentials —
+        product listing is a PUBLIC-key route, api_key alone (the secret/
+        merchant key) is not valid for it. Gating this sync on api_key
+        being set (as an earlier version did) meant a business with only
+        a public key configured got silently zero products, not an error."""
         target_source = (source or settings.CATALOG_SOURCE).lower()
         logger.info(f"Syncing catalog from external source: {target_source.upper()}")
 
@@ -217,8 +223,9 @@ class CatalogManager:
                 fetched_products = await PaystackClient(secret_key=effective_key).fetch_products()
         elif target_source == "bumpa":
             effective_key = api_key or settings.BUMPA_API_KEY
-            if effective_key:
-                fetched_products = await BumpaClient(api_key=effective_key).fetch_products()
+            effective_public_key = public_key or settings.BUMPA_PUBLIC_API_KEY
+            if effective_key or effective_public_key:
+                fetched_products = await BumpaClient(api_key=effective_key, public_key=effective_public_key).fetch_products(location_id=location_id)
         elif target_source == "local":
             logger.info("Local catalog active; skipping external API sync.")
             return {"imported": 0, "updated": 0}

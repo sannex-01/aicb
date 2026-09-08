@@ -355,11 +355,14 @@ async def list_import_providers(
 
     providers = {}
 
-    bumpa_key = await StoreConnectionService.get_effective_bumpa_key(db)
-    if bumpa_key:
+    bumpa_secret_key = await StoreConnectionService.get_effective_bumpa_key(db)
+    bumpa_public_key = await StoreConnectionService.get_effective_public_key(db, "bumpa")
+    if bumpa_secret_key or bumpa_public_key:
         from app.commerce.bumpa.client import BumpaClient
+        bumpa_cfg = await StoreConnectionService.get_connection_config(db, "bumpa")
+        bumpa_location_id = bumpa_cfg.get("config", {}).get("store_id") or None
         try:
-            products = await BumpaClient(api_key=bumpa_key).fetch_products()
+            products = await BumpaClient(api_key=bumpa_secret_key, public_key=bumpa_public_key).fetch_products(location_id=bumpa_location_id)
             providers["bumpa"] = {"configured": True, "preview_count": len(products)}
         except Exception:
             providers["bumpa"] = {"configured": True, "preview_count": None}
@@ -406,10 +409,15 @@ async def import_catalog(
     from app.services.store_connections import StoreConnectionService
 
     resolved_key = None
+    resolved_public_key = None
+    resolved_location_id = None
     if req.source == "bumpa":
         resolved_key = await StoreConnectionService.get_effective_bumpa_key(db)
-        if not resolved_key:
+        resolved_public_key = await StoreConnectionService.get_effective_public_key(db, "bumpa")
+        if not resolved_key and not resolved_public_key:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bumpa is not configured. Set it up under Integrations → Store Connections.")
+        bumpa_cfg = await StoreConnectionService.get_connection_config(db, "bumpa")
+        resolved_location_id = bumpa_cfg.get("config", {}).get("store_id") or None
     elif req.source == "paystack":
         resolved_key = await StoreConnectionService.get_effective_key(db, "paystack")
         if not resolved_key:
@@ -422,5 +430,5 @@ async def import_catalog(
         if not resolved_key:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paystack is not configured. Set it up under Integrations → Store Connections or Payment Gateways.")
 
-    result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source, api_key=resolved_key)
+    result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source, api_key=resolved_key, public_key=resolved_public_key, location_id=resolved_location_id)
     return {"status": "ok", "source": req.source, **result}

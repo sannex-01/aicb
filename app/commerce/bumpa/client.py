@@ -76,7 +76,13 @@ class BumpaClient:
                             "currency": p.get("currency", "NGN"),
                             "in_stock": p.get("quantity", 1) > 0,
                             "stock_quantity": int(p.get("quantity", 100)),
-                            "image_url": p.get("images", [{}])[0].get("url") if p.get("images") else None,
+                            # Real Bumpa response has a ready-to-use top-level
+                            # image_url (confirmed against a real API call);
+                            # its "images" array entries only carry relative
+                            # "path"/"thumbnail_path" fields, not a "url" —
+                            # optimized_image_url (CDN-resized) is preferred
+                            # when present.
+                            "image_url": p.get("optimized_image_url") or p.get("image_url"),
                             "source": "bumpa",
                         })
                     return products
