@@ -79,6 +79,7 @@ def _sync_columns(sync_conn) -> None:
         ("catalog_items", "access_group_ids_json", "TEXT", "'[]'"),
         ("catalog_items", "access_tags_json", "TEXT", "'[]'"),
         ("catalog_items", "has_variants", "BOOLEAN", "FALSE"),
+        ("catalog_items", "requires_shipping", "BOOLEAN", "TRUE"),
         ("knowledge_docs", "access_tags_json", "TEXT", "'[]'"),
         ("orders", "group_reference", "VARCHAR(100)", "NULL"),
     ]

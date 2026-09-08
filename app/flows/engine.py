@@ -16,6 +16,16 @@ from app.commerce.customer_profile import (
     is_profile_complete,
     is_valid_email,
     is_valid_phone,
+    get_delivery_address,
+    save_delivery_address,
+)
+from app.commerce.address import (
+    parse_free_text_address,
+    format_address_confirmation,
+    address_to_single_line,
+    ADDRESS_TEMPLATE_HINT,
+    match_state,
+    match_country,
 )
 from app.commerce.payments.unified import UnifiedPaymentManager
 from app.commerce.storage.manager import StorageManager
@@ -126,6 +136,33 @@ class FlowEngine:
                     logger.info(f"profile_collect abandoned after {PROFILE_COLLECT_TIMEOUT_MINUTES}min inactivity")
             else:
                 return await FlowEngine._handle_profile_collect_step(db, session, user_input or action_id)
+
+        # 0a. Delivery Address Collection Flow (interrupts any other action
+        # while active) — same shape/timeout/cancel-word handling as
+        # profile_collect above, kept as a fully separate flow rather than
+        # folded into it since it's conditional (only carts needing
+        # delivery trigger it) and can also be entered standalone from
+        # "My Profile" → "Update Delivery Address".
+        if session.active_flow == "address_collect":
+            timed_out = False
+            if session.last_active_at:
+                last_active = session.last_active_at
+                if last_active.tzinfo is None:
+                    last_active = last_active.replace(tzinfo=timezone.utc)
+                timed_out = datetime.now(timezone.utc) - last_active > timedelta(minutes=PROFILE_COLLECT_TIMEOUT_MINUTES)
+
+            cancelled = action in _PROFILE_COLLECT_CANCEL_WORDS
+
+            if timed_out or cancelled:
+                state = MemoryManager.get_flow_state_data(session)
+                state.pop("address_draft", None)
+                await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None, state_data=state)
+                if cancelled:
+                    logger.info("address_collect cancelled by user command")
+                else:
+                    logger.info(f"address_collect abandoned after {PROFILE_COLLECT_TIMEOUT_MINUTES}min inactivity")
+            else:
+                return await FlowEngine._handle_address_collect_step(db, session, action_id, user_input or action_id)
 
         # 0b. Quantity Selection Flow (intercept custom numbers sent in chat)
         if session.active_flow == "quantity_select" and not action.startswith("flow_") and not action.startswith("cart_") and not action.startswith("qty_set_"):
@@ -293,6 +330,7 @@ class FlowEngine:
                 variant_id=selected_variant.id if selected_variant else None,
                 variant_name=selected_variant.name if selected_variant else None,
                 source=product.source,
+                requires_shipping=product.requires_shipping,
             )
 
             # Get current quantity of this exact item+variant combination
@@ -408,12 +446,18 @@ class FlowEngine:
                     buttons=_buttons(CART_EMPTY_BUTTONS),
                 )
 
+            needs_shipping = CartManager.cart_requires_shipping(cart)
+
             if session.channel == "widget":
                 widget_profile = FlowEngine._get_widget_profile(session)
                 if widget_profile and widget_profile.get("name") and widget_profile.get("email") and widget_profile.get("phone"):
+                    if needs_shipping and not FlowEngine._get_widget_address(session):
+                        return FlowEngine._widget_address_required_response()
+                    widget_address = FlowEngine._get_widget_address(session) if needs_shipping else None
                     return await FlowEngine._build_checkout_response(
                         db, session, None,
                         name_override=widget_profile["name"], email_override=widget_profile["email"], phone_override=widget_profile["phone"],
+                        shipping_address_override=address_to_single_line(widget_address) if widget_address else None,
                     )
                 # Submitted-on-open form was skipped or never reached (e.g. API
                 # client bypassing the panel) — fall back to the same turn-by-turn
@@ -425,6 +469,9 @@ class FlowEngine:
                 return await FlowEngine._start_profile_collect(
                     db, session, customer, resume_intent={"path": "cart"}, prefill_name=prefill_name,
                 )
+
+            if needs_shipping and not get_delivery_address(customer):
+                return await FlowEngine._start_address_collect(db, session, customer, resume_intent={"path": "cart"})
 
             return await FlowEngine._build_checkout_response(db, session, customer)
 
@@ -635,8 +682,13 @@ class FlowEngine:
             has_profile = bool(customer and (customer.name or customer.email or customer.phone_number))
             btn_title = "✏️ Update Profile" if has_profile else "➕ Create Profile"
 
+            saved_address = get_delivery_address(customer)
+            address_line = f"\n\n📦 *Delivery Address:*\n{format_address_confirmation(saved_address)}" if saved_address else "\n\n📦 *Delivery Address:* [Not Set]"
+            address_btn_title = "📦 Update Delivery Address" if saved_address else "📦 Add Delivery Address"
+
             buttons = [
                 {"id": "flow_start_profile_edit", "title": btn_title},
+                {"id": "flow_update_address", "title": address_btn_title},
                 {"id": "flow_main_menu", "title": "🏠 Main Menu"},
             ]
 
@@ -646,7 +698,8 @@ class FlowEngine:
                     "👤 *Your Profile Details*\n\n"
                     f"• *Full Name:* {name_val}\n"
                     f"• *Email Address:* {email_val}\n"
-                    f"• *Phone Number:* {phone_val}\n\n"
+                    f"• *Phone Number:* {phone_val}"
+                    f"{address_line}\n\n"
                     "Please select an option below:"
                 ),
                 buttons=_buttons(buttons),
@@ -665,6 +718,20 @@ class FlowEngine:
             return await FlowEngine._start_profile_collect(
                 db, session, customer, resume_intent={"path": "profile_view"}, prefill_name=prefill_name, force_full=True,
             )
+
+        # 12. Start Delivery Address Collection — standalone, from "My Profile".
+        # Customers can update their delivery address at any time, not just
+        # when a delivery-requiring cart forces it at checkout.
+        elif action in ["flow_update_address", "update address", "update delivery address"]:
+            if session.channel == "widget":
+                await MemoryManager.update_flow_state(db, session, active_flow="main_menu", current_step="root")
+                return BotResponse(
+                    text=get_main_menu_text(),
+                    buttons=_buttons(WIDGET_MAIN_MENU_BUTTONS),
+                )
+
+            customer = await get_customer(db, session.channel, session.customer_identifier)
+            return await FlowEngine._start_address_collect(db, session, customer, resume_intent={"path": "profile_view"})
 
         return BotResponse(text="How else can we assist you today?")
 
@@ -908,6 +975,11 @@ class FlowEngine:
         path = resume_intent.get("path")
 
         if path == "cart":
+            cart = CartManager.get_cart(session)
+            if CartManager.cart_requires_shipping(cart) and not get_delivery_address(customer):
+                return await FlowEngine._start_address_collect(
+                    db, session, customer, resume_intent={"path": "cart", "name": draft.get("name"), "email": draft.get("email"), "phone": draft.get("phone")},
+                )
             return await FlowEngine._build_checkout_response(db, session, customer, name_override=draft.get("name"), email_override=draft.get("email"), phone_override=draft.get("phone"))
         if path == "ai_tool":
             return await FlowEngine._resume_ai_checkout_intent(db, session, customer, resume_intent, draft)
@@ -936,6 +1008,200 @@ class FlowEngine:
             ]),
         )
 
+    # ------------------------------------------------------------------
+    # Delivery Address Collection — Telegram/WhatsApp: one free-text
+    # message parsed into street/city/state/zip/country (see
+    # app/commerce/address.py), then a confirm screen with per-field edit
+    # buttons before saving. Only triggered when the cart actually needs
+    # delivery (CartManager.cart_requires_shipping) or when explicitly
+    # entered from "My Profile" → "Update Delivery Address". Widget uses a
+    # real form instead (see _get_widget_address/_widget_address_required_response
+    # below) — no chat state machine needed there.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    async def _start_address_collect(
+        db: AsyncSession,
+        session: ConversationSession,
+        customer: Optional[Customer],
+        resume_intent: Dict[str, Any],
+    ) -> BotResponse:
+        state = MemoryManager.get_flow_state_data(session)
+        saved = get_delivery_address(customer) or {}
+        draft: Dict[str, Any] = {"resume_intent": resume_intent, "fields": dict(saved), "missing": []}
+        state["address_draft"] = draft
+        await MemoryManager.update_flow_state(db, session, active_flow="address_collect", current_step="ask_address", state_data=state)
+
+        current_hint = ""
+        if saved:
+            current_hint = f"\n\n_You currently have an address on file:_\n{format_address_confirmation(saved)}\n\nReply 'skip' to keep it, or send a new one below."
+        return BotResponse(text=f"📦 We need a delivery address for this order.\n\n{ADDRESS_TEMPLATE_HINT}{current_hint}")
+
+    @staticmethod
+    async def _handle_address_collect_step(db: AsyncSession, session: ConversationSession, action_id: str, reply: str) -> BotResponse:
+        state = MemoryManager.get_flow_state_data(session)
+        draft: Dict[str, Any] = state.get("address_draft", {"resume_intent": {"path": "none"}, "fields": {}, "missing": []})
+        step = session.current_step
+        text = (reply or "").strip()
+        action = action_id.strip()
+
+        if step == "ask_address":
+            if text.lower() == "skip" and draft.get("fields"):
+                return await FlowEngine._advance_address_collect(db, session, state, draft)
+            if not text:
+                return BotResponse(text=f"Please send your address to continue.\n\n{ADDRESS_TEMPLATE_HINT}")
+            fields, missing = parse_free_text_address(text)
+            draft["fields"] = fields
+            draft["missing"] = missing
+            return await FlowEngine._advance_address_collect(db, session, state, draft)
+
+        if step.startswith("ask_missing_"):
+            field = step.replace("ask_missing_", "")
+            if not text:
+                return BotResponse(text=f"Please send your {field} to continue.")
+            if field == "state":
+                matched = match_state(text)
+                if not matched:
+                    return BotResponse(text=f"We don't recognize \"{text}\" as a state we deliver to — please check the spelling and try again (e.g. Lagos, Rivers, FCT).")
+                draft["fields"]["state"] = matched
+            elif field == "country":
+                matched = match_country(text)
+                if not matched:
+                    return BotResponse(text=f"We don't currently deliver to \"{text}\" — supported countries: Nigeria, Ghana, Kenya, South Africa. Please try again.")
+                draft["fields"]["country"] = matched
+            else:
+                draft["fields"][field] = text
+            draft["missing"] = [f for f in draft.get("missing", []) if f != field]
+            return await FlowEngine._advance_address_collect(db, session, state, draft)
+
+        if step == "confirm_address":
+            if action == "address_confirm" or text.lower() in ("yes", "confirm", "correct"):
+                return await FlowEngine._complete_address_collect(db, session, draft)
+            if action.startswith("address_edit_"):
+                field = action.replace("address_edit_", "")
+                draft["missing"] = [field]
+                state["address_draft"] = draft
+                await MemoryManager.update_flow_state(db, session, active_flow="address_collect", current_step=f"ask_missing_{field}", state_data=state)
+                current_val = draft["fields"].get(field)
+                current_hint = f" (currently: *{current_val}*)" if current_val else ""
+                return BotResponse(text=f"What should the {field} be?{current_hint}")
+            return BotResponse(
+                text="Please confirm your address, or tap a field to change it.",
+                buttons=_buttons(FlowEngine._address_confirm_buttons()),
+            )
+
+        # Unknown step — bail out to main menu rather than get stuck.
+        await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None)
+        return BotResponse(text=get_main_menu_text(), buttons=_buttons(MAIN_MENU_BUTTONS))
+
+    @staticmethod
+    def _address_confirm_buttons() -> List[Dict[str, str]]:
+        return [
+            {"id": "address_confirm", "title": "✅ Confirm Address"},
+            {"id": "address_edit_street", "title": "✏️ Street"},
+            {"id": "address_edit_city", "title": "✏️ City"},
+            {"id": "address_edit_state", "title": "✏️ State"},
+            {"id": "address_edit_zip", "title": "✏️ Zip Code"},
+            {"id": "address_edit_country", "title": "✏️ Country"},
+        ]
+
+    @staticmethod
+    async def _advance_address_collect(db: AsyncSession, session: ConversationSession, state: Dict[str, Any], draft: Dict[str, Any]) -> BotResponse:
+        state["address_draft"] = draft
+        missing = draft.get("missing", [])
+        if missing:
+            next_field = missing[0]
+            await MemoryManager.update_flow_state(db, session, active_flow="address_collect", current_step=f"ask_missing_{next_field}", state_data=state)
+            prompts = {
+                "street": "What's the street address?",
+                "city": "What city is this for?",
+                "state": "Which state? (e.g. Lagos, Rivers, FCT)",
+                "zip": "What's the zip/postal code?",
+                "country": "Which country? (Nigeria, Ghana, Kenya, or South Africa)",
+            }
+            return BotResponse(text=prompts.get(next_field, f"What's the {next_field}?"))
+
+        await MemoryManager.update_flow_state(db, session, active_flow="address_collect", current_step="confirm_address", state_data=state)
+        return BotResponse(
+            text=f"📦 Please confirm your delivery address:\n\n{format_address_confirmation(draft['fields'])}",
+            buttons=_buttons(FlowEngine._address_confirm_buttons()),
+        )
+
+    @staticmethod
+    async def _complete_address_collect(db: AsyncSession, session: ConversationSession, draft: Dict[str, Any]) -> BotResponse:
+        customer = None
+        if session.channel in ("whatsapp", "telegram"):
+            customer = await get_customer(db, session.channel, session.customer_identifier)
+            if not customer:
+                customer = await upsert_customer(db, session.channel, session.customer_identifier)
+            if customer:
+                await save_delivery_address(db, customer, draft["fields"])
+                try:
+                    from app.telemetry.client import telemetry_client
+                    telemetry_client.track(
+                        channel=session.channel,
+                        customer_id=session.customer_identifier,
+                        event="delivery_address_saved",
+                        metadata={"fields": draft["fields"]},
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to track delivery_address_saved telemetry: {e}")
+
+        state = MemoryManager.get_flow_state_data(session)
+        state.pop("address_draft", None)
+        await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None, state_data=state)
+
+        resume_intent = draft.get("resume_intent", {"path": "none"})
+        path = resume_intent.get("path")
+
+        if path == "cart":
+            return await FlowEngine._build_checkout_response(
+                db, session, customer,
+                name_override=resume_intent.get("name"), email_override=resume_intent.get("email"), phone_override=resume_intent.get("phone"),
+            )
+        # Note: no "ai_tool" resume path here (unlike profile_collect) — the
+        # AI-tool checkout path (create_order/generate_payment_link) never
+        # triggers address_collect today; it just passes through whatever
+        # shipping_address string the LLM already extracted. Wiring the LLM
+        # tool-calling loop to pause on a missing structured address is a
+        # separate, real piece of work, not yet built.
+
+        return BotResponse(
+            text=(
+                "✅ *Delivery address saved!*\n\n"
+                f"{format_address_confirmation(draft['fields'])}\n\n"
+                "What would you like to do next?"
+            ),
+            buttons=_buttons([
+                {"id": "flow_my_profile", "title": "👤 Back to Profile"},
+                {"id": "flow_browse_catalog", "title": "🛍️ Browse Products"},
+                {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+            ]),
+        )
+
+    @staticmethod
+    def _get_widget_address(session: ConversationSession) -> Optional[Dict[str, Any]]:
+        state = MemoryManager.get_flow_state_data(session)
+        return state.get("widget_address")
+
+    @staticmethod
+    async def set_widget_address(db: AsyncSession, session: ConversationSession, fields: Dict[str, Any]) -> None:
+        """Stores the widget's one-shot structured address form submission for
+        this session only — mirrors set_widget_profile (no durable Customer
+        row for widget sessions)."""
+        state = MemoryManager.get_flow_state_data(session)
+        state["widget_address"] = fields
+        await MemoryManager.update_flow_state(
+            db, session, active_flow=session.active_flow, current_step=session.current_step, state_data=state,
+        )
+
+    @staticmethod
+    def _widget_address_required_response() -> BotResponse:
+        return BotResponse(
+            text="📦 This order needs a delivery address. Please fill in the address form to continue.",
+            buttons=_buttons([{"id": "flow_view_cart", "title": "🛒 Back to Cart"}]),
+        )
+
     @staticmethod
     async def _build_checkout_response(
         db: AsyncSession,
@@ -944,6 +1210,7 @@ class FlowEngine:
         name_override: Optional[str] = None,
         email_override: Optional[str] = None,
         phone_override: Optional[str] = None,
+        shipping_address_override: Optional[str] = None,
     ) -> BotResponse:
         """Builds the order + Paystack checkout link from the current cart, using
         a resolved customer profile instead of a synthetic placeholder email."""
@@ -958,6 +1225,12 @@ class FlowEngine:
         customer_email = email_override or (customer.email if customer else None)
         customer_phone = phone_override or (customer.phone_number if customer else None)
 
+        shipping_address = shipping_address_override
+        if not shipping_address:
+            saved_address = get_delivery_address(customer)
+            if saved_address:
+                shipping_address = address_to_single_line(saved_address)
+
         currency = cart[0].get("currency", "NGN") if cart else "NGN"
 
         from app.commerce.checkout import create_checkout_orders
@@ -970,6 +1243,7 @@ class FlowEngine:
             customer_name=customer_name,
             customer_email=customer_email,
             customer_phone=customer_phone,
+            shipping_address=shipping_address,
             gateway="paystack",
         )
 

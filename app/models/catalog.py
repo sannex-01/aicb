@@ -26,6 +26,12 @@ class CatalogItem(Base):
     # are added/removed for this item.
     has_variants = Column(Boolean, default=False)
 
+    # True (default) for physical goods that need a delivery address before
+    # checkout — the flow engine only triggers address collection when the
+    # cart contains at least one such item. A business flips this off per
+    # product for digital/service items in the product form.
+    requires_shipping = Column(Boolean, default=True)
+
     # Access Group Scoping: JSON array of group IDs e.g. [1, 2]. Empty [] = globally accessible to all agents.
     access_group_ids_json = Column(Text, default="[]")
     access_tags_json = Column(Text, default="[]")

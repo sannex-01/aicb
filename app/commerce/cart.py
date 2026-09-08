@@ -20,6 +20,15 @@ class CartManager:
         return sum(float(item.get("price", 0.0)) * int(item.get("quantity", 1)) for item in cart)
 
     @staticmethod
+    def cart_requires_shipping(cart: List[Dict[str, Any]]) -> bool:
+        """True if ANY line needs delivery — address collection is gated on
+        this, not on every single item. Missing the key (older cart entries
+        added before this flag existed, or entries built by paths that don't
+        set it) defaults to True — the safer assumption for a physical-goods
+        catalog, matching CatalogItem.requires_shipping's own default."""
+        return any(item.get("requires_shipping", True) for item in cart)
+
+    @staticmethod
     async def add_item(
         db: AsyncSession,
         session: ConversationSession,
@@ -33,6 +42,7 @@ class CartManager:
         variant_name: Optional[str] = None,
         source: Optional[str] = None,
         variant_external_id: Optional[str] = None,
+        requires_shipping: bool = True,
     ) -> List[Dict[str, Any]]:
         state = MemoryManager.get_flow_state_data(session)
         cart = state.get("cart", [])
@@ -64,6 +74,7 @@ class CartManager:
                 "variant_name": variant_name,
                 "source": source,
                 "variant_external_id": variant_external_id,
+                "requires_shipping": requires_shipping,
             })
 
         state["cart"] = cart

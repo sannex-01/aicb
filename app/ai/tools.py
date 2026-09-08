@@ -254,11 +254,13 @@ class ToolExecutor:
                 product_id = itm.get("product_id")
                 item_source = None
                 item_external_id = None
+                item_requires_shipping = True
                 if product_id is not None:
                     catalog_item = await CatalogManager.get_product_by_id(db, product_id)
                     if catalog_item:
                         item_source = catalog_item.source
                         item_external_id = catalog_item.external_id
+                        item_requires_shipping = catalog_item.requires_shipping
 
                 await CartManager.add_item(
                     db=db,
@@ -269,6 +271,7 @@ class ToolExecutor:
                     quantity=int(itm.get("quantity", 1)),
                     external_id=item_external_id,
                     source=item_source,
+                    requires_shipping=item_requires_shipping,
                 )
                 added_titles.append(itm.get("title"))
 

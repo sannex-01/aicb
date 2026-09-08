@@ -64,6 +64,30 @@ async def widget_submit_profile(request: Request, req: WidgetProfileRequest, db:
     return {"status": "ok"}
 
 
+class WidgetAddressRequest(BaseModel):
+    session_id: str
+    street: Optional[str] = None
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip: Optional[str] = None
+    country: Optional[str] = None
+
+
+@router.post("/address")
+@limiter.limit("10/minute")
+async def widget_submit_address(request: Request, req: WidgetAddressRequest, db: AsyncSession = Depends(get_db)) -> dict:
+    """Structured delivery-address form, shown before checkout only when the
+    cart contains at least one item needing delivery (see
+    CartManager.cart_requires_shipping) — collected fresh every session,
+    never persisted (widget has no durable Customer identity), same
+    session-only shape as widget_submit_profile above."""
+    session = await MemoryManager.get_or_create_session(db, channel="widget", customer_identifier=req.session_id)
+    await FlowEngine.set_widget_address(db, session, fields={
+        "street": req.street, "city": req.city, "state": req.state, "zip": req.zip, "country": req.country,
+    })
+    return {"status": "ok"}
+
+
 @router.post("/chat/stream")
 @limiter.limit("15/minute")
 async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: AsyncSession = Depends(get_db)):

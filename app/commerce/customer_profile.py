@@ -1,5 +1,6 @@
+import json
 import re
-from typing import Optional
+from typing import Any, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.customer import Customer
@@ -63,6 +64,35 @@ async def upsert_customer(
     if phone:
         customer.phone_number = phone
 
+    await db.commit()
+    await db.refresh(customer)
+    return customer
+
+
+def get_delivery_address(customer: Optional[Customer]) -> Optional[Dict[str, Any]]:
+    """Reads the structured delivery address saved on a Customer, if any.
+    Shape: {"street", "city", "state", "zip", "country"} — see
+    app/commerce/address.py for the parsing that produces this."""
+    if not customer or not customer.metadata_json:
+        return None
+    try:
+        meta = json.loads(customer.metadata_json)
+    except Exception:
+        return None
+    return meta.get("delivery_address")
+
+
+async def save_delivery_address(db: AsyncSession, customer: Customer, fields: Dict[str, Any]) -> Customer:
+    """Persists a structured delivery address onto a Customer row (widget
+    has no durable Customer identity — callers must not call this for
+    channel == 'widget'; the widget's address lives only in session
+    state_data for that single checkout, same as its profile form)."""
+    try:
+        meta = json.loads(customer.metadata_json) if customer.metadata_json else {}
+    except Exception:
+        meta = {}
+    meta["delivery_address"] = fields
+    customer.metadata_json = json.dumps(meta)
     await db.commit()
     await db.refresh(customer)
     return customer
