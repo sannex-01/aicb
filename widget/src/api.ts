@@ -35,6 +35,18 @@ export class WidgetAPI {
     });
   }
 
+  /** One-shot submission of the checkout-time delivery address form. */
+  async submitAddress(
+    sessionId: string,
+    address: { street: string; city: string; state: string; zip: string; country: string }
+  ): Promise<void> {
+    await fetch(`${this.baseUrl}/api/v1/widget/address`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId, ...address }),
+    });
+  }
+
   /**
    * Streams a free-text chat message via SSE-over-POST. Native EventSource
    * doesn't support POST bodies, so this hand-rolls SSE parsing over

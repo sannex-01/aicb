@@ -299,6 +299,17 @@ export function injectStyles(): void {
   font-family: inherit;
 }
 .${PREFIX}-profile-field input:focus { border-color: #008060; }
+.${PREFIX}-profile-field select {
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 13.5px;
+  outline: none;
+  font-family: inherit;
+  background: #fff;
+  color: inherit;
+}
+.${PREFIX}-profile-field select:focus { border-color: #008060; }
 .${PREFIX}-profile-actions {
   display: flex;
   gap: 8px;

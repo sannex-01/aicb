@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Widget Preview</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { margin: 0; padding: 0; height: 100%; background: #f3f4f6; font-family: system-ui, sans-serif; }
+  .preview-page {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #9ca3af;
+    font-size: 13px;
+    text-align: center;
+    padding: 24px;
+  }
+</style>
+</head>
+<body>
+  <!--
+    Loaded inside an admin-side offcanvas/modal iframe (see agents.js's
+    "Preview" button) so an admin can exercise the REAL widget.js bundle —
+    buttons, cart, checkout, the delivery address form — exactly as a real
+    customer embedding it on their own site would see it. Not part of any
+    actual customer's page; this file only exists for that preview.
+
+    ?bot=<agent id or slug> selects which agent's widget to load, matching
+    the same data-bot-id the real embed snippet uses (see
+    pages/agents.js's showEmbedSnippet).
+  -->
+  <div class="preview-page">Loading widget preview…</div>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const botId = params.get('bot') || '';
+    const script = document.createElement('script');
+    script.src = '/widget.js';
+    if (botId) script.setAttribute('data-bot-id', botId);
+    script.async = true;
+    document.body.appendChild(script);
+  </script>
+</body>
+</html>

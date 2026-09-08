@@ -2,6 +2,7 @@ import { PREFIX } from "./styles";
 import { WidgetAPI } from "./api";
 import { renderBotResponse, renderUserMessage, type RenderHandlers } from "./render";
 import { renderProfileForm } from "./profile-form";
+import { renderAddressForm } from "./address-form";
 import { formatMessageHtml } from "./format";
 import type { BotResponse } from "./types";
 
@@ -239,11 +240,41 @@ export class WidgetPanel {
     this.setBusy(true);
     try {
       const resp = await this.api.dispatchAction(actionId, this.sessionId);
+      if (resp.requires_widget_form === "address") {
+        this.showAddressForm(actionId);
+        return;
+      }
       this.appendBotResponse(resp);
       this.maybeOpenCheckout(resp);
     } finally {
       this.setBusy(false);
     }
+  }
+
+  /**
+   * Blocks the chat behind a structured delivery-address form when a
+   * shipping-requiring checkout is attempted with no address on file (see
+   * BotResponse.requires_widget_form). On submit, re-dispatches the SAME
+   * action that triggered this (almost always flow_checkout) — the backend
+   * now finds the just-submitted address and proceeds normally. On cancel,
+   * falls back to showing the gate response's own text/buttons ("Back to
+   * Cart") rather than silently doing nothing.
+   */
+  private showAddressForm(retryActionId: string): void {
+    this.setChatBlocked(true);
+    const formEl = renderAddressForm(async (result) => {
+      if (!result) {
+        formEl.remove();
+        this.setChatBlocked(false);
+        this.dispatchAction("flow_view_cart");
+        return;
+      }
+      await this.api.submitAddress(this.sessionId, result);
+      formEl.remove();
+      this.setChatBlocked(false);
+      this.dispatchAction(retryActionId);
+    });
+    this.el.insertBefore(formEl, this.messagesEl);
   }
 
   private async sendMessage(text: string): Promise<void> {
@@ -271,6 +302,14 @@ export class WidgetPanel {
           this.scrollToBottom();
         },
         (finalResp) => {
+          if (finalResp.requires_widget_form === "address") {
+            // Retrying a free-text-triggered checkout re-sends the same
+            // text as a fast-path action rather than re-streaming through
+            // the LLM — flow_checkout is what the backend actually acts on
+            // once the address is on file, streaming isn't needed for it.
+            this.showAddressForm("flow_checkout");
+            return;
+          }
           // Streamed text already rendered incrementally above; only append
           // structured extras (product cards / buttons) from the final event.
           const hasButtons = WidgetPanel.hasButtons(finalResp);

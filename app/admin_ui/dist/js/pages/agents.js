@@ -95,8 +95,8 @@ export async function loadAgentsPage(container) {
                 </div>
 
                 <div class="flex items-center justify-end gap-2 pt-4 border-t border-subtle">
-                  <button class="btn btn-secondary btn-sm" onclick="window.testAgentModal(${agent.id}, '${escapeHtml(agent.name)}')">
-                    <i data-lucide="play" class="w-3.5 h-3.5"></i> Test Run
+                  <button class="btn btn-secondary btn-sm" onclick="window.previewWidget(${agent.id}, '${escapeHtml(agent.slug || '')}')">
+                    <i data-lucide="play" class="w-3.5 h-3.5"></i> Preview
                   </button>
                   ${hasWidget ? `
                   <button class="btn btn-secondary btn-sm" onclick="window.showEmbedSnippet('${escapeHtml(agent.id)}', '${escapeHtml(agent.slug || '')}')">
@@ -420,127 +420,16 @@ function deleteAgent(agentId, agentSlug = '', agentName = '') {
   });
 }
 
-function testAgentModal(agentId, agentName) {
-  openModal(`
-    <div class="modal-dialog max-w-2xl w-full flex flex-col h-[560px] max-h-[85vh] p-0 overflow-hidden">
-      <!-- Modal Header -->
-      <div class="modal-header flex items-center justify-between border-b border-subtle px-5 py-3.5 bg-surface flex-shrink-0">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center flex-shrink-0">
-            <i data-lucide="bot" class="w-4 h-4"></i>
-          </div>
-          <div class="min-w-0">
-            <h3 class="font-bold text-sm text-main truncate">${escapeHtml(agentName)}</h3>
-            <span class="text-[12px] text-muted block truncate">Interactive Sandbox Test</span>
-          </div>
-        </div>
-        <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
-      </div>
-
-      <!-- Chat Transcript (Scrollable) -->
-      <div id="test-chat-transcript" class="flex-1 overflow-y-auto p-4 space-y-3 bg-app/40">
-        <div class="flex flex-col items-start">
-          <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
-          <div class="bg-surface border border-subtle text-main rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
-            👋 Hello! I am <strong>${escapeHtml(agentName)}</strong>. Send me a message to test how I respond.
-          </div>
-        </div>
-      </div>
-
-      <!-- Input Footer -->
-      <div class="border-t border-subtle p-3.5 bg-surface flex-shrink-0">
-        <form id="test-chat-form" class="flex items-center gap-2 m-0">
-          <input type="text" id="test-msg-input" class="form-control text-xs flex-1" placeholder="Type a test query..." autocomplete="off" />
-          <button type="submit" class="btn btn-primary btn-sm flex items-center gap-1.5 flex-shrink-0" id="btn-send-test">
-            <span>Send</span>
-            <i data-lucide="send" class="w-3.5 h-3.5"></i>
-          </button>
-        </form>
-      </div>
-    </div>
-  `);
-
-  if (window.lucide) lucide.createIcons();
-
-  const form = document.getElementById('test-chat-form');
-  const input = document.getElementById('test-msg-input');
-  const sendBtn = document.getElementById('btn-send-test');
-  const transcript = document.getElementById('test-chat-transcript');
-
-  if (input) input.focus();
-
-  form.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const msg = input.value.trim();
-    if (!msg) return;
-
-    // Render User Bubble
-    transcript.innerHTML += `
-      <div class="flex flex-col items-end">
-        <span class="text-[12px] text-muted mb-1 px-1 font-medium">You</span>
-        <div class="bg-brand text-brand-contrast rounded-2xl rounded-tr-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
-          ${escapeHtml(msg)}
-        </div>
-      </div>
-    `;
-    input.value = '';
-    transcript.scrollTop = transcript.scrollHeight;
-
-    // Show Typing Indicator
-    const typingId = `typing-${Date.now()}`;
-    transcript.innerHTML += `
-      <div id="${typingId}" class="flex flex-col items-start">
-        <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
-        <div class="bg-surface border border-subtle text-muted rounded-2xl rounded-tl-sm px-3.5 py-2 text-xs flex items-center gap-1.5 shadow-sm">
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse"></span>
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse [animation-delay:0.2s]"></span>
-          <span class="inline-block w-1.5 h-1.5 rounded-full bg-brand animate-pulse [animation-delay:0.4s]"></span>
-          <span class="text-[12px] ml-1">Thinking...</span>
-        </div>
-      </div>
-    `;
-    transcript.scrollTop = transcript.scrollHeight;
-
-    input.disabled = true;
-    sendBtn.disabled = true;
-
-    try {
-      const res = await api(`/agents/${agentId}/test-run`, {
-        method: 'POST',
-        body: JSON.stringify({ message: msg }),
-      });
-
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) typingEl.remove();
-
-      transcript.innerHTML += `
-        <div class="flex flex-col items-start">
-          <span class="text-[12px] text-muted mb-1 px-1 font-medium">${escapeHtml(agentName)}</span>
-          <div class="bg-surface border border-subtle text-main rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%] whitespace-pre-wrap leading-relaxed shadow-sm">
-            ${escapeHtml(res.reply)}
-          </div>
-        </div>
-      `;
-      transcript.scrollTop = transcript.scrollHeight;
-    } catch (err) {
-      const typingEl = document.getElementById(typingId);
-      if (typingEl) typingEl.remove();
-
-      transcript.innerHTML += `
-        <div class="flex flex-col items-start">
-          <span class="text-[12px] text-rose mb-1 px-1 font-medium">Error</span>
-          <div class="bg-rose/10 border border-rose/20 text-rose rounded-2xl rounded-tl-sm px-3.5 py-2.5 text-xs max-w-[85%]">
-            Failed to get response: ${escapeHtml(err.message || 'Unknown error')}
-          </div>
-        </div>
-      `;
-      transcript.scrollTop = transcript.scrollHeight;
-    } finally {
-      input.disabled = false;
-      sendBtn.disabled = false;
-      input.focus();
-    }
-  });
+/**
+ * Opens the real widget.js bundle (buttons, cart, checkout, the delivery
+ * address form — the actual customer experience, not a raw LLM sandbox) in
+ * a new tab, pointed at this specific agent via the same data-bot-id the
+ * real embed snippet uses. See admin_ui/dist/widget-preview.html.
+ */
+function previewWidget(agentId, agentSlug) {
+  const botId = agentSlug || agentId || '';
+  const url = `/_/admin/widget-preview.html${botId ? `?bot=${encodeURIComponent(botId)}` : ''}`;
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 // ============================================================================
@@ -589,4 +478,4 @@ window.showEmbedSnippet = function(agentId, agentSlug) {
 
 window.editAgentModal = editAgentModal;
 window.deleteAgent = deleteAgent;
-window.testAgentModal = testAgentModal;
+window.previewWidget = previewWidget;

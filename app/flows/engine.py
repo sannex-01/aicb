@@ -969,6 +969,16 @@ class FlowEngine:
 
         state = MemoryManager.get_flow_state_data(session)
         state.pop("profile_draft", None)
+        if session.channel == "widget":
+            # Widget has no durable Customer row (upsert_customer no-ops for
+            # it above) — this chat-collected fallback profile (shown only
+            # when the upfront form was skipped) needs to land in the SAME
+            # session-only widget_profile slot the upfront form itself
+            # writes to, so a later retry (e.g. after address_collect closes
+            # the shipping gate) finds a complete profile via
+            # _get_widget_profile instead of restarting profile collection
+            # from scratch.
+            state["widget_profile"] = {"name": draft.get("name"), "email": draft.get("email"), "phone": draft.get("phone")}
         await MemoryManager.update_flow_state(db, session, active_flow=None, current_step=None, state_data=state)
 
         resume_intent = draft.get("resume_intent", {"path": "none"})
@@ -976,11 +986,19 @@ class FlowEngine:
 
         if path == "cart":
             cart = CartManager.get_cart(session)
-            if CartManager.cart_requires_shipping(cart) and not get_delivery_address(customer):
+            needs_shipping = CartManager.cart_requires_shipping(cart)
+            if needs_shipping and session.channel == "widget" and not FlowEngine._get_widget_address(session):
+                return FlowEngine._widget_address_required_response()
+            widget_address = FlowEngine._get_widget_address(session) if (needs_shipping and session.channel == "widget") else None
+            if needs_shipping and session.channel != "widget" and not get_delivery_address(customer):
                 return await FlowEngine._start_address_collect(
                     db, session, customer, resume_intent={"path": "cart", "name": draft.get("name"), "email": draft.get("email"), "phone": draft.get("phone")},
                 )
-            return await FlowEngine._build_checkout_response(db, session, customer, name_override=draft.get("name"), email_override=draft.get("email"), phone_override=draft.get("phone"))
+            return await FlowEngine._build_checkout_response(
+                db, session, customer,
+                name_override=draft.get("name"), email_override=draft.get("email"), phone_override=draft.get("phone"),
+                shipping_address_override=address_to_single_line(widget_address) if widget_address else None,
+            )
         if path == "ai_tool":
             return await FlowEngine._resume_ai_checkout_intent(db, session, customer, resume_intent, draft)
 
@@ -1200,6 +1218,7 @@ class FlowEngine:
         return BotResponse(
             text="📦 This order needs a delivery address. Please fill in the address form to continue.",
             buttons=_buttons([{"id": "flow_view_cart", "title": "🛒 Back to Cart"}]),
+            requires_widget_form="address",
         )
 
     @staticmethod

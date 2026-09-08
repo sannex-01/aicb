@@ -22,6 +22,10 @@ export interface BotResponse {
   quick_replies: string[];
   checkout_url?: string | null;
   end_session: boolean;
+  /** Widget-only: tells the panel to render a structured form instead of
+   * just text+buttons. Telegram/WhatsApp never send this (they collect the
+   * same data via free-text chat turns instead). */
+  requires_widget_form?: "address" | null;
 }
 
 export interface WidgetConfig {

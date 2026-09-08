@@ -39,3 +39,12 @@ class BotResponse(BaseModel):
     quick_replies: List[str] = Field(default_factory=list)
     checkout_url: Optional[str] = None
     end_session: bool = False
+
+    # Widget-only signal: tells the widget frontend to render a real
+    # structured form instead of just text+buttons — Telegram/WhatsApp
+    # ignore this and collect the same data via free-text chat turns
+    # instead (see FlowEngine's address_collect flow). Not yet used for
+    # "profile" since that form is shown upfront on panel open, driven by
+    # GET /widget/config's profile_collection_mode, not a mid-conversation
+    # response like this.
+    requires_widget_form: Optional[Literal["address"]] = None
