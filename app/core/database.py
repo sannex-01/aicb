@@ -80,6 +80,7 @@ def _sync_columns(sync_conn) -> None:
         ("catalog_items", "access_tags_json", "TEXT", "'[]'"),
         ("catalog_items", "has_variants", "BOOLEAN", "FALSE"),
         ("knowledge_docs", "access_tags_json", "TEXT", "'[]'"),
+        ("orders", "group_reference", "VARCHAR(100)", "NULL"),
     ]
 
     for table_name, col_name, col_type, default_val in migrations:

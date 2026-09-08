@@ -21,10 +21,18 @@ class Order(Base):
     customer_email = Column(String(255), nullable=True)
     
     status = Column(String(50), default="pending", index=True) # pending, paid, processing, completed, cancelled
-    payment_gateway = Column(String(50), nullable=True) # paystack, flutterwave, monnify, stripe, telegram
+    payment_gateway = Column(String(50), nullable=True) # paystack, flutterwave, monnify, stripe, telegram, bumpa
     payment_reference = Column(String(150), nullable=True, index=True)
     checkout_url = Column(String(500), nullable=True)
     metadata_json = Column(Text, default="{}")
+
+    # Set when a single cart had to be split into separate orders/payments
+    # because its items route to different gateways (e.g. Bumpa-sourced
+    # items must checkout through Bumpa's own cart+payment-intent flow,
+    # while everything else uses the business's normal gateway) — every
+    # sibling order shares the same group_reference so they can be
+    # reassembled for the customer's order history / a single receipt.
+    group_reference = Column(String(100), nullable=True, index=True)
     
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from app.core.config import settings
 from app.commerce.payments.paystack import PaystackClient
 from app.commerce.payments.flutterwave import FlutterwaveClient
@@ -8,7 +8,7 @@ from app.core.logger import logger
 
 
 class UnifiedPaymentManager:
-    """Unified Gateway Factory for Paystack, Flutterwave, Monnify, and Stripe."""
+    """Unified Gateway Factory for Paystack, Flutterwave, Monnify, Stripe, and Bumpa."""
 
     @staticmethod
     async def create_payment_link(
@@ -20,6 +20,8 @@ class UnifiedPaymentManager:
         customer_name: Optional[str] = None,
         customer_phone: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
+        items: Optional[List[Dict[str, Any]]] = None,
+        shipping_address: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         selected_gateway = (gateway or settings.DEFAULT_PAYMENT_GATEWAY).lower()
 
@@ -70,18 +72,36 @@ class UnifiedPaymentManager:
             )
 
         elif selected_gateway == "bumpa":
-            # Bumpa is selectable under Payment Gateways (it has its own
-            # checkout, sharing its Store Connections credential — see
-            # PaymentService/StoreConnectionService), but dispatching a real
-            # payment link through Bumpa's API isn't built yet: BumpaClient
-            # only has fetch_products/create_order today, no payment-link
-            # method, and Bumpa's checkout API shape hasn't been confirmed.
-            # Fail loudly and specifically here rather than silently no-op
-            # or fall into the generic "unsupported gateway" message below.
-            raise ValueError(
-                "Bumpa checkout isn't wired up for direct payment links yet — "
-                "this is a known gap, not a configuration problem."
+            # Bumpa's checkout is fundamentally cart-based (real Bumpa
+            # product_id/product_variation_id per line, via cart -> checkout
+            # -> payment-intent), unlike every other gateway here which is a
+            # flat amount -> link call. It needs actual line items, which
+            # only the split-checkout caller (app/commerce/checkout.py)
+            # provides — every item here MUST already be Bumpa-sourced
+            # (filtered by the caller), this method does not itself check.
+            if not items:
+                raise ValueError(
+                    "Bumpa checkout requires cart line items (product_id per "
+                    "line) — none were provided. This gateway can't be used "
+                    "with a flat amount-only payment link."
+                )
+            from app.services.store_connections import StoreConnectionService
+            from app.core.database import AsyncSessionLocal
+            from app.commerce.bumpa.client import BumpaClient
+
+            async with AsyncSessionLocal() as db:
+                secret_key = await StoreConnectionService.get_effective_key(db, "bumpa")
+                public_key = await StoreConnectionService.get_effective_public_key(db, "bumpa")
+
+            client = BumpaClient(api_key=secret_key, public_key=public_key)
+            result = await client.checkout_via_bumpa(
+                items=items,
+                customer_email=customer_email,
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                shipping_address=shipping_address,
             )
+            return result
 
         else:
             raise ValueError(f"Unsupported payment gateway: {selected_gateway}")

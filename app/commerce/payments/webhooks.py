@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from fastapi import APIRouter, Request, Header, HTTPException, Depends
 from fastapi.responses import HTMLResponse
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
@@ -35,6 +35,39 @@ async def _notify_customer_payment_success(db: AsyncSession, order: Order) -> No
             await TelegramClient().send_message(chat_id=order.customer_identifier, text=msg)
     except Exception as e:
         logger.error(f"Failed to send payment receipt to customer: {e}")
+
+    # Orders checked out through Bumpa settle via a real Paystack charge
+    # (Bumpa's own payment-intent creates it under the hood — see
+    # BumpaClient.checkout_via_bumpa), which is why this fires from the
+    # SAME Paystack webhook/callback as every other order. Bumpa's own
+    # side of that checkout still needs an explicit finalize call to close
+    # out — it's not automatic just because Paystack confirmed the charge.
+    if order.payment_gateway == "bumpa":
+        try:
+            meta = json.loads(order.metadata_json or "{}")
+            checkout_id = meta.get("bumpa_checkout_id")
+            cart_token = meta.get("bumpa_cart_token")
+            if checkout_id and cart_token:
+                from app.services.store_connections import StoreConnectionService
+                from app.commerce.bumpa.client import BumpaClient
+                secret_key = await StoreConnectionService.get_effective_key(db, "bumpa")
+                public_key = await StoreConnectionService.get_effective_public_key(db, "bumpa")
+                client = BumpaClient(api_key=secret_key, public_key=public_key)
+                await client.finalize_checkout(
+                    cart_token=cart_token,
+                    checkout_id=checkout_id,
+                    payment_details={"data": {
+                        "id": order.payment_reference,
+                        "currency": order.currency,
+                        "reference": order.payment_reference,
+                        "amount": int(round(order.total_amount * 100)),
+                        "status": "success",
+                    }},
+                )
+            else:
+                logger.error(f"Order {order.order_reference} is a Bumpa order but is missing bumpa_checkout_id/bumpa_cart_token — cannot finalize on Bumpa's side.")
+        except Exception as e:
+            logger.error(f"Failed to finalize Bumpa checkout for order {order.order_reference}: {e}")
 
     try:
         from app.commerce.fulfillment import FulfillmentManager
@@ -70,7 +103,11 @@ async def handle_paystack_webhook(
         amount = (data.get("amount") or 0) / 100.0
         currency = data.get("currency", "NGN")
 
-        stmt = select(Order).where(Order.order_reference == reference)
+        # A Bumpa checkout's Paystack charge carries BUMPA's payment-intent
+        # reference, not aicb's own order_reference (see
+        # app/commerce/checkout.py) — match on either so those orders still
+        # get marked paid from this same webhook.
+        stmt = select(Order).where(or_(Order.order_reference == reference, Order.payment_reference == reference))
         res = await db.execute(stmt)
         order = res.scalars().first()
 
@@ -82,7 +119,11 @@ async def handle_paystack_webhook(
         if order and order.status != "paid":
             order.status = "paid"
             order.payment_reference = reference
-            order.payment_gateway = "paystack"
+            # Don't clobber "bumpa" — the charge is still a real Paystack
+            # transaction under the hood, but the order's gateway of record
+            # should stay Bumpa so finalize_checkout still fires below.
+            if order.payment_gateway != "bumpa":
+                order.payment_gateway = "paystack"
 
             # Create payment log
             payment_log = PaymentLog(
@@ -145,8 +186,15 @@ async def handle_paystack_callback(
             status_code=400,
         )
 
-    # Check if order exists
-    stmt = select(Order).where(Order.order_reference == reference)
+    # Check if order exists. Note: for a Bumpa-checkout order, Paystack's
+    # authorization_url was created BY Bumpa, so Paystack redirects the
+    # customer's browser back to Bumpa's own callback URL, not aicb's — this
+    # route in practice only ever fires for orders aicb itself initiated
+    # directly. The payment_reference fallback here is defensive
+    # consistency with the webhook match above, not a path expected to be
+    # exercised for Bumpa orders; the webhook (server-to-server) is what
+    # actually confirms those.
+    stmt = select(Order).where(or_(Order.order_reference == reference, Order.payment_reference == reference))
     res = await db.execute(stmt)
     order = res.scalars().first()
 
@@ -193,7 +241,11 @@ async def handle_paystack_callback(
 
             order.status = "paid"
             order.payment_reference = reference
-            order.payment_gateway = "paystack"
+            # Don't clobber "bumpa" — the charge is still a real Paystack
+            # transaction under the hood, but the order's gateway of record
+            # should stay Bumpa so finalize_checkout still fires below.
+            if order.payment_gateway != "bumpa":
+                order.payment_gateway = "paystack"
 
             payment_log = PaymentLog(
                 order_reference=reference,

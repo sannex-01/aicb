@@ -395,6 +395,7 @@ async def send_test_telegram_alert(
 
 class UpdateBumpaConfigRequest(BaseModel):
     api_key: Optional[str] = None
+    public_key: Optional[str] = None
     store_id: Optional[str] = None
     share_for_payments: Optional[bool] = None
 
@@ -416,13 +417,16 @@ async def update_bumpa_settings(
     current_user: AdminUser = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db),
 ):
-    """Updates the Bumpa API key/store id, stored in the database instead
-    of requiring an env var — this is what a business actually sets from
-    the dashboard."""
+    """Updates the Bumpa secret/public API keys and store id, stored in the
+    database instead of requiring env vars — this is what a business
+    actually sets from the dashboard. api_key is the secret key (merchant
+    order/analytics routes); public_key is required separately for the
+    customer-facing cart/checkout routes (real checkout via Bumpa)."""
     from app.services.store_connections import StoreConnectionService
     try:
         return await StoreConnectionService.save_bumpa_config(db, {
             "api_key": req.api_key,
+            "public_key": req.public_key,
             "store_id": req.store_id,
             "share_for_payments": req.share_for_payments,
         })

@@ -1,6 +1,5 @@
 import json
 import re
-import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple, List
 from sqlalchemy import select
@@ -293,6 +292,7 @@ class FlowEngine:
                 external_id=product.external_id,
                 variant_id=selected_variant.id if selected_variant else None,
                 variant_name=selected_variant.name if selected_variant else None,
+                source=product.source,
             )
 
             # Get current quantity of this exact item+variant combination
@@ -958,109 +958,76 @@ class FlowEngine:
         customer_email = email_override or (customer.email if customer else None)
         customer_phone = phone_override or (customer.phone_number if customer else None)
 
-        total_amount = CartManager.calculate_subtotal(cart)
         currency = cart[0].get("currency", "NGN") if cart else "NGN"
-        order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
 
-        order = Order(
-            order_reference=order_ref,
+        from app.commerce.checkout import create_checkout_orders
+        order_results = await create_checkout_orders(
+            db,
+            items=cart,
+            currency=currency,
             customer_identifier=session.customer_identifier,
             channel=session.channel,
-            items_json=json.dumps(cart),
-            total_amount=total_amount,
-            currency=currency,
-            status="pending",
-            payment_gateway="paystack",
             customer_name=customer_name,
-            customer_phone=customer_phone,
             customer_email=customer_email,
-        )
-        db.add(order)
-        await db.commit()
-        await db.refresh(order)
-
-        items_summary = ", ".join(
-            f"{item.get('quantity', 1)}x {item.get('title', 'Item')}" for item in cart
-        ) if cart else "Order Items"
-
-        custom_fields = [
-            {
-                "display_name": "Items Purchased",
-                "variable_name": "items_purchased",
-                "value": items_summary[:255],
-            },
-            {
-                "display_name": "Order Reference",
-                "variable_name": "order_reference",
-                "value": order_ref,
-            },
-        ]
-        if customer_name:
-            custom_fields.append({
-                "display_name": "Customer Name",
-                "variable_name": "customer_name",
-                "value": customer_name,
-            })
-        if customer_phone:
-            custom_fields.append({
-                "display_name": "Customer Phone",
-                "variable_name": "customer_phone",
-                "value": customer_phone,
-            })
-
-        payment_res = await UnifiedPaymentManager.create_payment_link(
-            amount=total_amount,
-            currency=currency,
-            customer_email=customer_email,
-            customer_name=customer_name,
             customer_phone=customer_phone,
-            reference=order_ref,
             gateway="paystack",
-            metadata={
-                "channel": session.channel,
-                "customer_id": session.customer_identifier,
-                "order_reference": order_ref,
-                "customer_name": customer_name,
-                "customer_phone": customer_phone,
-                "custom_fields": custom_fields,
-            },
         )
-        checkout_url = payment_res.get("checkout_url")
-        order.checkout_url = checkout_url
-        await db.commit()
 
         await CartManager.clear_cart(db, session)
 
         from app.telemetry.client import telemetry_client
-        telemetry_client.track(
-            channel=session.channel,
-            customer_id=session.customer_identifier,
-            event="payment_initiated",
-            status="pending",
-            amount=total_amount,
-            metadata={
-                "order_reference": order_ref,
-                "currency": currency,
-                "checkout_url": checkout_url,
-            },
-        )
+        for res in order_results:
+            telemetry_client.track(
+                channel=session.channel,
+                customer_id=session.customer_identifier,
+                event="payment_initiated",
+                status="pending" if res.get("checkout_url") else "failed",
+                amount=res.get("total_amount", 0.0),
+                metadata={
+                    "order_reference": res["order_reference"],
+                    "currency": res.get("currency"),
+                    "checkout_url": res.get("checkout_url"),
+                    "gateway": res.get("gateway"),
+                },
+            )
 
-        order_summary = [
-            f"🎉 *Order #{order_ref} Created!*",
-            f"\n💵 *Total to Pay:* {total_amount:,.2f} {currency}",
-            f"\n👉 *Pay Now via Paystack:*",
-            f"{checkout_url}",
-            f"\n_We will notify you immediately once payment is confirmed!_",
-        ]
-        return BotResponse(
-            text="\n".join(order_summary),
-            buttons=_buttons([
-                {"id": f"flow_confirm_payment_{order_ref}", "title": "✅ I've Paid"},
-                {"id": "flow_track_order", "title": "📦 Track Order"},
-                {"id": "flow_main_menu", "title": "🏠 Main Menu"},
-            ]),
-            checkout_url=checkout_url,
-        )
+        # A mixed cart (some items sold via aicb's own catalog, some
+        # Bumpa-sourced) produces two separate orders/payments — each needs
+        # its own link and its own "I've Paid" confirmation, since they're
+        # two independent charges even though the customer experienced it
+        # as one checkout.
+        if len(order_results) == 1 and order_results[0].get("checkout_url"):
+            res = order_results[0]
+            order_summary = [
+                f"🎉 *Order #{res['order_reference']} Created!*",
+                f"\n💵 *Total to Pay:* {res['total_amount']:,.2f} {res['currency']}",
+                f"\n👉 *Pay Now:*",
+                f"{res['checkout_url']}",
+                f"\n_We will notify you immediately once payment is confirmed!_",
+            ]
+            return BotResponse(
+                text="\n".join(order_summary),
+                buttons=_buttons([
+                    {"id": f"flow_confirm_payment_{res['order_reference']}", "title": "✅ I've Paid"},
+                    {"id": "flow_track_order", "title": "📦 Track Order"},
+                    {"id": "flow_main_menu", "title": "🏠 Main Menu"},
+                ]),
+                checkout_url=res["checkout_url"],
+            )
+
+        lines = ["🎉 *Your order was split into separate payments* (some items ship via a different store):"]
+        buttons = []
+        for res in order_results:
+            if res.get("checkout_url"):
+                lines.append(f"\n*Order #{res['order_reference']}* — {res['total_amount']:,.2f} {res['currency']}\n{res['checkout_url']}")
+                buttons.append({"id": f"flow_confirm_payment_{res['order_reference']}", "title": f"✅ Paid {res['order_reference']}"})
+            else:
+                lines.append(f"\n*Order #{res['order_reference']}* — ⚠️ couldn't generate a payment link right now. Please try again shortly.")
+        lines.append("\n_We will notify you immediately once each payment is confirmed!_")
+        buttons.append({"id": "flow_track_order", "title": "📦 Track Orders"})
+        buttons.append({"id": "flow_main_menu", "title": "🏠 Main Menu"})
+
+        return BotResponse(text="\n".join(lines), buttons=_buttons(buttons))
 
     @staticmethod
     async def _resume_ai_checkout_intent(

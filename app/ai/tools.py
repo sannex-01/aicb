@@ -245,13 +245,30 @@ class ToolExecutor:
             items = arguments.get("items", [])
             added_titles = []
             for itm in items:
+                # Resolve source/external_id from the DB rather than trusting
+                # the LLM's arguments for them — needed so a Bumpa-sourced
+                # item added via this AI-tool path is still correctly routed
+                # to Bumpa checkout later (see FlowEngine's split-checkout
+                # logic), the same way the button-driven cart_add_ path
+                # already threads product.source through.
+                product_id = itm.get("product_id")
+                item_source = None
+                item_external_id = None
+                if product_id is not None:
+                    catalog_item = await CatalogManager.get_product_by_id(db, product_id)
+                    if catalog_item:
+                        item_source = catalog_item.source
+                        item_external_id = catalog_item.external_id
+
                 await CartManager.add_item(
                     db=db,
                     session=session,
-                    item_id=itm.get("product_id"),
+                    item_id=product_id,
                     title=itm.get("title"),
                     price=float(itm.get("price", 0.0)),
                     quantity=int(itm.get("quantity", 1)),
+                    external_id=item_external_id,
+                    source=item_source,
                 )
                 added_titles.append(itm.get("title"))
 
@@ -463,34 +480,60 @@ class ToolExecutor:
         channel: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Shared order-creation logic used by both the normal create_order tool
-        call and the profile_collect resume path (FlowEngine._resume_ai_checkout_intent)."""
+        call and the profile_collect resume path (FlowEngine._resume_ai_checkout_intent).
+
+        If any item is Bumpa-sourced, this actually creates it as its own
+        separate Order sharing a group_reference (Bumpa's checkout can only
+        ever settle its own catalog's items — see app/commerce/checkout.py) —
+        but since generate_payment_link's tool contract expects a single
+        order_reference, the PRIMARY order returned here is whichever group
+        has more items; the other group's reference is surfaced under
+        additional_order_references so the assistant can still mention it
+        and a second generate_payment_link call can be made for it."""
         customer_identifier = customer_identifier or (session.customer_identifier if session else None)
         channel = channel or (session.channel if session else None)
 
-        total_amount = sum(float(item.get("price", 0)) * int(item.get("quantity", 1)) for item in items)
-        order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+        bumpa_items = [i for i in items if i.get("source") == "bumpa" and i.get("external_id")]
+        other_items = [i for i in items if not (i.get("source") == "bumpa" and i.get("external_id"))]
+        groups = [g for g in (other_items, bumpa_items) if g]
+        group_reference = f"GRP-{uuid.uuid4().hex[:8].upper()}" if len(groups) > 1 else None
 
-        order = Order(
-            order_reference=order_ref,
-            customer_identifier=customer_identifier,
-            channel=channel,
-            items_json=json.dumps(items),
-            total_amount=total_amount,
-            currency="NGN",
-            customer_name=customer_name,
-            customer_phone=customer_phone,
-            customer_email=customer_email,
-            shipping_address=shipping_address,
-            status="pending",
-        )
-        db.add(order)
-        await db.commit()
-        await db.refresh(order)
+        created = []
+        for group_items in groups:
+            total_amount = sum(float(item.get("price", 0)) * int(item.get("quantity", 1)) for item in group_items)
+            order_ref = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+            is_bumpa_group = bool(group_items and group_items[0].get("source") == "bumpa" and group_items[0].get("external_id"))
+            order = Order(
+                order_reference=order_ref,
+                customer_identifier=customer_identifier,
+                channel=channel,
+                items_json=json.dumps(group_items),
+                total_amount=total_amount,
+                currency="NGN",
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                customer_email=customer_email,
+                shipping_address=shipping_address,
+                status="pending",
+                group_reference=group_reference,
+                # Pre-set here (rather than left to generate_payment_link's
+                # gateway argument) so a Bumpa-sourced order is ALWAYS routed
+                # to Bumpa checkout regardless of what gateway the LLM
+                # happens to pass later — only Bumpa's own checkout can sell
+                # Bumpa's own catalog items.
+                payment_gateway="bumpa" if is_bumpa_group else None,
+            )
+            db.add(order)
+            await db.commit()
+            await db.refresh(order)
+            created.append({"order_reference": order_ref, "total_amount": total_amount, "currency": order.currency})
 
+        primary = created[0]
         return {
-            "order_reference": order_ref,
-            "total_amount": total_amount,
-            "currency": order.currency,
+            "order_reference": primary["order_reference"],
+            "total_amount": primary["total_amount"],
+            "currency": primary["currency"],
+            "additional_order_references": [c["order_reference"] for c in created[1:]],
         }
 
     @staticmethod
@@ -561,22 +604,56 @@ class ToolExecutor:
             "customer_phone": customer_phone,
             "custom_fields": custom_fields,
         }
+
+        # An order created as a Bumpa group (see _create_order_with_profile)
+        # already has payment_gateway="bumpa" pre-set — that always wins over
+        # whatever gateway argument the LLM passes, since only Bumpa's own
+        # checkout can sell Bumpa's own catalog items.
+        effective_gateway = order.payment_gateway if order.payment_gateway == "bumpa" else gateway
+        bumpa_items = None
+        shipping_ctx = None
+        if effective_gateway == "bumpa":
+            from app.commerce.checkout import shipping_context_from_address
+            try:
+                order_items = json.loads(order.items_json or "[]")
+            except Exception:
+                order_items = []
+            bumpa_items = [
+                {"external_id": i.get("external_id"), "quantity": i.get("quantity", 1), "variant_external_id": i.get("variant_external_id")}
+                for i in order_items
+            ]
+            shipping_ctx = shipping_context_from_address(order.shipping_address)
+
         payment_res = await UnifiedPaymentManager.create_payment_link(
             amount=order.total_amount,
             currency=order.currency,
             customer_email=customer_email,
             reference=order.order_reference,
-            gateway=gateway,
+            gateway=effective_gateway,
             customer_name=customer_name,
             customer_phone=customer_phone,
             metadata=metadata,
+            items=bumpa_items,
+            shipping_address=shipping_ctx,
         )
         checkout_url = payment_res.get("checkout_url")
         order.checkout_url = checkout_url
-        order.payment_gateway = gateway or "default"
+        order.payment_gateway = effective_gateway or "default"
         order.customer_name = order.customer_name or customer_name
         order.customer_email = order.customer_email or customer_email
         order.customer_phone = order.customer_phone or customer_phone
+
+        if effective_gateway == "bumpa":
+            # Bumpa settles via its own Paystack reference, not aicb's
+            # order_reference — the Paystack webhook/callback matches on
+            # payment_reference too (see app/commerce/payments/webhooks.py)
+            # so this order gets marked paid correctly.
+            order.payment_reference = payment_res.get("reference")
+            meta = json.loads(order.metadata_json or "{}")
+            meta["bumpa_checkout_id"] = payment_res.get("bumpa_checkout_id")
+            meta["bumpa_cart_token"] = payment_res.get("bumpa_cart_token")
+            order.metadata_json = json.dumps(meta)
+
         await db.commit()
 
         return {

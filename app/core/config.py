@@ -82,10 +82,16 @@ class Settings(BaseSettings):
     # Catalog Provider: 'local' | 'paystack' | 'bumpa'
     CATALOG_SOURCE: Literal["local", "paystack", "bumpa"] = "local"
 
-    # Bumpa
+    # Bumpa — real API confirmed against docs.bumpa.io: base path is
+    # /api/commerce/v1, split auth (a "public key" for catalog/cart/checkout,
+    # a "secret key" for merchant order/analytics routes). BUMPA_API_KEY is
+    # kept as the secret-key env fallback (matches what was already deployed
+    # for catalog import); BUMPA_PUBLIC_API_KEY is new, needed for the
+    # customer-facing cart/checkout endpoints.
     BUMPA_API_KEY: Optional[str] = None
+    BUMPA_PUBLIC_API_KEY: Optional[str] = None
     BUMPA_STORE_ID: Optional[str] = None
-    BUMPA_API_BASE_URL: str = "https://api.getbumpa.com/v1"
+    BUMPA_API_BASE_URL: str = "https://api.getbumpa.com/api/commerce/v1"
 
     # Payments
     DEFAULT_PAYMENT_GATEWAY: Literal["paystack", "flutterwave", "monnify", "stripe"] = "paystack"

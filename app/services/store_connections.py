@@ -23,8 +23,14 @@ def _mask_key(key: Optional[str]) -> str:
 # also lives here even though its "connection" only exists in this table
 # once a business actually toggles sharing on, since it's the same
 # dual-purpose shape (import catalog + checkout).
+#
+# "public_key" is a SECOND, separate credential some providers split out
+# (Bumpa's confirmed real API: a public key for cart/checkout/catalog
+# routes, a secret/"api_key" for merchant order/analytics routes) — only
+# declared here for providers that actually need it; absent means the
+# provider uses one key for everything.
 _ENV_FALLBACKS = {
-    "bumpa": {"api_key": "BUMPA_API_KEY", "store_id": "BUMPA_STORE_ID"},
+    "bumpa": {"api_key": "BUMPA_API_KEY", "public_key": "BUMPA_PUBLIC_API_KEY", "store_id": "BUMPA_STORE_ID"},
     "paystack": {"api_key": "PAYSTACK_SECRET_KEY"},
 }
 
@@ -71,6 +77,13 @@ class StoreConnectionService:
         }
         if env_fallback.get("store_id") is not None or "store_id" in raw_config:
             result["config"]["store_id"] = store_id or ""
+
+        if "public_key" in env_fallback or "public_key" in raw_config:
+            env_public_key = getattr(settings, env_fallback.get("public_key", ""), None) if env_fallback.get("public_key") else None
+            public_key = raw_config.get("public_key") or env_public_key
+            result["config"]["public_key_masked"] = _mask_key(public_key)
+            result["config"]["public_key_configured"] = bool(public_key)
+
         return result
 
     @staticmethod
@@ -85,17 +98,24 @@ class StoreConnectionService:
         store_connections = meta.get("store_connections", {})
         existing = store_connections.get(provider, {})
 
-        raw_key = config.get("api_key")
-        if raw_key is None:
-            final_key = existing.get("api_key", "")
-        else:
-            stripped = raw_key.strip()
-            final_key = existing.get("api_key", "") if (stripped.startswith("***") or "..." in stripped) else stripped
+        def _resolve_key(field: str) -> str:
+            raw_val = config.get(field)
+            if raw_val is None:
+                return existing.get(field, "")
+            stripped = raw_val.strip()
+            return existing.get(field, "") if (stripped.startswith("***") or "..." in stripped) else stripped
 
-        entry = {"api_key": final_key, "share_for_payments": bool(config.get("share_for_payments", existing.get("share_for_payments", False)))}
+        entry = {
+            "api_key": _resolve_key("api_key"),
+            "share_for_payments": bool(config.get("share_for_payments", existing.get("share_for_payments", False))),
+        }
         if "store_id" in config or "store_id" in existing:
             entry["store_id"] = (config.get("store_id") if config.get("store_id") is not None else existing.get("store_id", "")) or ""
             entry["store_id"] = entry["store_id"].strip() if isinstance(entry["store_id"], str) else entry["store_id"]
+
+        env_fallback = _ENV_FALLBACKS.get(provider, {})
+        if "public_key" in env_fallback or "public_key" in config or "public_key" in existing:
+            entry["public_key"] = _resolve_key("public_key")
 
         store_connections[provider] = entry
         meta["store_connections"] = store_connections
@@ -115,6 +135,19 @@ class StoreConnectionService:
         env_fallback = _ENV_FALLBACKS.get(provider, {})
         env_key = getattr(settings, env_fallback.get("api_key", ""), None) if env_fallback.get("api_key") else None
         return raw_config.get("api_key") or env_key
+
+    @staticmethod
+    async def get_effective_public_key(db: AsyncSession, provider: str) -> Optional[str]:
+        """The public-key counterpart to get_effective_key, for providers
+        that split their credentials (Bumpa). Returns None for providers
+        with no public_key concept."""
+        res = await db.execute(select(BusinessProfile).limit(1))
+        biz = res.scalar_one_or_none()
+        meta = json.loads(biz.metadata_json or "{}") if biz else {}
+        raw_config = meta.get("store_connections", {}).get(provider, {})
+        env_fallback = _ENV_FALLBACKS.get(provider, {})
+        env_key = getattr(settings, env_fallback.get("public_key", ""), None) if env_fallback.get("public_key") else None
+        return raw_config.get("public_key") or env_key
 
     @staticmethod
     async def get_shared_payment_key(db: AsyncSession, provider: str) -> Optional[str]:

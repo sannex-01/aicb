@@ -31,6 +31,8 @@ class CartManager:
         external_id: Optional[str] = None,
         variant_id: Optional[int] = None,
         variant_name: Optional[str] = None,
+        source: Optional[str] = None,
+        variant_external_id: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         state = MemoryManager.get_flow_state_data(session)
         cart = state.get("cart", [])
@@ -60,6 +62,8 @@ class CartManager:
                 "currency": currency,
                 "variant_id": variant_id,
                 "variant_name": variant_name,
+                "source": source,
+                "variant_external_id": variant_external_id,
             })
 
         state["cart"] = cart
