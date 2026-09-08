@@ -157,50 +157,42 @@ async def handle_telegram_webhook(
         )
         rendered = TelegramRenderer.render(flow_res)
 
-        # When the callback came from an inline-result message (a message the
-        # USER sent into chat via inline mode), there is no bot-sent message to
-        # edit in place — attempt to do so would fail or mutate the wrong thing.
-        # Instead, always open / send to the user’s private bot DM directly.
-        if inline_message_id:
-            dm_chat_id = from_user.get("id")
-            if dm_chat_id:
-                logger.info(f"Inline-origin callback → delivering to bot DM for user {user_id}")
-                await _deliver(tg_client, dm_chat_id, flow_res)
+        # If product cards with images are present, send the media album first,
+        # then send the main catalog text with buttons below the album.
+        if rendered["photo_items"]:
+            album = TelegramRenderer.product_album(rendered["photo_items"])
+            if album["media_items"]:
+                await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
+
+            if chat_id:
+                if rendered["inline_keyboard"]:
+                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                else:
+                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
         else:
-            # If product cards with images are present, send the media album first,
-            # then send the main catalog text with buttons below the album.
-            if rendered["photo_items"]:
-                album = TelegramRenderer.product_album(rendered["photo_items"])
-                if album["media_items"]:
-                    await tg_client.send_media_group(chat_id=chat_id, items=album["media_items"])
+            # When no photos are present, edit the existing message in-place for a clean single-message UI
+            edit_success = False
 
-                if chat_id:
-                    if rendered["inline_keyboard"]:
-                        await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
-                    else:
-                        await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
-            else:
-                # When no photos are present, edit the existing message in-place for a clean single-message UI
-                edit_success = False
+            # For inline messages, we DO NOT want to edit the inline message itself
+            # because that replaces the user's sent message instead of the bot sending a response.
+            if message_id and chat_id and not inline_message_id:
+                try:
+                    res = await tg_client.edit_inline_buttons(
+                        chat_id=chat_id,
+                        message_id=message_id,
+                        text=rendered["text"],
+                        buttons=rendered["inline_keyboard"],
+                    )
+                    if res.get("ok"):
+                        edit_success = True
+                except Exception as e:
+                    logger.warning(f"In-place message edit failed, will send fresh message: {e}")
 
-                if message_id and chat_id:
-                    try:
-                        res = await tg_client.edit_inline_buttons(
-                            chat_id=chat_id,
-                            message_id=message_id,
-                            text=rendered["text"],
-                            buttons=rendered["inline_keyboard"],
-                        )
-                        if res.get("ok"):
-                            edit_success = True
-                    except Exception as e:
-                        logger.warning(f"In-place message edit failed, will send fresh message: {e}")
-
-                if not edit_success and chat_id:
-                    if rendered["inline_keyboard"]:
-                        await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
-                    else:
-                        await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+            if not edit_success and chat_id:
+                if rendered["inline_keyboard"]:
+                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                else:
+                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
 
         # Track interactive button action telemetry
         telemetry_client.track(

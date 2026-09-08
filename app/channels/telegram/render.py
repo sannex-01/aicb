@@ -133,7 +133,6 @@ class TelegramRenderer:
                 buttons = [
                     {"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id},
                     {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
-                    {"text": "🏠 Menu", "callback_data": "flow_main_menu"},
                 ]
             else:
                 caption += "\n\n👉 Tap below to buy:"
