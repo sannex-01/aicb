@@ -123,6 +123,33 @@ export class WidgetPanel {
         // fall through with defaults — still show the form/welcome below
       }
 
+      // A returning visitor (same browser, same localStorage session id —
+      // see getOrCreateSessionId) already has a real conversation on the
+      // backend. Restore it instead of restarting from the welcome
+      // message/profile form every time the page reloads or the panel is
+      // reopened — a genuinely new visitor gets an empty history and falls
+      // through to the normal first-time flow below.
+      try {
+        const history = await this.api.getHistory(this.sessionId);
+        if (history.messages.length) {
+          for (const m of history.messages) {
+            if (m.role === "user") {
+              this.appendUserMessage(m.content);
+            } else {
+              const bubble = document.createElement("div");
+              bubble.className = `${PREFIX}-bubble-msg bot`;
+              bubble.innerHTML = formatMessageHtml(m.content);
+              this.messagesEl.appendChild(bubble);
+            }
+          }
+          this.scrollToBottom();
+          this.setChatInputAvailable(true);
+          return;
+        }
+      } catch {
+        // fall through to the normal first-time flow below
+      }
+
       const startChat = async () => {
         // Dispatch the same flow_main_menu action Telegram/WhatsApp send on
         // /start, so the welcome message comes with real menu buttons

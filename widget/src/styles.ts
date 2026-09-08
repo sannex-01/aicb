@@ -139,6 +139,16 @@ export function injectStyles(): void {
   gap: 10px;
   background: #f7f8fa;
 }
+/* [hidden] and a class selector have equal specificity, so declaration
+   order decides the winner — this stylesheet is injected after the
+   browser's UA stylesheet, so without this override "hidden" elements
+   with a display rule of their own (messages, input row) would stay
+   visible instead of collapsing, letting the profile/address form's
+   flex:1 fight them for space instead of filling the panel. */
+.${PREFIX}-messages[hidden],
+.${PREFIX}-input-row[hidden] {
+  display: none !important;
+}
 
 .${PREFIX}-bubble-msg {
   max-width: 85%;

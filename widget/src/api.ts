@@ -8,6 +8,15 @@ export class WidgetAPI {
     return res.json();
   }
 
+  /** Recent transcript for this session, so a page reload can restore the
+   * conversation instead of restarting it — the session id itself already
+   * survives a reload via localStorage, but nothing replayed its history. */
+  async getHistory(sessionId: string): Promise<{ messages: { role: string; content: string }[]; has_profile: boolean }> {
+    const res = await fetch(`${this.baseUrl}/api/v1/widget/history?session_id=${encodeURIComponent(sessionId)}`);
+    if (!res.ok) return { messages: [], has_profile: false };
+    return res.json();
+  }
+
   async dispatchAction(actionId: string, sessionId: string, userInput?: string): Promise<BotResponse> {
     const res = await fetch(`${this.baseUrl}/api/v1/widget/action`, {
       method: "POST",

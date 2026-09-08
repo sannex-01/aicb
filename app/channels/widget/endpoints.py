@@ -46,6 +46,38 @@ class WidgetProfileRequest(BaseModel):
     skipped: bool = False
 
 
+@router.get("/history")
+@limiter.limit("30/minute")
+async def widget_history(request: Request, session_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Returns this widget session's recent transcript so a page reload can
+    restore the conversation instead of restarting it — the session_id
+    itself already survives a reload via localStorage (see panel.ts's
+    getOrCreateSessionId), but until now nothing replayed the messages
+    already logged against it (MessageLog, written by MemoryManager.add_message
+    on every turn — the same log every other channel already accumulates)."""
+    from app.models.session import ConversationSession, MessageLog
+
+    stmt = select(ConversationSession).where(
+        ConversationSession.channel == "widget",
+        ConversationSession.customer_identifier == session_id,
+    )
+    session = (await db.execute(stmt)).scalars().first()
+    if not session:
+        return {"messages": []}
+
+    msg_stmt = (
+        select(MessageLog)
+        .where(MessageLog.session_id == session.id, MessageLog.role.in_(["user", "assistant"]))
+        .order_by(MessageLog.created_at.asc())
+        .limit(50)
+    )
+    logs = (await db.execute(msg_stmt)).scalars().all()
+    return {
+        "messages": [{"role": m.role, "content": m.content} for m in logs],
+        "has_profile": bool(FlowEngine._get_widget_profile(session)),
+    }
+
+
 @router.post("/profile")
 @limiter.limit("10/minute")
 async def widget_submit_profile(request: Request, req: WidgetProfileRequest, db: AsyncSession = Depends(get_db)) -> dict:
@@ -116,9 +148,18 @@ async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: Async
         res = await db.execute(stmt)
         agent = res.scalar_one_or_none()
 
-    # If session is in profile_collect or quantity_select,
-    # intercept free-text input and route to FlowEngine.
-    if session.active_flow in ["profile_collect", "quantity_select"]:
+    # Flows that expect a specific free-text reply as their very next step
+    # (as opposed to "catalog"/"main_menu"/"profile_view", which just mark
+    # the last screen shown — free text there is a normal question for the
+    # AI, e.g. "do you have this in blue?") — intercept and route to
+    # FlowEngine instead of the LLM, exactly like Telegram/WhatsApp already
+    # do via FlowEngine._process_action's own routing. Missing "track_order"
+    # here (and "address_collect", added alongside it) previously meant
+    # replying with an order reference after tapping "Track Order" fell
+    # through to the AI orchestrator instead, which threw when no LLM
+    # provider key was configured — automatic order lookup shouldn't depend
+    # on an LLM being set up at all.
+    if session.active_flow in ["profile_collect", "quantity_select", "address_collect", "track_order"]:
         resp = await FlowEngine.handle_action(
             db=db, session=session, action_id=req.message, user_input=req.message,
         )
