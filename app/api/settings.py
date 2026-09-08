@@ -343,6 +343,56 @@ async def send_test_sms(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+class UpdateTelegramAlertsConfigRequest(BaseModel):
+    bot_token: Optional[str] = None
+    chat_id: Optional[str] = None
+
+
+@router.get("/alerts/telegram")
+async def get_telegram_alerts_settings(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns current Telegram order-alerts bot configuration, masked."""
+    from app.services.telegram_alerts import TelegramAlertService
+    return await TelegramAlertService.get_config(db)
+
+
+@router.put("/alerts/telegram")
+async def update_telegram_alerts_settings(
+    req: UpdateTelegramAlertsConfigRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates the dedicated Telegram alerts bot's token and recipient chat id."""
+    from app.services.telegram_alerts import TelegramAlertService
+    try:
+        return await TelegramAlertService.save_config(db, {"bot_token": req.bot_token, "chat_id": req.chat_id})
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
+@router.post("/alerts/telegram/test")
+async def send_test_telegram_alert(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sends a test alert message to verify the bot token and chat id."""
+    from app.services.telegram_alerts import TelegramAlertService
+    try:
+        biz_res = await db.execute(select(BusinessProfile).limit(1))
+        biz = biz_res.scalar_one_or_none()
+        biz_name = biz.name if biz else "AICB Studio"
+
+        await TelegramAlertService.send_alert(
+            db=db,
+            message=f"✅ Test alert from {biz_name}: your AICB order alerts bot is configured correctly.",
+        )
+        return {"status": "ok", "message": "Test alert sent successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 class UpdatePaymentConfigRequest(BaseModel):
     provider: Optional[str] = None  # "paystack", "flutterwave", "monnify", "stripe", or None
     config: Optional[dict] = {}
