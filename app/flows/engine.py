@@ -219,61 +219,116 @@ class FlowEngine:
                 product_cards=product_cards,
             )
 
-        # 3. Add to Cart via Button Click (e.g. "cart_add_1")
+        # 3. Add to Cart via Button Click (e.g. "cart_add_1", or
+        # "cart_add_1_variant_3" once a specific variant has been chosen —
+        # see 3a below for the variant-selection step this can trigger.
         elif action.startswith("cart_add_"):
-            item_id_str = action.replace("cart_add_", "")
+            remainder = action.replace("cart_add_", "")
+            variant_id: Optional[int] = None
+            item_id_str = remainder
+            if "_variant_" in remainder:
+                item_id_str, variant_part = remainder.split("_variant_", 1)
+                if variant_part.isdigit():
+                    variant_id = int(variant_part)
+
             product = None
             if item_id_str.isdigit():
                 product = await CatalogManager.get_product_by_id(db, int(item_id_str))
 
-            if product:
-                cart = await CartManager.add_item(
-                    db=db,
-                    session=session,
-                    item_id=product.id,
-                    title=product.title,
-                    price=product.price,
-                    quantity=1,
-                    currency=product.currency,
-                    external_id=product.external_id,
-                )
-
-                # Get current quantity of this item
-                item_qty = 1
-                for entry in cart:
-                    if entry.get("item_id") == product.id or entry.get("title", "").lower() == product.title.lower():
-                        item_qty = entry.get("quantity", 1)
-                        break
-
-                state = MemoryManager.get_flow_state_data(session)
-                state["selected_product_id"] = product.id
-                state["selected_product_title"] = product.title
-                await MemoryManager.update_flow_state(
-                    db,
-                    session,
-                    active_flow="quantity_select",
-                    current_step=f"qty_{product.id}",
-                    state_data=state,
-                )
-
-                cart_msg = CartManager.format_cart_message(cart)
-                qty_buttons = get_quantity_buttons(product.id, current_qty=item_qty)
-
-                return BotResponse(
-                    text=(
-                        f"✅ *Added 1x {product.title} to your cart!* (Total in cart: {item_qty})\n\n"
-                        f"🔢 *Select how many you'd like to buy:*\n"
-                        f"• Tap an example number below (*1*, *2*, *3*, *5*, *10*)\n"
-                        f"• Or type any custom number directly in chat (e.g. `4` or `12`)\n\n"
-                        f"{cart_msg}"
-                    ),
-                    buttons=_buttons(qty_buttons),
-                )
-            else:
+            if not product:
                 return BotResponse(
                     text="Could not find that product. Please select from our catalog:",
                     buttons=_buttons(MAIN_MENU_BUTTONS),
                 )
+
+            # If this product has variants and none was chosen yet, show
+            # the variant options instead of adding the base product
+            # straight to cart — mirrors the existing qty-selection step's
+            # pattern (intercept before the default add, resume once a
+            # choice is made) rather than a new subsystem.
+            if product.has_variants and variant_id is None:
+                variants = await CatalogManager.get_variants_for_product(db, product.id)
+                if variants:
+                    variant_buttons = [
+                        {"id": f"cart_add_{product.id}_variant_{v.id}", "title": v.name[:24]}
+                        for v in variants
+                        if v.in_stock
+                    ]
+                    if not variant_buttons:
+                        return BotResponse(
+                            text=f"😔 *{product.title}* is currently out of stock in all variants.",
+                            buttons=_buttons(MAIN_MENU_BUTTONS),
+                        )
+                    variant_buttons.append({"id": "flow_browse_catalog", "title": "🛍️ Back to Catalog"})
+                    return BotResponse(
+                        text=f"*{product.title}* comes in a few options — which would you like?",
+                        buttons=_buttons(variant_buttons),
+                    )
+
+            selected_variant = None
+            if variant_id is not None:
+                selected_variant = await CatalogManager.get_variant_by_id(db, variant_id)
+                if not selected_variant or selected_variant.catalog_item_id != product.id:
+                    return BotResponse(
+                        text="That option is no longer available. Please pick again:",
+                        buttons=_buttons([{"id": f"cart_add_{product.id}", "title": "🔄 Choose Again"}]),
+                    )
+                if not selected_variant.in_stock:
+                    return BotResponse(
+                        text=f"😔 *{selected_variant.name}* just went out of stock. Please pick a different option:",
+                        buttons=_buttons([{"id": f"cart_add_{product.id}", "title": "🔄 Choose Again"}]),
+                    )
+
+            effective_price = selected_variant.price_override if (selected_variant and selected_variant.price_override is not None) else product.price
+            display_title = f"{product.title} ({selected_variant.name})" if selected_variant else product.title
+
+            cart = await CartManager.add_item(
+                db=db,
+                session=session,
+                item_id=product.id,
+                title=product.title,
+                price=effective_price,
+                quantity=1,
+                currency=product.currency,
+                external_id=product.external_id,
+                variant_id=selected_variant.id if selected_variant else None,
+                variant_name=selected_variant.name if selected_variant else None,
+            )
+
+            # Get current quantity of this exact item+variant combination
+            item_qty = 1
+            for entry in cart:
+                same_item = entry.get("item_id") == product.id or entry.get("title", "").lower() == product.title.lower()
+                same_variant = entry.get("variant_id") == (selected_variant.id if selected_variant else None)
+                if same_item and same_variant:
+                    item_qty = entry.get("quantity", 1)
+                    break
+
+            state = MemoryManager.get_flow_state_data(session)
+            state["selected_product_id"] = product.id
+            state["selected_product_title"] = product.title
+            state["selected_variant_id"] = selected_variant.id if selected_variant else None
+            await MemoryManager.update_flow_state(
+                db,
+                session,
+                active_flow="quantity_select",
+                current_step=f"qty_{product.id}",
+                state_data=state,
+            )
+
+            cart_msg = CartManager.format_cart_message(cart)
+            qty_buttons = get_quantity_buttons(product.id, current_qty=item_qty)
+
+            return BotResponse(
+                text=(
+                    f"✅ *Added 1x {display_title} to your cart!* (Total in cart: {item_qty})\n\n"
+                    f"🔢 *Select how many you'd like to buy:*\n"
+                    f"• Tap an example number below (*1*, *2*, *3*, *5*, *10*)\n"
+                    f"• Or type any custom number directly in chat (e.g. `4` or `12`)\n\n"
+                    f"{cart_msg}"
+                ),
+                buttons=_buttons(qty_buttons),
+            )
 
         # 3b. Quantity Preset Button Selection (e.g. "qty_set_1_3")
         elif action.startswith("qty_set_"):

@@ -29,14 +29,22 @@ class CartManager:
         quantity: int = 1,
         currency: str = "NGN",
         external_id: Optional[str] = None,
+        variant_id: Optional[int] = None,
+        variant_name: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         state = MemoryManager.get_flow_state_data(session)
         cart = state.get("cart", [])
 
-        # Check if item already exists in cart
+        # Check if this exact item+variant combination already exists in
+        # cart. Two different variants of the same base product (same
+        # item_id, different variant_id) are separate cart lines, not
+        # merged — a customer buying a Small and a Large should see both,
+        # not a single "2x" line that loses which size is which.
         existing = None
         for entry in cart:
-            if (item_id is not None and entry.get("item_id") == item_id) or (entry.get("title", "").lower() == title.lower()):
+            same_item = (item_id is not None and entry.get("item_id") == item_id) or (entry.get("title", "").lower() == title.lower())
+            same_variant = entry.get("variant_id") == variant_id
+            if same_item and same_variant:
                 existing = entry
                 break
 
@@ -50,6 +58,8 @@ class CartManager:
                 "price": float(price),
                 "quantity": int(quantity),
                 "currency": currency,
+                "variant_id": variant_id,
+                "variant_name": variant_name,
             })
 
         state["cart"] = cart
@@ -155,7 +165,8 @@ class CartManager:
         lines = ["🛒 *Your Shopping Cart:*\n"]
         for idx, item in enumerate(cart, 1):
             item_total = float(item.get("price", 0.0)) * int(item.get("quantity", 1))
-            lines.append(f"{idx}. *{item.get('title')}* (x{item.get('quantity', 1)}) — {item_total:,.2f} {currency}")
+            variant_suffix = f" ({item['variant_name']})" if item.get("variant_name") else ""
+            lines.append(f"{idx}. *{item.get('title')}{variant_suffix}* (x{item.get('quantity', 1)}) — {item_total:,.2f} {currency}")
 
         lines.append(f"\n💰 *Subtotal:* {subtotal:,.2f} {currency}")
         lines.append("🚚 *Delivery:* Calculated at checkout")

@@ -144,7 +144,7 @@ export async function loadCatalogPage(container) {
 
 async function editProductModal(product) {
   const isEdit = Boolean(product);
-  
+
   if (!state.storageInfo) {
     try {
       state.storageInfo = await api('/settings/storage');
@@ -158,6 +158,19 @@ async function editProductModal(product) {
       state.accessGroups = await api('/access-groups');
     } catch {
       state.accessGroups = [];
+    }
+  }
+
+  // The table row passed in doesn't carry variant data (list_admin_catalog
+  // doesn't fetch variants per row) — fetch the full item so the form can
+  // pre-populate existing variant rows when editing.
+  let existingVariants = [];
+  if (isEdit && product.has_variants) {
+    try {
+      const fresh = await api(`/admin/catalog/${product.id}`);
+      existingVariants = fresh.variants || [];
+    } catch {
+      existingVariants = [];
     }
   }
 
@@ -233,6 +246,20 @@ async function editProductModal(product) {
               })}
             </div>
           </div>
+
+          <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="form-label font-semibold text-main m-0">Variants</label>
+              <button type="button" class="btn btn-secondary btn-sm" id="btn-add-variant">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i> Add Variant
+              </button>
+            </div>
+            <p class="text-[12px] text-muted">
+              Optional. If a product has variants (size, color, etc.), customers must pick one before
+              adding it to their cart. Leave empty to sell this product as a single item, as today.
+            </p>
+            <div id="variant-rows" class="space-y-2"></div>
+          </div>
         </div>
         <div class="modal-footer">
           ${isEdit ? `<button type="button" class="btn btn-danger btn-sm mr-auto" onclick="window.deleteProduct(${product.id}, '${escapeHtml(product.title)}')">Delete</button>` : ''}
@@ -244,12 +271,62 @@ async function editProductModal(product) {
   `);
 
   initImageUploadControl('prod-img');
+
+  // Variant repeatable rows — each row is a small inline form (name, sku,
+  // price override, stock). Keeps a hidden data-variant-id so an edited
+  // existing row round-trips its id (so the backend updates it in place
+  // instead of deleting + recreating), while a freshly-added row has no id
+  // and is created new on save.
+  const variantRowsEl = document.getElementById('variant-rows');
+
+  function addVariantRow(variant) {
+    const row = document.createElement('div');
+    row.className = 'flex items-start gap-2 variant-row';
+    if (variant?.id) row.dataset.variantId = variant.id;
+    row.innerHTML = `
+      <input type="text" class="form-control variant-name" placeholder="e.g. Large / Blue" value="${escapeHtml(variant?.name || '')}" style="flex: 2;" />
+      <input type="text" class="form-control variant-sku" placeholder="SKU (optional)" value="${escapeHtml(variant?.sku || '')}" style="flex: 1.5;" />
+      <input type="number" class="form-control variant-price" placeholder="Price override" step="0.01" value="${variant?.price_override ?? ''}" style="flex: 1;" />
+      <input type="number" class="form-control variant-stock" placeholder="Stock" value="${variant?.stock_quantity ?? 100}" style="flex: 1;" />
+      <button type="button" class="btn btn-icon btn-secondary btn-sm text-rose hover:bg-rose/10 btn-remove-variant" title="Remove variant">
+        <i data-lucide="x" class="w-4 h-4"></i>
+      </button>
+    `;
+    row.querySelector('.btn-remove-variant').addEventListener('click', () => row.remove());
+    variantRowsEl.appendChild(row);
+    if (window.lucide) lucide.createIcons();
+  }
+
+  (existingVariants || []).forEach(addVariantRow);
+  document.getElementById('btn-add-variant').addEventListener('click', () => addVariantRow(null));
+
   if (window.lucide) lucide.createIcons();
 
   document.getElementById('product-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const groupCheckboxes = document.querySelectorAll('input[name="prod-group"]:checked');
     const accessGroupIds = Array.from(groupCheckboxes).map(el => parseInt(el.value, 10));
+
+    // Build the variants payload from whatever rows remain. Rows with a
+    // blank name are ignored (treated as an accidentally-added empty row,
+    // not an error) rather than rejecting the whole save.
+    const variantRows = Array.from(document.querySelectorAll('.variant-row'));
+    const variants = variantRows
+      .map(row => {
+        const name = row.querySelector('.variant-name').value.trim();
+        if (!name) return null;
+        const priceVal = row.querySelector('.variant-price').value;
+        const v = {
+          name,
+          sku: row.querySelector('.variant-sku').value.trim() || null,
+          price_override: priceVal !== '' ? parseFloat(priceVal) : null,
+          stock_quantity: parseInt(row.querySelector('.variant-stock').value, 10) || 0,
+          in_stock: (parseInt(row.querySelector('.variant-stock').value, 10) || 0) > 0,
+        };
+        if (row.dataset.variantId) v.id = parseInt(row.dataset.variantId, 10);
+        return v;
+      })
+      .filter(Boolean);
 
     const payload = {
       title: document.getElementById('prod-title').value.trim(),
@@ -261,6 +338,11 @@ async function editProductModal(product) {
       image_url: document.getElementById('prod-img').value.trim() || null,
       access_group_ids: accessGroupIds,
       in_stock: parseInt(document.getElementById('prod-stock').value, 10) > 0,
+      // Always included (not conditionally omitted) since the form's rows
+      // always reflect the product's true current variant state — whether
+      // pre-populated from an existing product or freshly empty for a new
+      // one — so there's no "untouched, leave alone" case to preserve here.
+      variants,
     };
 
     try {

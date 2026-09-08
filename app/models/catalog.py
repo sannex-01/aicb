@@ -17,7 +17,15 @@ class CatalogItem(Base):
     image_url = Column(String(500), nullable=True)
     in_stock = Column(Boolean, default=True)
     stock_quantity = Column(Integer, default=100)
-    
+
+    # True when this item has one or more rows in product_variants (see
+    # app/models/product_variant.py). A cheap flag so callers (the chat
+    # flow's cart_add_ handler, the dashboard's product list) can check
+    # "does this need a variant-selection step?" without a join/count
+    # query on every product in a list. Kept in sync whenever variants
+    # are added/removed for this item.
+    has_variants = Column(Boolean, default=False)
+
     # Access Group Scoping: JSON array of group IDs e.g. [1, 2]. Empty [] = globally accessible to all agents.
     access_group_ids_json = Column(Text, default="[]")
     access_tags_json = Column(Text, default="[]")

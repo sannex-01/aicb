@@ -9,11 +9,21 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_admin_user, require_admin_role
 from app.models.catalog import CatalogItem
+from app.models.product_variant import ProductVariant
 from app.models.access_group import AccessGroup
 from app.models.user import AdminUser
 from app.core.access import parse_tags_json, parse_ids_json
 
 router = APIRouter(prefix="/admin/catalog", tags=["Admin Catalog Management"])
+
+
+class ProductVariantRequest(BaseModel):
+    id: Optional[int] = None  # present on update = keep/edit this row; absent = new row
+    name: str
+    sku: Optional[str] = None
+    price_override: Optional[float] = None
+    stock_quantity: int = 100
+    in_stock: bool = True
 
 
 class CatalogItemCreateRequest(BaseModel):
@@ -27,6 +37,7 @@ class CatalogItemCreateRequest(BaseModel):
     stock_quantity: int = 100
     access_group_ids: Optional[List[int]] = []
     access_tags: Optional[List[str]] = []
+    variants: Optional[List[ProductVariantRequest]] = None
 
 
 class CatalogItemUpdateRequest(BaseModel):
@@ -40,12 +51,31 @@ class CatalogItemUpdateRequest(BaseModel):
     stock_quantity: Optional[int] = None
     access_group_ids: Optional[List[int]] = None
     access_tags: Optional[List[str]] = None
+    # Sentinel: None = "don't touch variants" (a normal field edit that
+    # doesn't mention variants at all); [] = "explicitly clear all
+    # variants"; a populated list = "replace variants with these rows."
+    # A plain Optional[List[...]] can't tell "field omitted" apart from
+    # "field sent as null" once deserialized, so callers must send `[]`
+    # (not omit the key, not send `null`) to intentionally clear variants —
+    # documented on the dashboard form's save handler too.
+    variants: Optional[List[ProductVariantRequest]] = None
 
 
-def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None) -> dict:
+def _serialize_variant(v: ProductVariant) -> dict:
+    return {
+        "id": v.id,
+        "name": v.name,
+        "sku": v.sku,
+        "price_override": v.price_override,
+        "stock_quantity": v.stock_quantity,
+        "in_stock": v.in_stock,
+    }
+
+
+def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None, variants: Optional[List[ProductVariant]] = None) -> dict:
     group_ids = parse_ids_json(getattr(itm, "access_group_ids_json", "[]"))
     tags = parse_tags_json(itm.access_tags_json)
-    
+
     group_names = []
     if groups_map:
         for gid in group_ids:
@@ -68,8 +98,44 @@ def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None)
         "access_group_names": group_names,
         "access_tags": tags,
         "is_global": not bool(group_ids or tags),
+        "has_variants": bool(itm.has_variants),
+        "variants": [_serialize_variant(v) for v in variants] if variants is not None else None,
         "created_at": itm.created_at.isoformat() if itm.created_at else None,
     }
+
+
+async def _replace_variants(db: AsyncSession, catalog_item_id: int, variant_reqs: List[ProductVariantRequest]) -> None:
+    """Deletes any existing variants not present in variant_reqs (by id) and
+    creates/updates the rest. Called only when the caller explicitly sent a
+    `variants` list (see the sentinel note on CatalogItemUpdateRequest)."""
+    stmt = select(ProductVariant).where(ProductVariant.catalog_item_id == catalog_item_id)
+    res = await db.execute(stmt)
+    existing = {v.id: v for v in res.scalars().all()}
+
+    keep_ids = set()
+    for vr in variant_reqs:
+        if vr.id and vr.id in existing:
+            v = existing[vr.id]
+            v.name = vr.name.strip()
+            v.sku = vr.sku.strip() if vr.sku else None
+            v.price_override = vr.price_override
+            v.stock_quantity = vr.stock_quantity
+            v.in_stock = vr.in_stock
+            keep_ids.add(vr.id)
+        else:
+            new_variant = ProductVariant(
+                catalog_item_id=catalog_item_id,
+                name=vr.name.strip(),
+                sku=vr.sku.strip() if vr.sku else None,
+                price_override=vr.price_override,
+                stock_quantity=vr.stock_quantity,
+                in_stock=vr.in_stock,
+            )
+            db.add(new_variant)
+
+    for vid, v in existing.items():
+        if vid not in keep_ids:
+            await db.delete(v)
 
 
 @router.get("")
@@ -140,8 +206,22 @@ async def create_catalog_item(
         stock_quantity=req.stock_quantity,
         access_group_ids_json=json.dumps(group_ids),
         access_tags_json=json.dumps(combined_tags),
+        has_variants=bool(req.variants),
     )
     db.add(item)
+    await db.flush()  # assigns item.id before variants reference it
+
+    if req.variants:
+        for vr in req.variants:
+            db.add(ProductVariant(
+                catalog_item_id=item.id,
+                name=vr.name.strip(),
+                sku=vr.sku.strip() if vr.sku else None,
+                price_override=vr.price_override,
+                stock_quantity=vr.stock_quantity,
+                in_stock=vr.in_stock,
+            ))
+
     await db.commit()
     await db.refresh(item)
 
@@ -163,7 +243,10 @@ async def get_catalog_item(
     grp_res = await db.execute(select(AccessGroup))
     groups_map = {g.id: g.name for g in grp_res.scalars().all()}
 
-    return _serialize_catalog_item(item, groups_map)
+    variant_res = await db.execute(select(ProductVariant).where(ProductVariant.catalog_item_id == item.id))
+    variants = variant_res.scalars().all()
+
+    return _serialize_catalog_item(item, groups_map, variants=variants)
 
 
 @router.put("/{item_id}")
@@ -205,6 +288,15 @@ async def update_catalog_item(
     elif req.access_tags is not None:
         tags_clean = [t.strip().lower() for t in req.access_tags if t.strip()]
         item.access_tags_json = json.dumps(tags_clean)
+
+    if req.variants is not None:
+        # Sentinel: caller explicitly sent a variants list — [] clears all
+        # variants, a populated list replaces them. Omitting the key
+        # entirely (req.variants stays None) leaves existing variants
+        # untouched, so a plain "edit the price" PUT doesn't need to know
+        # or resend variant data.
+        await _replace_variants(db, item.id, req.variants)
+        item.has_variants = bool(req.variants)
 
     await db.commit()
     await db.refresh(item)

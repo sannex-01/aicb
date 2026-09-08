@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional, Set
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.catalog import CatalogItem
+from app.models.product_variant import ProductVariant
 from app.models.order import Order
 from app.commerce.payments.paystack import PaystackClient
 from app.commerce.bumpa.client import BumpaClient
@@ -166,6 +167,20 @@ class CatalogManager:
     @staticmethod
     async def get_product_by_id(db: AsyncSession, product_id: int) -> Optional[CatalogItem]:
         stmt = select(CatalogItem).where(CatalogItem.id == product_id)
+        result = await db.execute(stmt)
+        return result.scalars().first()
+
+    @staticmethod
+    async def get_variants_for_product(db: AsyncSession, product_id: int) -> List[ProductVariant]:
+        """Used by the chat flow's cart_add_ handler to decide whether to
+        show a variant-selection step before adding to cart."""
+        stmt = select(ProductVariant).where(ProductVariant.catalog_item_id == product_id)
+        result = await db.execute(stmt)
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_variant_by_id(db: AsyncSession, variant_id: int) -> Optional[ProductVariant]:
+        stmt = select(ProductVariant).where(ProductVariant.id == variant_id)
         result = await db.execute(stmt)
         return result.scalars().first()
 
