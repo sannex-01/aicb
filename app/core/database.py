@@ -78,6 +78,7 @@ def _sync_columns(sync_conn) -> None:
         ("access_groups", "tags_json", "TEXT", "'[]'"),
         ("catalog_items", "access_group_ids_json", "TEXT", "'[]'"),
         ("catalog_items", "access_tags_json", "TEXT", "'[]'"),
+        ("catalog_items", "has_variants", "BOOLEAN", "FALSE"),
         ("knowledge_docs", "access_tags_json", "TEXT", "'[]'"),
     ]
 
