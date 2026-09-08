@@ -6,14 +6,16 @@ export async function loadCatalogPage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 6 });
   try {
     const isAdmin = ['admin', 'super_admin'].includes(state.user?.role);
-    const [data, storageInfo, groups] = await Promise.all([
+    const [data, storageInfo, groups, importProviders] = await Promise.all([
       api('/admin/catalog'),
       api('/settings/storage').catch(() => ({ configured: false })),
       api('/access-groups').catch(() => []),
+      isAdmin ? api('/admin/catalog/import/providers').catch(() => ({})) : Promise.resolve({}),
     ]);
     state.storageInfo = storageInfo;
     state.accessGroups = groups || [];
     const items = data.items || [];
+    const hasImportSource = Object.values(importProviders || {}).some(p => p?.configured);
 
     container.innerHTML = `
       <div class="space-y-6">
@@ -23,15 +25,26 @@ export async function loadCatalogPage(container) {
             <p class="text-sm text-muted">Manage store items with image previews and scoped access groups</p>
           </div>
           ${isAdmin ? `
-          <button class="btn btn-primary btn-sm" id="btn-create-product">
-            <i data-lucide="plus" class="w-4 h-4"></i> Add Product
-          </button>
+          <div class="flex items-center gap-2">
+            ${hasImportSource ? `
+            <button class="btn btn-secondary btn-sm" id="btn-import-catalog">
+              <i data-lucide="download-cloud" class="w-4 h-4"></i> Import Catalog
+            </button>
+            ` : ''}
+            <button class="btn btn-primary btn-sm" id="btn-create-product">
+              <i data-lucide="plus" class="w-4 h-4"></i> Add Product
+            </button>
+          </div>
           ` : ''}
         </div>
 
         <div id="catalog-table-container"></div>
       </div>
     `;
+
+    if (hasImportSource) {
+      document.getElementById('btn-import-catalog').addEventListener('click', () => importCatalogModal(importProviders));
+    }
 
     const columns = [
       {
@@ -262,6 +275,77 @@ async function editProductModal(product) {
       loadCatalogPage(document.getElementById('page-content'));
     } catch (err) {
       showToast(err.message || 'Failed to save product', 'error');
+    }
+  });
+}
+
+const IMPORT_PROVIDER_LABELS = { bumpa: 'Bumpa', paystack: 'Paystack' };
+
+function importCatalogModal(providers) {
+  const available = Object.entries(providers || {}).filter(([, p]) => p?.configured);
+
+  openModal(`
+    <div class="modal-dialog max-w-md">
+      <div class="modal-header">
+        <h3 class="font-bold text-lg text-main">Import Catalog</h3>
+        <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
+      </div>
+      <div class="modal-body space-y-3">
+        <p class="text-sm text-muted">
+          Choose a connected source to pull products from. New products are added;
+          products already imported from that source are updated with the latest
+          price, stock, and image.
+        </p>
+        <div id="import-provider-list">
+          ${renderSelectCards({
+            name: 'import-source',
+            type: 'radio',
+            items: available.map(([key, info]) => ({
+              value: key,
+              title: IMPORT_PROVIDER_LABELS[key] || key,
+              badge: info.preview_count === null ? 'Count unavailable' : `${info.preview_count} product${info.preview_count === 1 ? '' : 's'} found`,
+              badgeClass: 'badge-subtle',
+            })),
+            selectedValues: available.length === 1 ? [available[0][0]] : [],
+            gridClass: 'space-y-2',
+          })}
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-import">
+          <i data-lucide="download-cloud" class="w-4 h-4"></i> Confirm Import
+        </button>
+      </div>
+    </div>
+  `);
+  if (window.lucide) lucide.createIcons();
+
+  document.getElementById('btn-confirm-import').addEventListener('click', async (e) => {
+    const selected = document.querySelector('input[name="import-source"]:checked');
+    if (!selected) {
+      showToast('Please choose a source to import from', 'error');
+      return;
+    }
+    const btn = e.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Importing...`;
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      const result = await api('/admin/catalog/import', {
+        method: 'POST',
+        body: JSON.stringify({ source: selected.value }),
+      });
+      closeModal();
+      showToast(`Imported ${result.imported} new, updated ${result.updated} existing products`, 'success');
+      loadCatalogPage(document.getElementById('page-content'));
+    } catch (err) {
+      showToast(err.message || 'Import failed', 'error');
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      if (window.lucide) lucide.createIcons();
     }
   });
 }

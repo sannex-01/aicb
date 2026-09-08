@@ -1,10 +1,11 @@
 import json
-from typing import Optional, List
+from typing import Optional, List, Literal
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import select, or_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import get_current_admin_user, require_admin_role
 from app.models.catalog import CatalogItem
@@ -227,3 +228,69 @@ async def delete_catalog_item(
     await db.commit()
 
     return {"status": "ok", "message": "Catalog item deleted"}
+
+
+class CatalogImportRequest(BaseModel):
+    source: Literal["bumpa", "paystack"]
+
+
+@router.get("/import/providers")
+async def list_import_providers(
+    _: AdminUser = Depends(get_current_admin_user),
+):
+    """Reports which external catalog sources are configured and ready to
+    import from, with a live preview count — backs the dashboard's Import
+    Catalog button (shown only when at least one provider is configured)
+    and its confirmation screen ("We found 42 products in your Bumpa
+    store"). Fetches the real product list to count it, but writes nothing.
+
+    Note: both BumpaClient.fetch_products and PaystackClient.fetch_products
+    already swallow their own request errors and return [] rather than
+    raising (see their own try/except blocks) — so a bad key or network
+    issue surfaces here as preview_count: 0, not an exception. The
+    try/except below is defensive for any error that isn't already
+    caught upstream, not the primary path for a bad-credentials case."""
+    providers = {}
+
+    if settings.BUMPA_API_KEY:
+        from app.commerce.bumpa.client import BumpaClient
+        try:
+            products = await BumpaClient().fetch_products()
+            providers["bumpa"] = {"configured": True, "preview_count": len(products)}
+        except Exception:
+            providers["bumpa"] = {"configured": True, "preview_count": None}
+    else:
+        providers["bumpa"] = {"configured": False, "preview_count": None}
+
+    if settings.PAYSTACK_SECRET_KEY:
+        from app.commerce.payments.paystack import PaystackClient
+        try:
+            products = await PaystackClient().fetch_products()
+            providers["paystack"] = {"configured": True, "preview_count": len(products)}
+        except Exception:
+            providers["paystack"] = {"configured": True, "preview_count": None}
+    else:
+        providers["paystack"] = {"configured": False, "preview_count": None}
+
+    return providers
+
+
+@router.post("/import")
+async def import_catalog(
+    req: CatalogImportRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(require_admin_role),
+):
+    """Imports (creates new / updates existing) catalog items from the
+    given external source. Reuses the same sync logic the background sync
+    worker and Bumpa's product webhook already rely on — this just adds a
+    business-triggered, confirmable entry point with a real result count."""
+    from app.commerce.catalog_provider import CatalogManager
+
+    if req.source == "bumpa" and not settings.BUMPA_API_KEY:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bumpa is not configured on this instance.")
+    if req.source == "paystack" and not settings.PAYSTACK_SECRET_KEY:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paystack is not configured on this instance.")
+
+    result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source)
+    return {"status": "ok", "source": req.source, **result}

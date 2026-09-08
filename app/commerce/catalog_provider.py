@@ -171,7 +171,19 @@ class CatalogManager:
 
     @staticmethod
     async def sync_external_catalog(db: AsyncSession, source: Optional[str] = None) -> int:
-        """Syncs catalog products from Paystack or Bumpa into local database."""
+        """Syncs catalog products from Paystack or Bumpa into local database.
+        Returns the total count synced (imported + updated) — kept for
+        backwards compatibility with existing callers (background sync
+        worker, Bumpa product webhook). For the imported/updated breakdown,
+        use sync_external_catalog_detailed instead."""
+        result = await CatalogManager.sync_external_catalog_detailed(db, source=source)
+        return result["imported"] + result["updated"]
+
+    @staticmethod
+    async def sync_external_catalog_detailed(db: AsyncSession, source: Optional[str] = None) -> Dict[str, int]:
+        """Same sync as sync_external_catalog, but returns {"imported": int, "updated": int}
+        separately — used by the dashboard's Import Catalog confirmation flow so a
+        business can see "42 new, 3 updated" instead of just a single total."""
         target_source = (source or settings.CATALOG_SOURCE).lower()
         logger.info(f"Syncing catalog from external source: {target_source.upper()}")
 
@@ -185,9 +197,10 @@ class CatalogManager:
                 fetched_products = await BumpaClient().fetch_products()
         elif target_source == "local":
             logger.info("Local catalog active; skipping external API sync.")
-            return 0
+            return {"imported": 0, "updated": 0}
 
-        synced_count = 0
+        imported_count = 0
+        updated_count = 0
         for item in fetched_products:
             ext_id = item.get("external_id")
             stmt = select(CatalogItem).where(
@@ -205,6 +218,7 @@ class CatalogManager:
                 existing.in_stock = item.get("in_stock", True)
                 existing.stock_quantity = item.get("stock_quantity", 100)
                 existing.image_url = item.get("image_url")
+                updated_count += 1
             else:
                 new_item = CatalogItem(
                     source=item.get("source", target_source),
@@ -218,8 +232,11 @@ class CatalogManager:
                     image_url=item.get("image_url"),
                 )
                 db.add(new_item)
-            synced_count += 1
+                imported_count += 1
 
         await db.commit()
-        logger.info(f"Successfully synced {synced_count} products from {target_source.upper()}")
-        return synced_count
+        logger.info(
+            f"Successfully synced {imported_count + updated_count} products from {target_source.upper()} "
+            f"({imported_count} new, {updated_count} updated)"
+        )
+        return {"imported": imported_count, "updated": updated_count}
