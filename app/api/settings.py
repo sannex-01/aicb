@@ -287,6 +287,62 @@ async def send_test_email(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+class UpdateSMSConfigRequest(BaseModel):
+    provider: Optional[str] = None  # "africastalking", "termii", or None
+    config: Optional[dict] = {}
+
+
+class SendTestSMSRequest(BaseModel):
+    to_phone: str
+
+
+@router.get("/sms")
+async def get_sms_settings(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns current SMS delivery configuration status and masked settings."""
+    from app.services.sms import SMSService
+    return await SMSService.get_config(db)
+
+
+@router.put("/sms")
+async def update_sms_settings(
+    req: UpdateSMSConfigRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates SMS delivery provider configuration (Africa's Talking or Termii)."""
+    from app.services.sms import SMSService
+    try:
+        return await SMSService.save_config(db, req.provider, req.config or {})
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
+@router.post("/sms/test")
+async def send_test_sms(
+    req: SendTestSMSRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Sends a test SMS to verify credentials and delivery."""
+    from app.services.sms import SMSService
+    try:
+        biz_res = await db.execute(select(BusinessProfile).limit(1))
+        biz = biz_res.scalar_one_or_none()
+        biz_name = biz.name if biz else "AICB Studio"
+
+        await SMSService.send_sms(
+            db=db,
+            to_phone=req.to_phone.strip(),
+            message=f"Test SMS from {biz_name}: your AICB order alert SMS delivery is configured correctly.",
+        )
+        return {"status": "ok", "message": f"Test SMS sent successfully to {req.to_phone}."}
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
 class UpdatePaymentConfigRequest(BaseModel):
     provider: Optional[str] = None  # "paystack", "flutterwave", "monnify", "stripe", or None
     config: Optional[dict] = {}
