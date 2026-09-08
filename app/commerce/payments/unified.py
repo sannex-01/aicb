@@ -69,6 +69,20 @@ class UnifiedPaymentManager:
                 customer_phone=customer_phone,
             )
 
+        elif selected_gateway == "bumpa":
+            # Bumpa is selectable under Payment Gateways (it has its own
+            # checkout, sharing its Store Connections credential — see
+            # PaymentService/StoreConnectionService), but dispatching a real
+            # payment link through Bumpa's API isn't built yet: BumpaClient
+            # only has fetch_products/create_order today, no payment-link
+            # method, and Bumpa's checkout API shape hasn't been confirmed.
+            # Fail loudly and specifically here rather than silently no-op
+            # or fall into the generic "unsupported gateway" message below.
+            raise ValueError(
+                "Bumpa checkout isn't wired up for direct payment links yet — "
+                "this is a known gap, not a configuration problem."
+            )
+
         else:
             raise ValueError(f"Unsupported payment gateway: {selected_gateway}")
 

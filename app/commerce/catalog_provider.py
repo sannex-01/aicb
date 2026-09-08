@@ -195,21 +195,30 @@ class CatalogManager:
         return result["imported"] + result["updated"]
 
     @staticmethod
-    async def sync_external_catalog_detailed(db: AsyncSession, source: Optional[str] = None) -> Dict[str, int]:
+    async def sync_external_catalog_detailed(db: AsyncSession, source: Optional[str] = None, api_key: Optional[str] = None) -> Dict[str, int]:
         """Same sync as sync_external_catalog, but returns {"imported": int, "updated": int}
         separately — used by the dashboard's Import Catalog confirmation flow so a
-        business can see "42 new, 3 updated" instead of just a single total."""
+        business can see "42 new, 3 updated" instead of just a single total.
+
+        api_key, when given, overrides the client's own env-var default —
+        used by the dashboard-triggered import, which resolves a
+        database-saved key (via StoreConnectionService/PaymentService)
+        before falling back to env. Existing callers (background sync
+        worker, Bumpa's product webhook) don't pass this and keep reading
+        straight from env, unchanged."""
         target_source = (source or settings.CATALOG_SOURCE).lower()
         logger.info(f"Syncing catalog from external source: {target_source.upper()}")
 
         fetched_products: List[Dict[str, Any]] = []
 
         if target_source == "paystack":
-            if settings.PAYSTACK_SECRET_KEY:
-                fetched_products = await PaystackClient().fetch_products()
+            effective_key = api_key or settings.PAYSTACK_SECRET_KEY
+            if effective_key:
+                fetched_products = await PaystackClient(secret_key=effective_key).fetch_products()
         elif target_source == "bumpa":
-            if settings.BUMPA_API_KEY:
-                fetched_products = await BumpaClient().fetch_products()
+            effective_key = api_key or settings.BUMPA_API_KEY
+            if effective_key:
+                fetched_products = await BumpaClient(api_key=effective_key).fetch_products()
         elif target_source == "local":
             logger.info("Local catalog active; skipping external API sync.")
             return {"imported": 0, "updated": 0}

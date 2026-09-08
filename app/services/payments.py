@@ -86,13 +86,52 @@ class PaymentService:
         is_configured = False
 
         if provider == "paystack":
-            sk = raw_config.get("secret_key") or settings.PAYSTACK_SECRET_KEY
-            pk = raw_config.get("public_key") or getattr(settings, "PAYSTACK_PUBLIC_KEY", "")
+            # Any provider that also appears under Store Connections (i.e.
+            # it can supply a catalog AND process payments — Paystack fits
+            # this today, so will Bumpa once it's a selectable gateway) can
+            # have its Store Connection credential shared into this slot via
+            # a per-provider toggle, instead of pasting the same key twice.
+            # When shared, this tab shows a read-only pointer back to Store
+            # Connections instead of its own editable key field.
+            from app.services.store_connections import StoreConnectionService
+            shared_key = await StoreConnectionService.get_shared_payment_key(db, "paystack")
+
+            if shared_key:
+                sk = shared_key
+                pk = raw_config.get("public_key") or getattr(settings, "PAYSTACK_PUBLIC_KEY", "")
+                is_configured = bool(sk)
+                safe_config = {
+                    "secret_key_masked": _mask_key(sk),
+                    "secret_key_configured": bool(sk),
+                    "public_key": pk or "",
+                    "shared_from_connection": "paystack",
+                }
+            else:
+                sk = raw_config.get("secret_key") or settings.PAYSTACK_SECRET_KEY
+                pk = raw_config.get("public_key") or getattr(settings, "PAYSTACK_PUBLIC_KEY", "")
+                is_configured = bool(sk)
+                safe_config = {
+                    "secret_key_masked": _mask_key(sk),
+                    "secret_key_configured": bool(sk),
+                    "public_key": pk or "",
+                    "shared_from_connection": None,
+                }
+        elif provider == "bumpa":
+            # Bumpa as a Payment Gateway shares the SAME credential as its
+            # Store Connection entry when that connection has
+            # share_for_payments on — Bumpa doesn't have a second, separate
+            # "payments" key to paste; its checkout uses the same API key
+            # used to pull its catalog. Dispatch support for actually
+            # charging through Bumpa (UnifiedPaymentManager) is not wired up
+            # yet — this reports configuration status only.
+            from app.services.store_connections import StoreConnectionService
+            shared_key = await StoreConnectionService.get_shared_payment_key(db, "bumpa")
+            sk = shared_key or await StoreConnectionService.get_effective_key(db, "bumpa")
             is_configured = bool(sk)
             safe_config = {
                 "secret_key_masked": _mask_key(sk),
                 "secret_key_configured": bool(sk),
-                "public_key": pk or "",
+                "shared_from_connection": "bumpa" if shared_key else None,
             }
         else:
             provider = None
@@ -126,6 +165,14 @@ class PaymentService:
         incoming_config = dict(config or {})
 
         if clean_provider == "paystack":
+            from app.services.store_connections import StoreConnectionService
+            if await StoreConnectionService.get_shared_payment_key(db, "paystack"):
+                raise ValueError(
+                    "Paystack is currently using the shared Store Connection credential. "
+                    "Turn off \"Share for payments\" on the Paystack card under "
+                    "Integrations → Store Connections before setting a separate Paystack key."
+                )
+
             sk = (incoming_config.get("secret_key") or "").strip()
             if (not sk or sk.startswith("***") or "..." in sk) and existing_provider == "paystack":
                 sk = (existing_config.get("secret_key") or "").strip()
@@ -136,8 +183,24 @@ class PaymentService:
             if "public_key" in incoming_config:
                 merged_config["public_key"] = (incoming_config.get("public_key") or "").strip()
 
+        elif clean_provider == "bumpa":
+            # Bumpa has no independent payment key of its own to paste here —
+            # it always uses the same credential as its Store Connection
+            # entry. Selecting Bumpa as the active gateway is allowed (it's
+            # just a "provider" pointer, no config to store), but it only
+            # actually works once that connection's "Share for payments"
+            # toggle is on and has a key — same as the read-only status
+            # get_config already reports.
+            from app.services.store_connections import StoreConnectionService
+            if not await StoreConnectionService.get_shared_payment_key(db, "bumpa"):
+                raise ValueError(
+                    "Turn on \"Share for payments\" on the Bumpa card under Integrations → "
+                    "Store Connections first — Bumpa has no separate payment key of its own."
+                )
+            merged_config = {}
+
         elif clean_provider is not None:
-            raise ValueError(f"Unsupported payment gateway: '{clean_provider}'. Currently, only 'paystack' is supported.")
+            raise ValueError(f"Unsupported payment gateway: '{clean_provider}'. Currently, only 'paystack' and 'bumpa' are supported.")
 
         meta["payments"] = {
             "provider": clean_provider,

@@ -393,8 +393,45 @@ async def send_test_telegram_alert(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
+class UpdateBumpaConfigRequest(BaseModel):
+    api_key: Optional[str] = None
+    store_id: Optional[str] = None
+    share_for_payments: Optional[bool] = None
+
+
+@router.get("/store-connections/bumpa")
+async def get_bumpa_settings(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Returns Bumpa connection status and masked config — backs the Store
+    Connections tab and the catalog Import Catalog button's provider check."""
+    from app.services.store_connections import StoreConnectionService
+    return await StoreConnectionService.get_bumpa_config(db)
+
+
+@router.put("/store-connections/bumpa")
+async def update_bumpa_settings(
+    req: UpdateBumpaConfigRequest,
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Updates the Bumpa API key/store id, stored in the database instead
+    of requiring an env var — this is what a business actually sets from
+    the dashboard."""
+    from app.services.store_connections import StoreConnectionService
+    try:
+        return await StoreConnectionService.save_bumpa_config(db, {
+            "api_key": req.api_key,
+            "store_id": req.store_id,
+            "share_for_payments": req.share_for_payments,
+        })
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+
+
 class UpdatePaymentConfigRequest(BaseModel):
-    provider: Optional[str] = None  # "paystack", "flutterwave", "monnify", "stripe", or None
+    provider: Optional[str] = None  # "paystack", "bumpa", "flutterwave", "monnify", "stripe", or None
     config: Optional[dict] = {}
     default_gateway: Optional[str] = None
     gateways: Optional[dict] = None

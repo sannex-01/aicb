@@ -12,6 +12,7 @@ from app.models.catalog import CatalogItem
 from app.models.product_variant import ProductVariant
 from app.models.access_group import AccessGroup
 from app.models.user import AdminUser
+from app.models.business import BusinessProfile
 from app.core.access import parse_tags_json, parse_ids_json
 
 router = APIRouter(prefix="/admin/catalog", tags=["Admin Catalog Management"])
@@ -328,6 +329,7 @@ class CatalogImportRequest(BaseModel):
 
 @router.get("/import/providers")
 async def list_import_providers(
+    db: AsyncSession = Depends(get_db),
     _: AdminUser = Depends(get_current_admin_user),
 ):
     """Reports which external catalog sources are configured and ready to
@@ -336,28 +338,51 @@ async def list_import_providers(
     and its confirmation screen ("We found 42 products in your Bumpa
     store"). Fetches the real product list to count it, but writes nothing.
 
+    Keys are read the same way PaymentService/StoreConnectionService
+    already resolve them elsewhere: a database-saved key (Store
+    Connections tab for Bumpa, Payment Gateways tab for Paystack) takes
+    priority, falling back to the instance's env var only if nothing is
+    saved in the dashboard — .env is a deploy-time default, not where a
+    business is expected to manage these keys day to day.
+
     Note: both BumpaClient.fetch_products and PaystackClient.fetch_products
     already swallow their own request errors and return [] rather than
     raising (see their own try/except blocks) — so a bad key or network
     issue surfaces here as preview_count: 0, not an exception. The
     try/except below is defensive for any error that isn't already
     caught upstream, not the primary path for a bad-credentials case."""
+    from app.services.store_connections import StoreConnectionService
+
     providers = {}
 
-    if settings.BUMPA_API_KEY:
+    bumpa_key = await StoreConnectionService.get_effective_bumpa_key(db)
+    if bumpa_key:
         from app.commerce.bumpa.client import BumpaClient
         try:
-            products = await BumpaClient().fetch_products()
+            products = await BumpaClient(api_key=bumpa_key).fetch_products()
             providers["bumpa"] = {"configured": True, "preview_count": len(products)}
         except Exception:
             providers["bumpa"] = {"configured": True, "preview_count": None}
     else:
         providers["bumpa"] = {"configured": False, "preview_count": None}
 
-    if settings.PAYSTACK_SECRET_KEY:
+    # Paystack's key for catalog import can come from either side: a
+    # Store Connection entry (used for import only, or shared into
+    # Payment Gateways via the toggle) or the Payment Gateway's own
+    # independently-set key — check both, DB before env either way.
+    paystack_key = await StoreConnectionService.get_effective_key(db, "paystack")
+    if not paystack_key:
+        biz_res = await db.execute(select(BusinessProfile).limit(1))
+        biz = biz_res.scalar_one_or_none()
+        meta = json.loads(biz.metadata_json or "{}") if biz else {}
+        if meta.get("payments", {}).get("provider") == "paystack":
+            paystack_key = meta.get("payments", {}).get("config", {}).get("secret_key")
+    paystack_key = paystack_key or settings.PAYSTACK_SECRET_KEY
+
+    if paystack_key:
         from app.commerce.payments.paystack import PaystackClient
         try:
-            products = await PaystackClient().fetch_products()
+            products = await PaystackClient(secret_key=paystack_key).fetch_products()
             providers["paystack"] = {"configured": True, "preview_count": len(products)}
         except Exception:
             providers["paystack"] = {"configured": True, "preview_count": None}
@@ -378,11 +403,24 @@ async def import_catalog(
     worker and Bumpa's product webhook already rely on — this just adds a
     business-triggered, confirmable entry point with a real result count."""
     from app.commerce.catalog_provider import CatalogManager
+    from app.services.store_connections import StoreConnectionService
 
-    if req.source == "bumpa" and not settings.BUMPA_API_KEY:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bumpa is not configured on this instance.")
-    if req.source == "paystack" and not settings.PAYSTACK_SECRET_KEY:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paystack is not configured on this instance.")
+    resolved_key = None
+    if req.source == "bumpa":
+        resolved_key = await StoreConnectionService.get_effective_bumpa_key(db)
+        if not resolved_key:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bumpa is not configured. Set it up under Integrations → Store Connections.")
+    elif req.source == "paystack":
+        resolved_key = await StoreConnectionService.get_effective_key(db, "paystack")
+        if not resolved_key:
+            biz_res = await db.execute(select(BusinessProfile).limit(1))
+            biz = biz_res.scalar_one_or_none()
+            meta = json.loads(biz.metadata_json or "{}") if biz else {}
+            if meta.get("payments", {}).get("provider") == "paystack":
+                resolved_key = meta.get("payments", {}).get("config", {}).get("secret_key")
+        resolved_key = resolved_key or settings.PAYSTACK_SECRET_KEY
+        if not resolved_key:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Paystack is not configured. Set it up under Integrations → Store Connections or Payment Gateways.")
 
-    result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source)
+    result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source, api_key=resolved_key)
     return {"status": "ok", "source": req.source, **result}
