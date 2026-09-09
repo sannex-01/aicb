@@ -146,7 +146,7 @@ function renderReportsView(container, data) {
                 </div>
                 <!-- Progress Bar -->
                 <div class="w-full bg-surface-elevated h-2 rounded-full overflow-hidden border border-subtle">
-                  <div class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full transition-all duration-500" style="width: ${ch.percentage || 2}%"></div>
+                  <div class="bg-gradient-to-r from-sky-500 to-indigo-500 h-full rounded-full transition-all duration-500" style="width: ${ch.percentage > 0 ? ch.percentage : 0}%"></div>
                 </div>
               </div>
             `).join('')}

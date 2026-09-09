@@ -5,6 +5,7 @@ Provides aggregated analytics on GMV, order conversion, AI resolution efficiency
 
 import io
 import csv
+import json
 from datetime import datetime, timezone, timedelta
 from typing import Optional, Dict, Any, List
 from fastapi import APIRouter, Depends, Query, Response, status
@@ -145,17 +146,39 @@ async def get_reports_summary(
 
     top_products: List[ProductPerformance] = []
     for p in products:
-        # Match orders containing product title
-        matched_orders = [o for o in paid_orders if (p.title or "").lower() in str(getattr(o, "items_json", "")).lower()]
-        orders_cnt = len(matched_orders) or 1
+        # Count real purchases of this exact product by its own id, not a
+        # title substring match (which could also false-match an unrelated
+        # product whose title happens to contain this one's title as a
+        # substring). Sums actual quantity across matching cart lines
+        # rather than counting 1 per order, so a customer buying 3 units
+        # in one order reflects as 3, not 1.
+        units_sold = 0
+        matched_order_count = 0
+        for o in paid_orders:
+            try:
+                items = json.loads(o.items_json or "[]")
+            except Exception:
+                continue
+            line_qty = sum(
+                int(item.get("quantity", 1))
+                for item in items
+                if item.get("item_id") == p.id or item.get("product_id") == p.id
+            )
+            if line_qty > 0:
+                units_sold += line_qty
+                matched_order_count += 1
+
+        # A product genuinely never purchased shows 0, not a fabricated 1 —
+        # `len(...) or 1` here previously meant EVERY product displayed at
+        # least one fake sale regardless of real order history.
         top_products.append(
             ProductPerformance(
                 id=p.id,
                 name=p.title or f"Product #{p.id}",
                 price=p.price or 0.0,
                 currency=p.currency or "NGN",
-                orders_count=orders_cnt,
-                total_sales=round((p.price or 0.0) * orders_cnt, 2),
+                orders_count=matched_order_count,
+                total_sales=round((p.price or 0.0) * units_sold, 2),
             )
         )
 

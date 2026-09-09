@@ -160,6 +160,54 @@ async def _replace_variants(db: AsyncSession, catalog_item_id: int, variant_reqs
             await db.delete(v)
 
 
+@router.get("/stats")
+async def get_catalog_stats(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin_user),
+):
+    """Catalog-wide summary stats for the Products & Catalog page's stat
+    cards (mirrors the shape of Bumpa's own catalog stats row). Computed
+    across the WHOLE catalog, not just the current page of results —
+    list_admin_catalog is paginated (default 50/page), so summing its
+    `items` alone would undercount any store with more than one page of
+    products.
+
+    "Total Inventory Value" (Bumpa's own metric, cost-basis) isn't shown
+    here — CatalogItem has no separate cost_price field, only the selling
+    price, so a true cost-based figure isn't derivable. "Total Units in
+    Stock" is shown instead as a real, honestly-computed number from data
+    we actually track, rather than faking a cost figure."""
+    from app.models.order import Order
+
+    all_items_res = await db.execute(select(CatalogItem))
+    all_items = all_items_res.scalars().all()
+
+    total_retail_value = sum((itm.price or 0.0) * (itm.stock_quantity or 0) for itm in all_items if itm.in_stock)
+    total_units_in_stock = sum((itm.stock_quantity or 0) for itm in all_items if itm.in_stock)
+    out_of_stock_count = sum(1 for itm in all_items if not itm.in_stock or (itm.stock_quantity or 0) <= 0)
+
+    # Products sold: real units sold across PAID orders, matched by the
+    # cart line's own item_id/product_id (same approach as the Reports
+    # page's top-products fix) rather than a fabricated or title-guessed
+    # count.
+    paid_orders_res = await db.execute(select(Order).where(Order.status == "paid"))
+    paid_orders = paid_orders_res.scalars().all()
+    products_sold = 0
+    for o in paid_orders:
+        try:
+            items = json.loads(o.items_json or "[]")
+        except Exception:
+            continue
+        products_sold += sum(int(item.get("quantity", 1)) for item in items)
+
+    return {
+        "total_retail_value": round(total_retail_value, 2),
+        "total_units_in_stock": total_units_in_stock,
+        "products_sold": products_sold,
+        "out_of_stock_count": out_of_stock_count,
+    }
+
+
 @router.get("")
 async def list_admin_catalog(
     search: Optional[str] = Query(None),

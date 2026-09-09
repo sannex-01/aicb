@@ -600,6 +600,13 @@ export async function loadIntegrationsPage(container) {
       const smsProvider = sms.provider || 'none';
       const smsCfg = sms.config || {};
 
+      const subTabs = [
+        { id: 'telegram', label: 'Telegram', icon: 'send', badge: tg.webhook_secret_configured ? 'badge-sky' : 'badge-subtle', badgeLabel: tg.webhook_secret_configured ? 'Secret Token Active' : 'Auto-Generated' },
+        { id: 'whatsapp', label: 'Whatsapp', icon: 'message-circle', badge: wa.app_secret_configured ? 'badge-emerald' : 'badge-subtle', badgeLabel: wa.app_secret_configured ? 'App Secret Configured' : 'Open / Unverified' },
+        { id: 'sms', label: 'SMS', icon: 'message-square-text', badge: sms.configured ? 'badge-emerald' : 'badge-subtle', badgeLabel: sms.configured ? 'Active' : 'Not Configured' },
+      ];
+      const activeSubTab = state.channelsSubTab && subTabs.some(t => t.id === state.channelsSubTab) ? state.channelsSubTab : 'telegram';
+
       el.innerHTML = `
         <div class="card space-y-6">
           <div>
@@ -607,9 +614,19 @@ export async function loadIntegrationsPage(container) {
             <p class="text-xs text-muted mt-0.5">Configure global webhook verification tokens, channel secrets, and test live webhooks</p>
           </div>
 
+          <div class="flex gap-1 p-1 bg-surface rounded-xl border border-subtle overflow-x-auto">
+            ${subTabs.map(t => `
+              <button type="button" class="channels-sub-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${activeSubTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-subtab="${t.id}">
+                <i data-lucide="${t.icon}" class="w-3.5 h-3.5 flex-shrink-0"></i>
+                <span>${t.label}</span>
+                <span class="badge ${t.badge} text-[10px] !py-0 !px-1.5">${t.badgeLabel}</span>
+              </button>
+            `).join('')}
+          </div>
+
           <form id="channels-settings-form" class="space-y-6">
             <!-- WhatsApp Cloud API -->
-            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
+            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4 channels-subtab-panel" data-subtab-panel="whatsapp" ${activeSubTab === 'whatsapp' ? '' : 'hidden'}>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2 text-xs font-semibold text-emerald">
                   <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp Cloud API
@@ -662,10 +679,28 @@ export async function loadIntegrationsPage(container) {
                   </div>
                 </div>
               </div>
+
+              <!-- WhatsApp Guide -->
+              <div class="p-4 rounded-xl border border-subtle bg-surface space-y-2.5 text-xs">
+                <div class="font-bold text-main flex items-center gap-1.5 text-emerald">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i> WhatsApp Setup Instructions
+                </div>
+                <ol class="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
+                  <li>Open your <span class="font-semibold text-main">Meta Developer App Dashboard</span>.</li>
+                  <li>Go to <span class="font-semibold text-main">WhatsApp &rarr; Configuration</span>.</li>
+                  <li>In <span class="font-semibold text-main">Webhook</span>, click <span class="font-semibold text-main">Edit</span>.</li>
+                  <li>Paste the <span class="font-mono text-[12px] text-main">Webhook Callback URL</span> and <span class="font-mono text-[12px] text-main">Verify Token</span> above.</li>
+                  <li>Click <span class="font-semibold text-main">Verify and Save</span>, then subscribe to the <code class="px-1 py-0.5 rounded bg-surface-elevated border border-subtle text-brand font-mono">messages</code> field.</li>
+                </ol>
+              </div>
+
+              <div class="flex justify-end pt-2 border-t border-subtle">
+                <button type="submit" class="btn btn-primary" id="btn-save-channels-whatsapp">Save WhatsApp Settings</button>
+              </div>
             </div>
 
             <!-- Telegram Bot API -->
-            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
+            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4 channels-subtab-panel" data-subtab-panel="telegram" ${activeSubTab === 'telegram' ? '' : 'hidden'}>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2 text-xs font-semibold text-sky">
                   <i data-lucide="send" class="w-4 h-4"></i> Telegram Bot API
@@ -708,15 +743,35 @@ export async function loadIntegrationsPage(container) {
                   </div>
                 </div>
               </div>
-            </div>
 
-            <div class="flex justify-end pt-2 border-t border-subtle">
-              <button type="submit" class="btn btn-primary" id="btn-save-channels">Save Messaging Settings</button>
+              <!-- Telegram Tester -->
+              <div class="p-4 rounded-xl border border-subtle bg-surface space-y-3 text-xs">
+                <div class="font-bold text-main flex items-center gap-1.5 text-sky">
+                  <i data-lucide="zap" class="w-4 h-4"></i> Telegram Webhook Live Tester
+                </div>
+                <p class="text-muted leading-relaxed">
+                  Once an agent has a Telegram Bot Token, the webhook is registered automatically. You can also test or register it directly here:
+                </p>
+                <div class="space-y-2">
+                  <div class="flex gap-2">
+                    <input type="text" id="tg-test-token" class="form-control text-xs font-mono flex-1" placeholder="123456789:ABCdefGHIjklMNOpqr..." />
+                    <button type="button" id="btn-test-tg-webhook" class="btn btn-secondary text-xs flex-shrink-0 flex items-center gap-1.5">
+                      <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
+                      <span>Test & Set</span>
+                    </button>
+                  </div>
+                  <div id="tg-test-result" class="hidden text-xs p-2.5 rounded-lg"></div>
+                </div>
+              </div>
+
+              <div class="flex justify-end pt-2 border-t border-subtle">
+                <button type="submit" class="btn btn-primary" id="btn-save-channels-telegram">Save Telegram Settings</button>
+              </div>
             </div>
           </form>
 
           <!-- SMS -->
-          <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
+          <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4 channels-subtab-panel" data-subtab-panel="sms" ${activeSubTab === 'sms' ? '' : 'hidden'}>
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2 text-xs font-semibold text-main">
                 <i data-lucide="message-square-text" class="w-4 h-4 text-brand"></i> SMS
@@ -790,60 +845,18 @@ export async function loadIntegrationsPage(container) {
               </div>
             </form>
           </div>
-
-          <!-- Webhook Setup & Live Test Instructions -->
-          <div class="p-5 rounded-2xl border border-subtle bg-surface-elevated/40 space-y-4">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 rounded-lg bg-brand/10 text-brand flex items-center justify-center flex-shrink-0">
-                <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-              </div>
-              <div>
-                <h4 class="font-bold text-sm text-main">Webhook Setup & Live Test Diagnostics</h4>
-                <p class="text-xs text-muted">Verify connectivity and confirm webhooks are receiving events</p>
-              </div>
-            </div>
-
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-              <!-- WhatsApp Guide -->
-              <div class="p-4 rounded-xl border border-subtle bg-surface space-y-2.5 text-xs">
-                <div class="font-bold text-main flex items-center gap-1.5 text-emerald">
-                  <i data-lucide="message-circle" class="w-4 h-4"></i> WhatsApp Setup Instructions
-                </div>
-                <ol class="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
-                  <li>Open your <span class="font-semibold text-main">Meta Developer App Dashboard</span>.</li>
-                  <li>Go to <span class="font-semibold text-main">WhatsApp &rarr; Configuration</span>.</li>
-                  <li>In <span class="font-semibold text-main">Webhook</span>, click <span class="font-semibold text-main">Edit</span>.</li>
-                  <li>Paste the <span class="font-mono text-[12px] text-main">Webhook Callback URL</span> and <span class="font-mono text-[12px] text-main">Verify Token</span> above.</li>
-                  <li>Click <span class="font-semibold text-main">Verify and Save</span>, then subscribe to the <code class="px-1 py-0.5 rounded bg-surface-elevated border border-subtle text-brand font-mono">messages</code> field.</li>
-                </ol>
-              </div>
-
-              <!-- Telegram Tester -->
-              <div class="p-4 rounded-xl border border-subtle bg-surface space-y-3 text-xs">
-                <div class="font-bold text-main flex items-center gap-1.5 text-sky">
-                  <i data-lucide="send" class="w-4 h-4"></i> Telegram Webhook Live Tester
-                </div>
-                <p class="text-muted leading-relaxed">
-                  Once an agent has a Telegram Bot Token, the webhook is registered automatically. You can also test or register it directly here:
-                </p>
-                <div class="space-y-2">
-                  <div class="flex gap-2">
-                    <input type="text" id="tg-test-token" class="form-control text-xs font-mono flex-1" placeholder="123456789:ABCdefGHIjklMNOpqr..." />
-                    <button type="button" id="btn-test-tg-webhook" class="btn btn-secondary text-xs flex-shrink-0 flex items-center gap-1.5">
-                      <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-500"></i>
-                      <span>Test & Set</span>
-                    </button>
-                  </div>
-                  <div id="tg-test-result" class="hidden text-xs p-2.5 rounded-lg"></div>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
       `;
 
       initPasswordToggles(el);
       if (window.lucide) lucide.createIcons();
+
+      el.querySelectorAll('.channels-sub-tab').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          state.channelsSubTab = btn.dataset.subtab;
+          renderChannelsTab();
+        });
+      });
 
       const rotateWa = async () => {
         try {
@@ -935,7 +948,7 @@ export async function loadIntegrationsPage(container) {
 
       document.getElementById('channels-settings-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const btn = document.getElementById('btn-save-channels');
+        const btn = e.submitter || document.getElementById('btn-save-channels-telegram') || document.getElementById('btn-save-channels-whatsapp');
         const orig = btn.innerHTML;
         btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 mr-1 animate-spin"></i> Saving...`;
         btn.disabled = true;

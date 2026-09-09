@@ -7,16 +7,59 @@ export async function loadCatalogPage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 6 });
   try {
     const isAdmin = ['admin', 'super_admin'].includes(state.user?.role);
-    const [data, storageInfo, groups, importProviders] = await Promise.all([
+    const [data, storageInfo, groups, importProviders, catalogStats] = await Promise.all([
       api('/admin/catalog'),
       api('/settings/storage').catch(() => ({ configured: false })),
       api('/access-groups').catch(() => []),
       isAdmin ? api('/admin/catalog/import/providers').catch(() => ({})) : Promise.resolve({}),
+      api('/admin/catalog/stats').catch(() => null),
     ]);
     state.storageInfo = storageInfo;
     state.accessGroups = groups || [];
     const items = data.items || [];
     const hasImportSource = Object.values(importProviders || {}).some(p => p?.configured);
+    const currency = state.business?.currency || state.user?.business?.currency || 'NGN';
+
+    const statCards = catalogStats ? `
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="p-4 rounded-xl bg-sky-500/5 border border-sky-500/15 flex items-center justify-between">
+          <div>
+            <div class="text-lg font-bold text-main font-mono">${formatCurrency(catalogStats.total_retail_value, currency)}</div>
+            <div class="text-xs text-muted mt-0.5">Total Retail Value</div>
+          </div>
+          <div class="w-9 h-9 rounded-lg bg-surface border border-subtle flex items-center justify-center flex-shrink-0">
+            <i data-lucide="banknote" class="w-4 h-4 text-sky-600 dark:text-sky-400"></i>
+          </div>
+        </div>
+        <div class="p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/15 flex items-center justify-between">
+          <div>
+            <div class="text-lg font-bold text-main font-mono">${catalogStats.total_units_in_stock.toLocaleString()}</div>
+            <div class="text-xs text-muted mt-0.5">Total Units in Stock</div>
+          </div>
+          <div class="w-9 h-9 rounded-lg bg-surface border border-subtle flex items-center justify-center flex-shrink-0">
+            <i data-lucide="layers" class="w-4 h-4 text-emerald-600 dark:text-emerald-400"></i>
+          </div>
+        </div>
+        <div class="p-4 rounded-xl bg-rose-500/5 border border-rose-500/15 flex items-center justify-between">
+          <div>
+            <div class="text-lg font-bold text-main font-mono">${catalogStats.products_sold.toLocaleString()}</div>
+            <div class="text-xs text-muted mt-0.5">Products Sold</div>
+          </div>
+          <div class="w-9 h-9 rounded-lg bg-surface border border-subtle flex items-center justify-center flex-shrink-0">
+            <i data-lucide="tag" class="w-4 h-4 text-rose-600 dark:text-rose-400"></i>
+          </div>
+        </div>
+        <div class="p-4 rounded-xl bg-amber-500/5 border border-amber-500/15 flex items-center justify-between">
+          <div>
+            <div class="text-lg font-bold text-main font-mono">${catalogStats.out_of_stock_count.toLocaleString()}</div>
+            <div class="text-xs text-muted mt-0.5">Out of Stock</div>
+          </div>
+          <div class="w-9 h-9 rounded-lg bg-surface border border-subtle flex items-center justify-center flex-shrink-0">
+            <i data-lucide="package-x" class="w-4 h-4 text-amber-600 dark:text-amber-400"></i>
+          </div>
+        </div>
+      </div>
+    ` : '';
 
     container.innerHTML = `
       <div class="space-y-6">
@@ -38,6 +81,8 @@ export async function loadCatalogPage(container) {
           </div>
           ` : ''}
         </div>
+
+        ${statCards}
 
         <div id="catalog-table-container"></div>
       </div>

@@ -55,11 +55,31 @@
             main: 'var(--text-main)',
             muted: 'var(--text-muted)',
             // Status colors — kept distinct from brand, since these convey
-            // state (success/error/warning/info) not identity.
-            emerald: '#008060',
-            rose: '#d72c0d',
-            amber: '#b45309',
-            sky: '#0369a1',
+            // state (success/error/warning/info) not identity. Each is a
+            // full numbered shade scale (DEFAULT = the original flat value,
+            // so existing bg-emerald/text-rose/etc. usages keep working
+            // unchanged) rather than a single flat hex — a flat value here
+            // silently breaks EVERY existing emerald-500/rose-600/etc.
+            // usage elsewhere in the app (Tailwind can no longer resolve
+            // the shade suffix at all, so the utility generates no color
+            // rule — text/backgrounds quietly fall back to inherited grey
+            // instead of erroring, which is how this went unnoticed).
+            emerald: {
+              DEFAULT: '#008060', 50: '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+              400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857', 800: '#065f46', 900: '#064e3b',
+            },
+            rose: {
+              DEFAULT: '#d72c0d', 50: '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af',
+              400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c', 800: '#9f1239', 900: '#881337',
+            },
+            amber: {
+              DEFAULT: '#b45309', 50: '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+              400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309', 800: '#92400e', 900: '#78350f',
+            },
+            sky: {
+              DEFAULT: '#0369a1', 50: '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc',
+              400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e',
+            },
           }
         }
       }
