@@ -1,7 +1,10 @@
+import csv
+import io
 import json
 from typing import Optional, List, Literal
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, ValidationError
 from sqlalchemy import select, or_, func, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -251,13 +254,14 @@ async def list_admin_catalog(
     }
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
-async def create_catalog_item(
-    req: CatalogItemCreateRequest,
-    db: AsyncSession = Depends(get_db),
-    _: AdminUser = Depends(require_admin_role),
-):
-    """Creates a new catalog product with access group assignments."""
+async def _build_catalog_item_from_request(db: AsyncSession, req: CatalogItemCreateRequest) -> CatalogItem:
+    """Shared construction logic for a new local catalog item — used by both
+    the single-product create endpoint and the CSV bulk importer below, so
+    the two never drift on business rules (effective currency, derived
+    requires_shipping, access tag/group merging). Adds the item (and any
+    variants) to the session via db.add/flush but does NOT commit — callers
+    decide whether to commit per-item or batch the whole import in one
+    transaction."""
     group_ids = [int(gid) for gid in (req.access_group_ids or []) if gid]
     tags_clean = [t.strip().lower() for t in (req.access_tags or []) if t.strip()]
 
@@ -312,6 +316,17 @@ async def create_catalog_item(
                 in_stock=vr.in_stock,
             ))
 
+    return item
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+async def create_catalog_item(
+    req: CatalogItemCreateRequest,
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(require_admin_role),
+):
+    """Creates a new catalog product with access group assignments."""
+    item = await _build_catalog_item_from_request(db, req)
     await db.commit()
     await db.refresh(item)
 
@@ -562,3 +577,182 @@ async def import_catalog(
 
     result = await CatalogManager.sync_external_catalog_detailed(db, source=req.source, api_key=resolved_key, public_key=resolved_public_key, location_id=resolved_location_id)
     return {"status": "ok", "source": req.source, **result}
+
+
+# ---------------------------------------------------------------------------
+# CSV bulk import — a business's own spreadsheet, not a connected storefront.
+# Deliberately a separate pair of endpoints from /import (Bumpa/Paystack)
+# above, since a CSV has no "source" to check credentials for and no live
+# preview-count step; the dashboard's Import Catalog offcanvas offers both
+# side by side.
+# ---------------------------------------------------------------------------
+
+# Column order also drives the downloaded template — keep in sync with
+# _csv_row_to_request below, and with CatalogItemCreateRequest's fields.
+# "currency" is deliberately NOT a column: a locally-created product always
+# uses the business's own default currency (see _build_catalog_item_from_request).
+CSV_COLUMNS = [
+    "title", "description", "price", "category", "subcategory",
+    "image_url", "in_stock", "stock_quantity", "fulfillment_type",
+    "digital_asset_url", "requires_shipping",
+]
+
+CSV_TEMPLATE_SAMPLE_ROWS = [
+    {
+        "title": "Velvet Silk Evening Gown",
+        "description": "Handcrafted emerald green velvet gown with crystal details.",
+        "price": "500.00",
+        "category": "Fashion & Apparel",
+        "subcategory": "Dresses & Gowns",
+        "image_url": "https://example.com/images/gown.jpg",
+        "in_stock": "true",
+        "stock_quantity": "20",
+        "fulfillment_type": "physical",
+        "digital_asset_url": "",
+        "requires_shipping": "",
+    },
+    {
+        "title": "Brand Style Guide (PDF)",
+        "description": "Downloadable PDF sent automatically after payment.",
+        "price": "15.00",
+        "category": "Digital Products",
+        "subcategory": "Ebooks & Guides",
+        "image_url": "",
+        "in_stock": "true",
+        "stock_quantity": "9999",
+        "fulfillment_type": "digital",
+        "digital_asset_url": "https://example.com/files/style-guide.pdf",
+        "requires_shipping": "",
+    },
+]
+
+
+@router.get("/import/csv-template")
+async def download_csv_template(
+    _: AdminUser = Depends(get_current_admin_user),
+):
+    """Downloads a starter CSV with the exact headers /import/csv expects,
+    pre-filled with two example rows (one physical, one digital) so a
+    business can see the expected format at a glance rather than guessing
+    column names from documentation."""
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=CSV_COLUMNS)
+    writer.writeheader()
+    for row in CSV_TEMPLATE_SAMPLE_ROWS:
+        writer.writerow(row)
+
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=aicb_product_import_template.csv"},
+    )
+
+
+def _parse_csv_bool(raw: str, default: Optional[bool]) -> Optional[bool]:
+    val = (raw or "").strip().lower()
+    if val in ("true", "1", "yes", "y"):
+        return True
+    if val in ("false", "0", "no", "n"):
+        return False
+    return default  # blank/unrecognized — keep the field's own schema default
+
+
+def _csv_row_to_request(row: dict) -> CatalogItemCreateRequest:
+    """Converts one CSV row (raw strings from csv.DictReader) into the same
+    request shape create_catalog_item validates against, so a CSV import
+    gets the exact same field validation and defaults as the single-product
+    form — no separate, drifting validation logic for this path."""
+    title = (row.get("title") or "").strip()
+    if not title:
+        raise ValueError("Missing required 'title'")
+
+    price_raw = (row.get("price") or "").strip()
+    try:
+        price = float(price_raw) if price_raw else 0.0
+    except ValueError:
+        raise ValueError(f"'price' must be a number, got {price_raw!r}")
+
+    stock_raw = (row.get("stock_quantity") or "").strip()
+    try:
+        stock_quantity = int(float(stock_raw)) if stock_raw else 100
+    except ValueError:
+        raise ValueError(f"'stock_quantity' must be a whole number, got {stock_raw!r}")
+
+    fulfillment_type = (row.get("fulfillment_type") or "physical").strip().lower() or "physical"
+    if fulfillment_type not in ("physical", "digital", "service"):
+        raise ValueError(f"'fulfillment_type' must be physical, digital, or service — got {fulfillment_type!r}")
+
+    requires_shipping = _parse_csv_bool(row.get("requires_shipping", ""), default=None)
+
+    return CatalogItemCreateRequest(
+        title=title,
+        description=(row.get("description") or "").strip() or None,
+        price=price,
+        category=(row.get("category") or "").strip() or None,
+        subcategory=(row.get("subcategory") or "").strip() or None,
+        image_url=(row.get("image_url") or "").strip() or None,
+        in_stock=_parse_csv_bool(row.get("in_stock", ""), default=True),
+        stock_quantity=stock_quantity,
+        fulfillment_type=fulfillment_type,
+        digital_asset_url=(row.get("digital_asset_url") or "").strip() or None,
+        requires_shipping=requires_shipping,
+    )
+
+
+@router.post("/import/csv")
+async def import_catalog_csv(
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(require_admin_role),
+):
+    """Bulk-creates catalog products from an uploaded CSV (see CSV_COLUMNS /
+    the downloadable template above for the expected headers). Every row is
+    a NEW product — unlike the Bumpa/Paystack import above, there is no
+    stable external id to match against for an "update existing" path, so
+    re-uploading the same CSV twice creates duplicates rather than silently
+    overwriting anything. Partial success is allowed: valid rows are
+    created, invalid rows are collected into per-row errors and reported
+    back rather than failing the whole batch on one bad line."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Please upload a .csv file.")
+
+    raw_bytes = await file.read()
+    if len(raw_bytes) > 5 * 1024 * 1024:  # 5MB — generous for a product spreadsheet, not for arbitrary uploads
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV file exceeds 5MB limit.")
+
+    try:
+        text = raw_bytes.decode("utf-8-sig")  # -sig strips a leading BOM (common from Excel-saved CSVs)
+    except UnicodeDecodeError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not read file as UTF-8 text. Please save the CSV with UTF-8 encoding.")
+
+    reader = csv.DictReader(io.StringIO(text))
+    if not reader.fieldnames or "title" not in [f.strip().lower() for f in reader.fieldnames]:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CSV is missing a 'title' column. Download the template to see the expected format.")
+
+    # DictReader keys off the file's actual header casing/spacing; normalize
+    # once so a business's own slightly-different header capitalization
+    # ("Title", "Price ") still matches.
+    normalized_rows = [{(k or "").strip().lower(): v for k, v in row.items()} for row in reader]
+
+    created = 0
+    errors: List[dict] = []
+    for idx, row in enumerate(normalized_rows, start=2):  # start=2: row 1 is the header line
+        try:
+            req = _csv_row_to_request(row)
+        except (ValueError, ValidationError) as e:
+            errors.append({"row": idx, "title": row.get("title", ""), "error": str(e)})
+            continue
+        try:
+            await _build_catalog_item_from_request(db, req)
+            created += 1
+        except Exception as e:
+            errors.append({"row": idx, "title": req.title, "error": str(e)})
+
+    await db.commit()
+
+    return {
+        "status": "ok",
+        "created": created,
+        "failed": len(errors),
+        "errors": errors[:50],  # cap the echoed error list — a business with a badly-malformed 5000-row file doesn't need all 5000 back
+    }

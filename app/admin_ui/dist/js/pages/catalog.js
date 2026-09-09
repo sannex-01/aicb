@@ -507,28 +507,54 @@ function importCatalogModal() {
   // /import/providers preview count on demand — this is the one place
   // that's allowed to hit Bumpa/Paystack for a real product count, since
   // it only runs when the business actually asks to import, not on every
-  // background catalog page load.
+  // background catalog page load. The CSV section below doesn't need any
+  // of that — it's always available, no connected source required.
   openModal(`
     <div class="modal-dialog max-w-md">
       <div class="modal-header">
         <h3 class="font-bold text-lg text-main">Import Catalog</h3>
         <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
       </div>
-      <div class="modal-body space-y-3">
-        <p class="text-sm text-muted">
-          Choose a connected source to pull products from. New products are added;
-          products already imported from that source are updated with the latest
-          price, stock, and image.
-        </p>
-        <div id="import-provider-list" class="flex items-center gap-2 text-sm text-muted py-4">
-          <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Checking connected sources...
+      <div class="modal-body space-y-5">
+        <div class="space-y-3">
+          <p class="text-sm text-muted">
+            Choose a connected source to pull products from. New products are added;
+            products already imported from that source are updated with the latest
+            price, stock, and image.
+          </p>
+          <div id="import-provider-list" class="flex items-center gap-2 text-sm text-muted py-4">
+            <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Checking connected sources...
+          </div>
+          <div class="flex justify-end">
+            <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-import" disabled>
+              <i data-lucide="download-cloud" class="w-4 h-4"></i> Confirm Import
+            </button>
+          </div>
+        </div>
+
+        <div class="border-t border-subtle pt-4 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2 text-xs font-semibold text-main">
+              <i data-lucide="file-spreadsheet" class="w-4 h-4 text-brand"></i> Upload from CSV
+            </div>
+            <button type="button" id="btn-download-csv-template" class="text-[12px] text-brand hover:underline flex items-center gap-1">
+              <i data-lucide="download" class="w-3 h-3"></i> Download Template
+            </button>
+          </div>
+          <p class="text-[12px] text-muted -mt-1">
+            Every row becomes a new product — re-uploading the same file creates duplicates rather than updating existing ones.
+          </p>
+          <input type="file" id="csv-import-file" accept=".csv,text/csv" class="form-control text-xs" />
+          <div id="csv-import-result" class="hidden text-xs p-2.5 rounded-lg border"></div>
+          <div class="flex justify-end">
+            <button type="button" class="btn btn-secondary btn-sm" id="btn-confirm-csv-import" disabled>
+              <i data-lucide="upload" class="w-4 h-4"></i> Upload & Import
+            </button>
+          </div>
         </div>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-import" disabled>
-          <i data-lucide="download-cloud" class="w-4 h-4"></i> Confirm Import
-        </button>
+        <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Close</button>
       </div>
     </div>
   `);
@@ -546,6 +572,11 @@ function importCatalogModal() {
     const available = Object.entries(providers || {}).filter(([, p]) => p?.configured);
     const listEl = document.getElementById('import-provider-list');
     if (!listEl) return; // modal was closed before the fetch resolved
+    if (!available.length) {
+      listEl.className = 'text-sm text-muted';
+      listEl.innerHTML = 'No connected storefront yet — set one up under Integrations → Store Connections, or use CSV below.';
+      return;
+    }
     listEl.className = '';
     listEl.innerHTML = renderSelectCards({
       name: 'import-source',
@@ -587,6 +618,93 @@ function importCatalogModal() {
       showToast(err.message || 'Import failed', 'error');
       btn.disabled = false;
       btn.innerHTML = originalHtml;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
+  document.getElementById('btn-download-csv-template').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    try {
+      const token = localStorage.getItem('aicb_admin_token');
+      const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+      const res = await fetch('/api/v1/admin/catalog/import/csv-template', { headers });
+      if (!res.ok) throw new Error('Failed to download template');
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.style.display = 'none';
+      a.href = url;
+      a.download = 'aicb_product_import_template.csv';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      showToast(err.message || 'Failed to download template', 'error');
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = originalHtml;
+      if (window.lucide) lucide.createIcons();
+    }
+  });
+
+  const csvFileInput = document.getElementById('csv-import-file');
+  const csvConfirmBtn = document.getElementById('btn-confirm-csv-import');
+  csvFileInput.addEventListener('change', () => {
+    csvConfirmBtn.disabled = !csvFileInput.files.length;
+  });
+
+  csvConfirmBtn.addEventListener('click', async () => {
+    const file = csvFileInput.files[0];
+    if (!file) return;
+
+    const resultEl = document.getElementById('csv-import-result');
+    const originalHtml = csvConfirmBtn.innerHTML;
+    csvConfirmBtn.disabled = true;
+    csvConfirmBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Uploading...`;
+    resultEl.classList.add('hidden');
+    if (window.lucide) lucide.createIcons();
+
+    try {
+      // Bypasses api() deliberately — it always sets Content-Type:
+      // application/json, which would break multipart/form-data's
+      // browser-generated boundary (see uploadMediaFile in utils.js for
+      // the same pattern).
+      const token = localStorage.getItem('aicb_admin_token');
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await fetch('/api/v1/admin/catalog/import/csv', {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        body: formData,
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(result.detail || result.message || 'CSV import failed');
+
+      resultEl.classList.remove('hidden', 'bg-emerald/10', 'text-emerald', 'border-emerald/20', 'bg-amber/10', 'text-amber', 'border-amber/20');
+      if (result.failed > 0) {
+        resultEl.classList.add('bg-amber/10', 'text-amber', 'border-amber/20');
+        const errorLines = (result.errors || []).slice(0, 5).map(e => `Row ${e.row}${e.title ? ` (${escapeHtml(e.title)})` : ''}: ${escapeHtml(e.error)}`).join('<br/>');
+        resultEl.innerHTML = `<strong>${result.created} imported, ${result.failed} failed.</strong><br/>${errorLines}${result.failed > 5 ? `<br/>...and ${result.failed - 5} more` : ''}`;
+      } else {
+        resultEl.classList.add('bg-emerald/10', 'text-emerald', 'border-emerald/20');
+        resultEl.innerHTML = `<strong>${result.created} product${result.created === 1 ? '' : 's'} imported successfully.</strong>`;
+      }
+
+      if (result.created > 0) {
+        showToast(`Imported ${result.created} product${result.created === 1 ? '' : 's'} from CSV`, 'success');
+        loadCatalogPage(document.getElementById('page-content'));
+      }
+      csvFileInput.value = '';
+      csvConfirmBtn.disabled = true;
+    } catch (err) {
+      resultEl.classList.remove('hidden');
+      resultEl.className = 'text-xs p-2.5 rounded-lg border bg-rose/10 text-rose border-rose/20';
+      resultEl.textContent = err.message || 'CSV import failed';
+    } finally {
+      csvConfirmBtn.innerHTML = originalHtml;
       if (window.lucide) lucide.createIcons();
     }
   });
