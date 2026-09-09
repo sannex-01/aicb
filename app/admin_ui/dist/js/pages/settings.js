@@ -329,9 +329,12 @@ export async function loadSettingsPage(container) {
       state.settingsTab = tabId;
       document.querySelectorAll('.settings-tab').forEach((btn) => {
         const isActive = btn.dataset.tab === tabId;
-        btn.classList.toggle('bg-brand/10', isActive);
-        btn.classList.toggle('text-brand', isActive);
-        btn.classList.toggle('font-semibold', isActive);
+        // Matches the sidebar's own active-menu-item background (see
+        // main.js) — bg-surface-hover/text-main, not the old bg-brand/10
+        // tint this toggle previously still referenced (which is why a
+        // tab click never visually updated until a full page reload).
+        btn.classList.toggle('bg-surface-hover', isActive);
+        btn.classList.toggle('text-main', isActive);
         btn.classList.toggle('text-muted', !isActive);
       });
       if (tabId === 'profile') renderProfileTab();

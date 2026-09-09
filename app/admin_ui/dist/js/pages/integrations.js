@@ -1469,9 +1469,14 @@ export async function loadIntegrationsPage(container) {
       state.integrationsTab = tabId;
       document.querySelectorAll('.integrations-tab').forEach((btn) => {
         const isActive = btn.dataset.tab === tabId;
-        btn.classList.toggle('bg-brand/10', isActive);
-        btn.classList.toggle('text-brand', isActive);
-        btn.classList.toggle('font-semibold', isActive);
+        // Matches the sidebar's own active-menu-item background (see
+        // main.js) — bg-surface-hover/text-main, not the old bg-brand/10
+        // tint. This toggle previously still referenced that old class
+        // pair, so a tab click never visually updated (only a full page
+        // reload did, since the initial render's template string already
+        // used the new classes but this click handler didn't).
+        btn.classList.toggle('bg-surface-hover', isActive);
+        btn.classList.toggle('text-main', isActive);
         btn.classList.toggle('text-muted', !isActive);
       });
       if (tabId === 'store-connections') renderStoreConnectionsTab();
