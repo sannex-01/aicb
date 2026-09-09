@@ -205,7 +205,7 @@ export function injectStyles(): void {
 
 .${PREFIX}-cards {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   flex-shrink: 0;
   gap: 10px;
   overflow-x: auto;
@@ -214,6 +214,8 @@ export function injectStyles(): void {
 .${PREFIX}-card {
   flex: 0 0 auto;
   width: 150px;
+  display: flex;
+  flex-direction: column;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   overflow: hidden;
@@ -222,6 +224,7 @@ export function injectStyles(): void {
 .${PREFIX}-card img, .${PREFIX}-card-placeholder {
   width: 100%;
   height: 100px;
+  flex-shrink: 0;
   object-fit: cover;
   background: #eef1f4;
   display: flex;
@@ -230,11 +233,17 @@ export function injectStyles(): void {
   color: #9aa1a9;
   font-size: 12px;
 }
-.${PREFIX}-card-body { padding: 8px; }
+.${PREFIX}-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  padding: 8px;
+}
 .${PREFIX}-card-title { font-weight: 600; font-size: 12.5px; margin-bottom: 2px; }
 .${PREFIX}-card-price { color: #008060; font-weight: 700; font-size: 12.5px; margin-bottom: 6px; }
 .${PREFIX}-card-buy {
   width: 100%;
+  margin-top: auto;
   background: #008060;
   color: #fff;
   border: none;

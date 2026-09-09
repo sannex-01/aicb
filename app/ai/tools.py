@@ -7,7 +7,6 @@ from app.commerce.catalog_provider import CatalogManager
 from app.commerce.cart import CartManager
 from app.commerce.customer_profile import get_customer, is_profile_complete
 from app.commerce.payments.unified import UnifiedPaymentManager
-from app.commerce.storage.manager import StorageManager
 from app.channels.slack.client import SlackDispatcher
 from app.channels.slack.fallback import get_support_contact_message
 from app.models.order import Order
@@ -205,8 +204,6 @@ class ToolExecutor:
             if not items:
                 return {"results": [], "message": "No matching products found."}
 
-            storage_ok = StorageManager.is_configured()
-
             return {
                 "results": [
                     {
@@ -232,7 +229,11 @@ class ToolExecutor:
                             "description": item.description,
                             "price": item.price,
                             "currency": item.currency,
-                            "image_url": item.image_url if storage_ok else None,
+                            # See app/flows/engine.py's flow_browse_catalog for
+                            # why this isn't gated on StorageManager.is_configured
+                            # (that answers "can this server upload new images
+                            # right now", not "is this saved image_url valid").
+                            "image_url": item.image_url or None,
                             "buy_action_id": f"cart_add_{item.id}",
                         }
                         for item in items

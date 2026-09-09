@@ -28,7 +28,6 @@ from app.commerce.address import (
     match_country,
 )
 from app.commerce.payments.unified import UnifiedPaymentManager
-from app.commerce.storage.manager import StorageManager
 from app.channels.slack.fallback import get_support_contact_message
 from app.flows.definitions import (
     MAIN_MENU_BUTTONS,
@@ -219,7 +218,6 @@ class FlowEngine:
                     buttons=_buttons(MAIN_MENU_BUTTONS),
                 )
 
-            storage_ok = StorageManager.is_configured()
             product_lines = []
             buttons = []
             product_cards = []
@@ -233,7 +231,16 @@ class FlowEngine:
                         description=p.description,
                         price=p.price,
                         currency=p.currency,
-                        image_url=p.image_url if storage_ok else None,
+                        # Whether THIS server's storage provider is configured
+                        # for new uploads (StorageManager.is_configured) is a
+                        # different question from whether an already-saved
+                        # image_url is a valid, servable URL — a product
+                        # imported from Bumpa or uploaded while a different
+                        # provider was configured still has a perfectly good
+                        # external URL. Gating display on the former hid
+                        # every product image regardless of whether it would
+                        # actually load.
+                        image_url=p.image_url or None,
                         buy_action_id=f"cart_add_{p.id}",
                     )
                 )
