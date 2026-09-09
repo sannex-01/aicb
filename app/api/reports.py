@@ -104,24 +104,30 @@ async def get_reports_summary(
     ai_resolution_rate = round((ai_resolved_count / total_conversations * 100), 1) if total_conversations > 0 else 100.0
 
     # 3. Channel breakdown
+    # Deliberately a fixed allowlist of the three real customer channels,
+    # not a dynamic bucket-per-distinct-value. A dynamic bucket meant any
+    # stray channel string ever written to a row (a manual test insert, an
+    # internal debug session, a future typo) would permanently show up as
+    # its own "channel" on this dashboard for as long as that row existed
+    # in the DB — real production-analytics UI, not somewhere test/internal
+    # data should ever be able to leak into. Anything outside the three
+    # known channels folds into "widget" (the same fallback already used
+    # for a null/missing channel) rather than being dropped silently.
+    KNOWN_CHANNELS = {"whatsapp", "telegram", "widget"}
     channels_map = {"whatsapp": 0, "telegram": 0, "widget": 0}
     channel_revenue = {"whatsapp": 0.0, "telegram": 0.0, "widget": 0.0}
     channel_orders = {"whatsapp": 0, "telegram": 0, "widget": 0}
 
     for c in conversations:
         ch = (c.channel or "widget").lower()
-        if ch in channels_map:
-            channels_map[ch] += 1
-        else:
-            channels_map[ch] = 1
-            channel_revenue[ch] = 0.0
-            channel_orders[ch] = 0
+        if ch not in KNOWN_CHANNELS:
+            ch = "widget"
+        channels_map[ch] += 1
 
     for o in orders:
         ch = (o.channel or "widget").lower()
-        if ch not in channel_orders:
-            channel_orders[ch] = 0
-            channel_revenue[ch] = 0.0
+        if ch not in KNOWN_CHANNELS:
+            ch = "widget"
         channel_orders[ch] += 1
         if o.status == "paid":
             channel_revenue[ch] += (o.total_amount or 0.0)

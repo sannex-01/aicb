@@ -9,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
 from app.core.config import settings
 from app.core.rate_limit import limiter
+from app.core.logger import logger
 from app.ai.memory import MemoryManager
 from app.ai.orchestrator import AIOrchestrator
 from app.flows.engine import FlowEngine
+from app.flows.definitions import WIDGET_MAIN_MENU_BUTTONS
 from app.models.config_override import ConfigOverride
 from app.schemas.bot_response import BotResponse
 
@@ -65,9 +67,19 @@ async def widget_history(request: Request, session_id: str, db: AsyncSession = D
     if not session:
         return {"messages": []}
 
+    msg_filters = [MessageLog.session_id == session.id, MessageLog.role.in_(["user", "assistant"])]
+    if session.session_started_at:
+        # Only replay messages from the CURRENT conversation, not the
+        # session row's entire lifetime — a session_key is reused forever
+        # (see ConversationSession), and once MemoryManager resets an
+        # expired session's AI/flow state, replaying everything logged
+        # before that reset showed a stale transcript (old buttons whose
+        # underlying flow state no longer existed) even though the backend
+        # had genuinely started a fresh conversation.
+        msg_filters.append(MessageLog.created_at >= session.session_started_at)
     msg_stmt = (
         select(MessageLog)
-        .where(MessageLog.session_id == session.id, MessageLog.role.in_(["user", "assistant"]))
+        .where(*msg_filters)
         .order_by(MessageLog.created_at.asc())
         .limit(50)
     )
@@ -172,18 +184,36 @@ async def widget_chat_stream(request: Request, req: WidgetChatRequest, db: Async
         return StreamingResponse(flow_event_generator(), media_type="text/event-stream")
 
     async def event_generator():
-        stream = AIOrchestrator.process_message_stream(
-            db=db,
-            channel="widget",
-            customer_identifier=req.session_id,
-            user_message=req.message,
-            agent=agent,
-        )
-        async for chunk in stream:
-            if isinstance(chunk, str):
-                yield f"data: {json.dumps({'content': chunk})}\n\n"
-            elif isinstance(chunk, dict) and chunk.get("type") == "final":
-                yield f"data: {json.dumps({'final': chunk['data'].model_dump()})}\n\n"
+        # Mirrors Telegram/WhatsApp's own try/except around AIOrchestrator
+        # (see telegram/webhook.py) — an unconfigured or failing LLM
+        # provider must never surface as a raw exception here: with SSE
+        # already streaming, an uncaught error mid-generator tears down the
+        # connection outright (net::ERR_INCOMPLETE_CHUNKED_ENCODING in the
+        # browser) instead of returning a normal reply. Falls back to the
+        # same deterministic main-menu buttons every other channel uses so
+        # the widget stays usable with zero AI configured.
+        try:
+            stream = AIOrchestrator.process_message_stream(
+                db=db,
+                channel="widget",
+                customer_identifier=req.session_id,
+                user_message=req.message,
+                agent=agent,
+            )
+            async for chunk in stream:
+                if isinstance(chunk, str):
+                    yield f"data: {json.dumps({'content': chunk})}\n\n"
+                elif isinstance(chunk, dict) and chunk.get("type") == "final":
+                    yield f"data: {json.dumps({'final': chunk['data'].model_dump()})}\n\n"
+        except Exception as e:
+            logger.warning(f"AI Orchestrator unavailable for widget ({e}). Falling back to interactive menu buttons.")
+            fallback_text = "👋 I received your message! Please select from the menu below to browse products, check your cart, or track an order:"
+            fallback_resp = BotResponse(text=fallback_text, buttons=[
+                {"id": b["id"], "title": b["title"], "kind": "action", "url": None}
+                for b in WIDGET_MAIN_MENU_BUTTONS
+            ])
+            yield f"data: {json.dumps({'content': fallback_text})}\n\n"
+            yield f"data: {json.dumps({'final': fallback_resp.model_dump()})}\n\n"
 
         yield "data: [DONE]\n\n"
 

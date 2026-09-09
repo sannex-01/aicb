@@ -74,7 +74,7 @@ export async function loadIntegrationsPage(container) {
         <div class="flex flex-col md:flex-row gap-6 items-start">
           <nav class="w-full md:w-60 flex-shrink-0 flex flex-row md:flex-col gap-1 p-1.5 bg-sidebar rounded-xl border border-subtle overflow-x-auto">
             ${tabs.map(t => `
-              <button class="integrations-tab flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] font-medium text-left transition-colors whitespace-nowrap ${activeTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-tab="${t.id}">
+              <button class="integrations-tab flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] font-medium text-left transition-colors whitespace-nowrap ${activeTab === t.id ? 'bg-surface-hover text-main' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-tab="${t.id}">
                 <i data-lucide="${t.icon}" class="w-4 h-4 flex-shrink-0"></i>
                 <span>${t.label}</span>
               </button>
@@ -631,7 +631,7 @@ export async function loadIntegrationsPage(container) {
 
           <div class="flex gap-1 p-1 bg-sidebar rounded-xl border border-subtle overflow-x-auto">
             ${subTabs.map(t => `
-              <button type="button" class="channels-sub-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${activeSubTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-subtab="${t.id}">
+              <button type="button" class="channels-sub-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${activeSubTab === t.id ? 'bg-surface-hover text-main' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-subtab="${t.id}">
                 <i data-lucide="${t.icon}" class="w-3.5 h-3.5 flex-shrink-0"></i>
                 <span>${t.label}</span>
                 <span class="badge ${t.badge} text-[10px] !py-0 !px-1.5">${t.badgeLabel}</span>

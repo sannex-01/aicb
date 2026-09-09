@@ -57,6 +57,7 @@ def _sync_columns(sync_conn) -> None:
         # (table_name, column_name, column_type_sql, default_sql)
         ("conversation_sessions", "agent_id", "INTEGER", "NULL"),
         ("conversation_sessions", "bot_mode", "VARCHAR(50)", "'hybrid'"),
+        ("conversation_sessions", "session_started_at", "TIMESTAMP WITH TIME ZONE", "NULL"),
         ("customers", "total_orders", "INTEGER", "0"),
         ("customers", "total_spent", "FLOAT", "0.0"),
         ("customers", "last_seen_at", "TIMESTAMP WITH TIME ZONE", "NULL"),

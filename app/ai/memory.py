@@ -61,6 +61,11 @@ class MemoryManager:
                 session.active_flow = None
                 session.current_step = None
                 session.state_data = "{}"
+                # Marks the new conversation's start so history-replaying
+                # channels (widget /history) know to stop replaying
+                # anything logged before this point — see the column's
+                # docstring in app/models/session.py.
+                session.session_started_at = now
 
         # Refresh expiry and active time
         session.last_active_at = now

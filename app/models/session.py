@@ -30,6 +30,18 @@ class ConversationSession(Base):
     )
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
+    # Marks when the CURRENT conversation actually started — set on session
+    # creation, and bumped forward every time MemoryManager.get_or_create_session
+    # resets a stale/expired session's AI memory & flow state. A row's
+    # ConversationSession never gets a new id when it expires (the same
+    # session_key is reused indefinitely), so MessageLog history keeps
+    # accumulating across every expiry — without this marker, a channel
+    # that replays history on reconnect (see widget /history) has no way
+    # to tell "this session genuinely restarted" from "this is a mid-chat
+    # reload" and ends up replaying a stale transcript from a session the
+    # backend has already reset.
+    session_started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
     messages = relationship("MessageLog", back_populates="session", cascade="all, delete-orphan")
     agent = relationship("Agent", lazy="joined")
 
