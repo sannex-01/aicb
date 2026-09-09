@@ -594,11 +594,11 @@ export async function loadIntegrationsPage(container) {
             <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2 text-xs font-semibold text-sky">
-                  <i data-lucide="send" class="w-4 h-4"></i> Telegram (Dedicated Alerts Bot)
+                  <i data-lucide="send" class="w-4 h-4"></i> Telegram (Alerts Bot + Group)
                 </div>
                 <span class="badge ${tg.configured ? 'badge-sky' : 'badge-subtle'} text-[12px]">${tg.configured ? 'Active' : 'Not Configured'}</span>
               </div>
-              <p class="text-[12px] text-muted -mt-2">Create a small second bot via <a href="https://t.me/BotFather" target="_blank" class="text-brand hover:underline">@BotFather</a> just for alerts (separate from any customer-facing bot).</p>
+              <p class="text-[12px] text-muted -mt-2">Create a small second bot via <a href="https://t.me/BotFather" target="_blank" class="text-brand hover:underline">@BotFather</a> (separate from any customer-facing bot), add it to a Telegram group with your team, and paste that group's chat ID below — everyone in the group gets order alerts.</p>
 
               <form id="telegram-alerts-form" class="grid grid-cols-2 gap-3">
                 <div class="form-group col-span-2 sm:col-span-1">
@@ -609,8 +609,9 @@ export async function loadIntegrationsPage(container) {
                   <input type="password" id="tg-alerts-token" class="form-control font-mono text-xs" placeholder="${tgCfg.bot_token_configured ? '•••••••••• (leave blank to keep)' : '123456789:ABC...'}" />
                 </div>
                 <div class="form-group col-span-2 sm:col-span-1">
-                  <label class="form-label">Your Telegram Chat ID</label>
-                  <input type="text" id="tg-alerts-chat" class="form-control text-xs" value="${escapeHtml(tgCfg.chat_id || '')}" placeholder="e.g. 123456789" />
+                  <label class="form-label">Group Chat ID</label>
+                  <input type="text" id="tg-alerts-chat" class="form-control text-xs" value="${escapeHtml(tgCfg.chat_id || '')}" placeholder="e.g. -1001234567890 (or a personal chat ID)" />
+                  <p class="text-[12px] text-muted mt-1">Add the bot to your group, send any message, then check it with <a href="https://t.me/getidsbot" target="_blank" class="text-brand hover:underline">@getidsbot</a>.</p>
                 </div>
                 <div class="col-span-2 flex items-center justify-between gap-3">
                   ${tg.configured ? `<button type="button" id="btn-test-tg-alert" class="btn btn-secondary btn-sm">Send Test Alert</button>` : '<div></div>'}

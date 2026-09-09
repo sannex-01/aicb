@@ -31,8 +31,18 @@ class CatalogItemCreateRequest(BaseModel):
     title: str
     description: Optional[str] = None
     price: float
+    # No longer settable per-product from the dashboard form — a locally
+    # created product always uses the business's own default currency
+    # (see create_catalog_item, which overwrites this regardless of what's
+    # sent). Kept as a field, not removed outright, because catalog rows
+    # imported from Paystack/Bumpa (a different code path, sync_external_catalog)
+    # DO carry a real per-item currency from that platform, and every
+    # existing read site (cart, checkout, AI tool responses) already
+    # depends on CatalogItem.currency existing — this only changes what a
+    # LOCAL product's currency is set to, not the column itself.
     currency: str = "NGN"
     category: Optional[str] = None
+    subcategory: Optional[str] = None
     image_url: Optional[str] = None
     in_stock: bool = True
     stock_quantity: int = 100
@@ -50,6 +60,7 @@ class CatalogItemUpdateRequest(BaseModel):
     price: Optional[float] = None
     currency: Optional[str] = None
     category: Optional[str] = None
+    subcategory: Optional[str] = None
     image_url: Optional[str] = None
     in_stock: Optional[bool] = None
     stock_quantity: Optional[int] = None
@@ -98,6 +109,7 @@ def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None,
         "price": itm.price,
         "currency": itm.currency,
         "category": itm.category,
+        "subcategory": itm.subcategory,
         "image_url": itm.image_url,
         "in_stock": itm.in_stock,
         "stock_quantity": itm.stock_quantity,
@@ -210,13 +222,24 @@ async def create_catalog_item(
     # in-store, no delivery address needed even though it's a real good).
     effective_requires_shipping = req.requires_shipping if req.requires_shipping is not None else (req.fulfillment_type == "physical")
 
+    # A locally-created product always uses the business's own default
+    # currency — no per-product currency picker on the dashboard form
+    # anymore. Whatever req.currency carries (the field still exists for
+    # API compatibility) is ignored here; only sync_external_catalog
+    # (Paystack/Bumpa imports) sets a real per-item currency, since those
+    # platforms can genuinely differ from the business's own default.
+    biz_res = await db.execute(select(BusinessProfile).limit(1))
+    biz = biz_res.scalar_one_or_none()
+    effective_currency = (biz.currency if biz and biz.currency else "NGN").strip().upper()
+
     item = CatalogItem(
         source="local",
         title=req.title.strip(),
         description=req.description.strip() if req.description else None,
         price=req.price,
-        currency=req.currency.strip().upper(),
+        currency=effective_currency,
         category=req.category.strip() if req.category else None,
+        subcategory=req.subcategory.strip() if req.subcategory else None,
         image_url=req.image_url.strip() if req.image_url else None,
         in_stock=req.in_stock,
         stock_quantity=req.stock_quantity,
@@ -291,6 +314,8 @@ async def update_catalog_item(
         item.currency = req.currency.strip().upper()
     if req.category is not None:
         item.category = req.category.strip() if req.category else None
+    if req.subcategory is not None:
+        item.subcategory = req.subcategory.strip() if req.subcategory else None
     if req.image_url is not None:
         item.image_url = req.image_url.strip() if req.image_url else None
     if req.in_stock is not None:

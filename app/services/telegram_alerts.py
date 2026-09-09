@@ -11,9 +11,14 @@ class TelegramAlertService:
     """BYO-key Telegram order alerts, mirroring EmailService/SMSService's
     shape. Deliberately a SEPARATE bot from whatever the business uses for
     customer-facing conversations — a business owner creates a small
-    second bot via @BotFather purely for order alerts, pastes its token
-    plus their own numeric Telegram user id (the chat_id to send alerts
-    to) here. Config lives on BusinessProfile.metadata_json["telegram_alerts"]."""
+    second bot via @BotFather purely for order alerts, adds it to a
+    Telegram GROUP (so multiple team members can see alerts, not just one
+    person), and pastes the bot token plus that group's chat_id here.
+    Telegram's sendMessage API treats a group chat_id (a negative number,
+    e.g. -1001234567890) exactly like a personal one — same client method,
+    no special-casing needed; a lone chat_id still works fine for a
+    business that just wants alerts to themselves. Config lives on
+    BusinessProfile.metadata_json["telegram_alerts"]."""
 
     @staticmethod
     async def get_config(db: AsyncSession) -> Dict[str, Any]:
@@ -74,7 +79,7 @@ class TelegramAlertService:
             if not final_token:
                 raise ValueError("Bot Token is required. Create a bot via @BotFather in Telegram and paste its token here.")
             if not chat_id:
-                raise ValueError("Chat ID is required — send /start to your alerts bot, then use @userinfobot to find your numeric Telegram user ID.")
+                raise ValueError("Chat ID is required — add your alerts bot to a Telegram group (recommended, so your whole team gets alerts), send any message in it, then use @getidsbot or @userinfobot to find the group's chat ID (a negative number). A personal chat_id works too if you'd rather alerts go to just you.")
             meta["telegram_alerts"] = {"bot_token": final_token, "chat_id": chat_id}
 
         biz.metadata_json = json.dumps(meta)

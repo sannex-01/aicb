@@ -348,10 +348,16 @@ function renderAdminShell(container, currentPath) {
                       : 'text-muted group-hover:text-main transition-colors';
 
                     if (isAgentTab) {
+                      // The FILL itself glows and glitters — a deep
+                      // green/black gradient that slowly animates plus a
+                      // sweeping highlight pass (see .glow-fill-agents in
+                      // style.css) — deliberately no box-shadow at all,
+                      // which used to read as a faint halo around the
+                      // edges rather than the fill itself glowing.
                       linkClass = isActive
-                        ? 'bg-surface-elevated text-main shadow-[0_0_15px_rgba(20,184,166,0.5)] dark:shadow-[0_0_15px_rgba(45,212,191,0.4)] border border-subtle'
-                        : 'text-muted hover:bg-surface-hover hover:text-main border border-transparent shadow-[0_0_8px_rgba(20,184,166,0.2)] dark:shadow-[0_0_8px_rgba(45,212,191,0.15)]';
-                      iconClass = isActive ? 'text-brand' : 'text-faint group-hover:text-main transition-colors';
+                        ? 'glow-fill-agents text-white font-semibold'
+                        : 'glow-fill-agents glow-fill-agents-resting text-white/90 hover:text-white';
+                      iconClass = 'text-white';
                     }
 
                     return `

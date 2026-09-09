@@ -14,6 +14,7 @@ class CatalogItem(Base):
     price = Column(Float, nullable=False, default=0.0)
     currency = Column(String(10), default="NGN")
     category = Column(String(100), nullable=True, index=True)
+    subcategory = Column(String(100), nullable=True, index=True)
     image_url = Column(String(500), nullable=True)
     in_stock = Column(Boolean, default=True)
     stock_quantity = Column(Integer, default=100)

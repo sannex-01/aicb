@@ -82,6 +82,7 @@ def _sync_columns(sync_conn) -> None:
         ("catalog_items", "requires_shipping", "BOOLEAN", "TRUE"),
         ("catalog_items", "fulfillment_type", "VARCHAR(20)", "'physical'"),
         ("catalog_items", "digital_asset_url", "VARCHAR(500)", "NULL"),
+        ("catalog_items", "subcategory", "VARCHAR(100)", "NULL"),
         ("knowledge_docs", "access_tags_json", "TEXT", "'[]'"),
         ("orders", "group_reference", "VARCHAR(100)", "NULL"),
         ("orders", "fulfillment_status", "VARCHAR(30)", "NULL"),

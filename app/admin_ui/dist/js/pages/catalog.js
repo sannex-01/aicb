@@ -1,6 +1,7 @@
 import { state } from '../state.js';
 import { api } from '../api.js';
 import { showToast, openModal, closeModal, openConfirmModal, escapeHtml, formatCurrency, formatDate, skeletonPage, renderDataTable, renderImageUploadField, initImageUploadControl, renderSelectCards } from '../utils.js';
+import { CATALOG_CATEGORIES, subcategoriesFor } from '../catalog-taxonomy.js';
 
 export async function loadCatalogPage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 6 });
@@ -71,7 +72,10 @@ export async function loadCatalogPage(container) {
         key: 'category',
         label: 'Category',
         sortable: true,
-        render: (val) => `<span class="badge badge-subtle">${escapeHtml(val || 'General')}</span>`
+        render: (val, row) => `
+          <span class="badge badge-subtle">${escapeHtml(val || 'General')}</span>
+          ${row.subcategory ? `<span class="badge badge-subtle ml-1">${escapeHtml(row.subcategory)}</span>` : ''}
+        `
       },
       {
         key: 'price',
@@ -145,6 +149,15 @@ export async function loadCatalogPage(container) {
 async function editProductModal(product) {
   const isEdit = Boolean(product);
 
+  const businessCurrency = (product?.currency || state.business?.currency || state.user?.business?.currency || 'NGN').toUpperCase();
+  let currencySymbol = businessCurrency;
+  try {
+    currencySymbol = new Intl.NumberFormat('en-US', { style: 'currency', currency: businessCurrency, currencyDisplay: 'narrowSymbol' })
+      .formatToParts(0).find(p => p.type === 'currency')?.value || businessCurrency;
+  } catch {
+    // Intl throws on an unrecognized currency code — fall back to the code itself
+  }
+
   if (!state.storageInfo) {
     try {
       state.storageInfo = await api('/settings/storage');
@@ -205,19 +218,28 @@ async function editProductModal(product) {
           <div class="grid grid-cols-2 gap-4">
             <div class="form-group">
               <label class="form-label">Price</label>
-              <input type="number" id="prod-price" class="form-control" step="0.01" required value="${product?.price || 0}" />
-            </div>
-            <div class="form-group">
-              <label class="form-label">Category</label>
-              <input type="text" id="prod-cat" class="form-control" value="${escapeHtml(product?.category || '')}" placeholder="Electronics" />
+              <div class="relative">
+                <span class="absolute left-3 top-1/2 -translate-y-1/2 text-muted text-sm pointer-events-none">${escapeHtml(currencySymbol)}</span>
+                <input type="number" id="prod-price" class="form-control pl-8" step="0.01" required value="${product?.price || 0}" />
+              </div>
+              <p class="text-[12px] text-muted mt-1">Priced in your store's default currency (${escapeHtml(businessCurrency)}) — set under Settings.</p>
             </div>
             <div class="form-group">
               <label class="form-label">Stock Quantity</label>
               <input type="number" id="prod-stock" class="form-control" value="${product?.stock_quantity ?? 100}" />
             </div>
             <div class="form-group">
-              <label class="form-label">Currency</label>
-              <input type="text" id="prod-currency" class="form-control" value="${escapeHtml(product?.currency || state.user?.business?.currency || 'NGN')}" />
+              <label class="form-label">Category</label>
+              <select id="prod-cat" class="form-control">
+                <option value="">Select category...</option>
+                ${CATALOG_CATEGORIES.map(c => `<option value="${escapeHtml(c)}" ${product?.category === c ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sub-category</label>
+              <select id="prod-subcat" class="form-control">
+                ${subcategoriesFor(product?.category || CATALOG_CATEGORIES[0]).map(sc => `<option value="${escapeHtml(sc)}" ${product?.subcategory === sc ? 'selected' : ''}>${escapeHtml(sc)}</option>`).join('')}
+              </select>
             </div>
           </div>
 
@@ -333,6 +355,12 @@ async function editProductModal(product) {
   (existingVariants || []).forEach(addVariantRow);
   document.getElementById('btn-add-variant').addEventListener('click', () => addVariantRow(null));
 
+  document.getElementById('prod-cat').addEventListener('change', (e) => {
+    const subcatSelect = document.getElementById('prod-subcat');
+    const options = subcategoriesFor(e.target.value);
+    subcatSelect.innerHTML = options.map(sc => `<option value="${escapeHtml(sc)}">${escapeHtml(sc)}</option>`).join('');
+  });
+
   window.switchFulfillmentTypeUI = (type) => {
     document.getElementById('prod-fulfillment-digital-field')?.classList.toggle('hidden', type !== 'digital');
     document.querySelectorAll('input[name="prod-fulfillment-type"]').forEach(inp => {
@@ -379,9 +407,9 @@ async function editProductModal(product) {
       title: document.getElementById('prod-title').value.trim(),
       description: document.getElementById('prod-desc').value.trim() || null,
       price: parseFloat(document.getElementById('prod-price').value),
-      category: document.getElementById('prod-cat').value.trim() || null,
+      category: document.getElementById('prod-cat').value || null,
+      subcategory: document.getElementById('prod-subcat').value || null,
       stock_quantity: parseInt(document.getElementById('prod-stock').value, 10),
-      currency: document.getElementById('prod-currency').value.trim() || 'NGN',
       image_url: document.getElementById('prod-img').value.trim() || null,
       access_group_ids: accessGroupIds,
       in_stock: parseInt(document.getElementById('prod-stock').value, 10) > 0,
