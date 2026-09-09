@@ -591,9 +591,14 @@ async def import_catalog(
 # _csv_row_to_request below, and with CatalogItemCreateRequest's fields.
 # "currency" is deliberately NOT a column: a locally-created product always
 # uses the business's own default currency (see _build_catalog_item_from_request).
+# "in_stock" is deliberately NOT a column either: every CSV-imported product
+# is always in stock (see _csv_row_to_request) — a business bulk-uploading a
+# spreadsheet of products they're about to sell has no reason to import
+# something already marked out of stock; they'd just toggle that later, per
+# product, once real stock/sales data exists.
 CSV_COLUMNS = [
     "title", "description", "price", "category", "subcategory",
-    "image_url", "in_stock", "stock_quantity", "fulfillment_type",
+    "image_url", "stock_quantity", "fulfillment_type",
     "digital_asset_url", "requires_shipping",
 ]
 
@@ -605,11 +610,10 @@ CSV_TEMPLATE_SAMPLE_ROWS = [
         "category": "Fashion & Apparel",
         "subcategory": "Dresses & Gowns",
         "image_url": "https://example.com/images/gown.jpg",
-        "in_stock": "true",
         "stock_quantity": "20",
         "fulfillment_type": "physical",
         "digital_asset_url": "",
-        "requires_shipping": "",
+        "requires_shipping": "TRUE",
     },
     {
         "title": "Brand Style Guide (PDF)",
@@ -618,11 +622,10 @@ CSV_TEMPLATE_SAMPLE_ROWS = [
         "category": "Digital Products",
         "subcategory": "Ebooks & Guides",
         "image_url": "",
-        "in_stock": "true",
         "stock_quantity": "9999",
         "fulfillment_type": "digital",
         "digital_asset_url": "https://example.com/files/style-guide.pdf",
-        "requires_shipping": "",
+        "requires_shipping": "FALSE",
     },
 ]
 
@@ -691,7 +694,7 @@ def _csv_row_to_request(row: dict) -> CatalogItemCreateRequest:
         category=(row.get("category") or "").strip() or None,
         subcategory=(row.get("subcategory") or "").strip() or None,
         image_url=(row.get("image_url") or "").strip() or None,
-        in_stock=_parse_csv_bool(row.get("in_stock", ""), default=True),
+        in_stock=True,  # always true for a CSV import — see CSV_COLUMNS's comment
         stock_quantity=stock_quantity,
         fulfillment_type=fulfillment_type,
         digital_asset_url=(row.get("digital_asset_url") or "").strip() or None,
