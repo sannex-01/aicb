@@ -331,6 +331,7 @@ class FlowEngine:
                 variant_name=selected_variant.name if selected_variant else None,
                 source=product.source,
                 requires_shipping=product.requires_shipping,
+                fulfillment_type=product.fulfillment_type or "physical",
             )
 
             # Get current quantity of this exact item+variant combination
@@ -588,6 +589,16 @@ class FlowEngine:
                         buttons = MAIN_MENU_BUTTONS
                         pay_now_section = ""
 
+                    fulfillment_line = ""
+                    if order.fulfillment_status:
+                        f_emoji = {"delivered": "✅", "delivered_digital": "✅", "shipped": "🚚", "dispatched": "📦", "failed": "⚠️"}.get(order.fulfillment_status, "📦")
+                        fulfillment_label = order.fulfillment_status.replace("_", " ").title()
+                        fulfillment_line = f"\n• *Fulfillment:* {f_emoji} {fulfillment_label}"
+                        if order.courier_name:
+                            fulfillment_line += f" via {order.courier_name}"
+                        if order.tracking_url:
+                            fulfillment_line += f"\n  🔗 {order.tracking_url}"
+
                     return BotResponse(
                         text=(
                             f"{status_emoji} *Order #{order.order_reference} Details*\n\n"
@@ -595,6 +606,7 @@ class FlowEngine:
                             f"• *Total:* {order.total_amount:,.2f} {order.currency}\n"
                             f"• *Items:*{items_detail}\n"
                             f"• *Date:* {order.created_at.strftime('%Y-%m-%d %H:%M UTC') if order.created_at else 'Recent'}"
+                            f"{fulfillment_line}"
                             f"{pay_now_section}"
                         ),
                         buttons=_buttons(buttons),
@@ -641,9 +653,10 @@ class FlowEngine:
             for order in orders:
                 emoji = status_emoji.get(order.status, "📦")
                 date_str = order.created_at.strftime("%Y-%m-%d") if order.created_at else "Recent"
+                fulfillment_suffix = f" — {order.fulfillment_status.replace('_', ' ').title()}" if order.fulfillment_status else ""
                 lines.append(
                     f"{emoji} *#{order.order_reference}* — {order.total_amount:,.2f} {order.currency} "
-                    f"({order.status.upper()}, {date_str})"
+                    f"({order.status.upper()}, {date_str}){fulfillment_suffix}"
                 )
                 if order.status == "pending" and pending_shown < PENDING_BUTTON_LIMIT:
                     buttons.append({"id": f"flow_confirm_payment_{order.order_reference}", "title": f"✅ Pay {order.order_reference}"})

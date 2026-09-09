@@ -39,6 +39,9 @@ class CatalogItemCreateRequest(BaseModel):
     access_group_ids: Optional[List[int]] = []
     access_tags: Optional[List[str]] = []
     variants: Optional[List[ProductVariantRequest]] = None
+    fulfillment_type: Literal["physical", "digital", "service"] = "physical"
+    digital_asset_url: Optional[str] = None
+    requires_shipping: Optional[bool] = None  # None = derive from fulfillment_type
 
 
 class CatalogItemUpdateRequest(BaseModel):
@@ -52,6 +55,9 @@ class CatalogItemUpdateRequest(BaseModel):
     stock_quantity: Optional[int] = None
     access_group_ids: Optional[List[int]] = None
     access_tags: Optional[List[str]] = None
+    fulfillment_type: Optional[Literal["physical", "digital", "service"]] = None
+    digital_asset_url: Optional[str] = None
+    requires_shipping: Optional[bool] = None
     # Sentinel: None = "don't touch variants" (a normal field edit that
     # doesn't mention variants at all); [] = "explicitly clear all
     # variants"; a populated list = "replace variants with these rows."
@@ -101,6 +107,9 @@ def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None,
         "is_global": not bool(group_ids or tags),
         "has_variants": bool(itm.has_variants),
         "variants": [_serialize_variant(v) for v in variants] if variants is not None else None,
+        "fulfillment_type": itm.fulfillment_type or "physical",
+        "digital_asset_url": itm.digital_asset_url,
+        "requires_shipping": bool(itm.requires_shipping),
         "created_at": itm.created_at.isoformat() if itm.created_at else None,
     }
 
@@ -195,6 +204,12 @@ async def create_catalog_item(
     # If group_ids are provided, also record group IDs in tags for dual-query compatibility
     combined_tags = list(set(tags_clean + [str(gid) for gid in group_ids]))
 
+    # requires_shipping defaults to "does this actually ship" — physical
+    # items ship by default, digital/service items don't — unless the
+    # caller explicitly overrides it (e.g. a physical item picked up
+    # in-store, no delivery address needed even though it's a real good).
+    effective_requires_shipping = req.requires_shipping if req.requires_shipping is not None else (req.fulfillment_type == "physical")
+
     item = CatalogItem(
         source="local",
         title=req.title.strip(),
@@ -208,6 +223,9 @@ async def create_catalog_item(
         access_group_ids_json=json.dumps(group_ids),
         access_tags_json=json.dumps(combined_tags),
         has_variants=bool(req.variants),
+        fulfillment_type=req.fulfillment_type,
+        digital_asset_url=req.digital_asset_url.strip() if req.digital_asset_url else None,
+        requires_shipping=effective_requires_shipping,
     )
     db.add(item)
     await db.flush()  # assigns item.id before variants reference it
@@ -279,7 +297,13 @@ async def update_catalog_item(
         item.in_stock = req.in_stock
     if req.stock_quantity is not None:
         item.stock_quantity = req.stock_quantity
-    
+    if req.fulfillment_type is not None:
+        item.fulfillment_type = req.fulfillment_type
+    if req.digital_asset_url is not None:
+        item.digital_asset_url = req.digital_asset_url.strip() if req.digital_asset_url else None
+    if req.requires_shipping is not None:
+        item.requires_shipping = req.requires_shipping
+
     if req.access_group_ids is not None:
         group_ids = [int(gid) for gid in req.access_group_ids if gid]
         item.access_group_ids_json = json.dumps(group_ids)

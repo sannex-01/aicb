@@ -36,6 +36,33 @@ class NotificationManager:
             lines.append(f"Email: {order.customer_email}")
         if order.shipping_address:
             lines.append(f"Delivery address: {order.shipping_address}")
+
+        # Fulfillment groups (see FulfillmentManager.dispatch_order, which
+        # already ran by the time this fires — see the shared call site in
+        # _notify_customer_payment_success) — explicit action-needed
+        # call-outs so a merchant scanning the alert immediately knows
+        # what, if anything, they still have to do themselves.
+        try:
+            metadata = json.loads(order.metadata_json or "{}")
+            groups = metadata.get("fulfillment_groups", {})
+        except Exception:
+            groups = {}
+
+        if groups:
+            lines.append("")
+            lines.append("Fulfillment:")
+            for group_name, result in groups.items():
+                status = result.get("status", "unknown")
+                detail = result.get("detail", "")
+                if status in ("manual", "failed"):
+                    lines.append(f"⚠️ Action needed ({group_name}): {detail}")
+                elif status == "delivered_digital":
+                    lines.append(f"✅ {group_name.title()}: delivered automatically. {detail}")
+                elif status in ("dispatched", "shipped"):
+                    lines.append(f"📦 {group_name.title()}: {detail}")
+                else:
+                    lines.append(f"{group_name.title()}: {detail}")
+
         return "\n".join(lines)
 
     @staticmethod

@@ -32,6 +32,25 @@ class CatalogItem(Base):
     # product for digital/service items in the product form.
     requires_shipping = Column(Boolean, default=True)
 
+    # How this item is actually fulfilled after payment: "physical" (ships,
+    # dispatched via FulfillmentManager's courier/Bumpa path — the
+    # historical default, matches requires_shipping=True), "digital"
+    # (delivered instantly via digital_asset_url, no shipping), "service"
+    # (no automated dispatch at all — just a merchant notification).
+    # Deliberately a separate concept from requires_shipping (which only
+    # gates the ADDRESS COLLECTION step) rather than derived from it, since
+    # a business could conceivably want delivery tracking without needing
+    # an upfront address (e.g. pickup) — kept simple for now: physical
+    # items default requires_shipping=True, digital/service default False,
+    # but a business can still mix them if they have a real reason to.
+    fulfillment_type = Column(String(20), default="physical")
+
+    # The downloadable asset/link a digital product delivers on payment —
+    # only meaningful when fulfillment_type == "digital". Anything
+    # StorageManager can produce a URL for (an uploaded file, or a plain
+    # external link the business already hosts elsewhere).
+    digital_asset_url = Column(String(500), nullable=True)
+
     # Access Group Scoping: JSON array of group IDs e.g. [1, 2]. Empty [] = globally accessible to all agents.
     access_group_ids_json = Column(Text, default="[]")
     access_tags_json = Column(Text, default="[]")

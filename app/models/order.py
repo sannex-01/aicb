@@ -33,7 +33,19 @@ class Order(Base):
     # sibling order shares the same group_reference so they can be
     # reassembled for the customer's order history / a single receipt.
     group_reference = Column(String(100), nullable=True, index=True)
-    
+
+    # Real fulfillment status columns — previously only ever written into
+    # metadata_json["fulfillment_status"] by FulfillmentManager and never
+    # read back anywhere (a write-only field). fulfillment_status:
+    # "pending" | "dispatched" | "delivered_digital" | "shipped" |
+    # "delivered" | "failed" | "manual" — see FulfillmentManager for the
+    # actual transitions. tracking_url/courier_name are populated once a
+    # real courier booking exists (Terminal Africa integration, not yet
+    # built) — both stay null for digital/service/manual orders.
+    fulfillment_status = Column(String(30), nullable=True, index=True)
+    tracking_url = Column(String(500), nullable=True)
+    courier_name = Column(String(100), nullable=True)
+
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 

@@ -222,6 +222,39 @@ async function editProductModal(product) {
           </div>
 
           <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-2.5">
+            <label class="form-label font-semibold text-main m-0">Fulfillment</label>
+            <p class="text-[12px] text-muted">How this product is delivered after payment — decides whether customers are asked for a delivery address, and what happens automatically once they pay.</p>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2" id="prod-fulfillment-cards">
+              <label class="flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${(product?.fulfillment_type || 'physical') === 'physical' ? 'border-brand bg-brand/5' : 'border-subtle bg-surface hover:bg-surface-hover'}">
+                <input type="radio" name="prod-fulfillment-type" value="physical" ${(product?.fulfillment_type || 'physical') === 'physical' ? 'checked' : ''} class="mt-0.5" onchange="window.switchFulfillmentTypeUI('physical')" />
+                <div>
+                  <div class="font-semibold text-xs text-main">Physical</div>
+                  <div class="text-[12px] text-muted">Ships to a delivery address</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${product?.fulfillment_type === 'digital' ? 'border-brand bg-brand/5' : 'border-subtle bg-surface hover:bg-surface-hover'}">
+                <input type="radio" name="prod-fulfillment-type" value="digital" ${product?.fulfillment_type === 'digital' ? 'checked' : ''} class="mt-0.5" onchange="window.switchFulfillmentTypeUI('digital')" />
+                <div>
+                  <div class="font-semibold text-xs text-main">Digital</div>
+                  <div class="text-[12px] text-muted">Instant link, no shipping</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all ${product?.fulfillment_type === 'service' ? 'border-brand bg-brand/5' : 'border-subtle bg-surface hover:bg-surface-hover'}">
+                <input type="radio" name="prod-fulfillment-type" value="service" ${product?.fulfillment_type === 'service' ? 'checked' : ''} class="mt-0.5" onchange="window.switchFulfillmentTypeUI('service')" />
+                <div>
+                  <div class="font-semibold text-xs text-main">Service</div>
+                  <div class="text-[12px] text-muted">No auto dispatch, just a merchant alert</div>
+                </div>
+              </label>
+            </div>
+            <div id="prod-fulfillment-digital-field" class="form-group ${product?.fulfillment_type === 'digital' ? '' : 'hidden'}">
+              <label class="form-label">Digital Asset URL</label>
+              <input type="text" id="prod-digital-asset-url" class="form-control text-xs" value="${escapeHtml(product?.digital_asset_url || '')}" placeholder="https://... (download link, license key page, etc.)" />
+              <p class="text-[12px] text-muted mt-1">Sent to the customer automatically the moment they pay.</p>
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-2.5">
             <div class="flex items-center justify-between">
               <label class="form-label font-semibold text-main m-0">Access Groups</label>
               <span class="text-[12px] text-muted">Empty = Globally Accessible</span>
@@ -300,6 +333,18 @@ async function editProductModal(product) {
   (existingVariants || []).forEach(addVariantRow);
   document.getElementById('btn-add-variant').addEventListener('click', () => addVariantRow(null));
 
+  window.switchFulfillmentTypeUI = (type) => {
+    document.getElementById('prod-fulfillment-digital-field')?.classList.toggle('hidden', type !== 'digital');
+    document.querySelectorAll('input[name="prod-fulfillment-type"]').forEach(inp => {
+      const card = inp.closest('label');
+      if (card) {
+        card.className = inp.value === type
+          ? 'flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all border-brand bg-brand/5'
+          : 'flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-all border-subtle bg-surface hover:bg-surface-hover';
+      }
+    });
+  };
+
   if (window.lucide) lucide.createIcons();
 
   document.getElementById('product-form').addEventListener('submit', async (e) => {
@@ -328,6 +373,8 @@ async function editProductModal(product) {
       })
       .filter(Boolean);
 
+    const fulfillmentType = document.querySelector('input[name="prod-fulfillment-type"]:checked')?.value || 'physical';
+
     const payload = {
       title: document.getElementById('prod-title').value.trim(),
       description: document.getElementById('prod-desc').value.trim() || null,
@@ -343,6 +390,9 @@ async function editProductModal(product) {
       // pre-populated from an existing product or freshly empty for a new
       // one — so there's no "untouched, leave alone" case to preserve here.
       variants,
+      fulfillment_type: fulfillmentType,
+      digital_asset_url: fulfillmentType === 'digital' ? (document.getElementById('prod-digital-asset-url').value.trim() || null) : null,
+      requires_shipping: fulfillmentType === 'physical',
     };
 
     try {

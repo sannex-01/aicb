@@ -255,12 +255,14 @@ class ToolExecutor:
                 item_source = None
                 item_external_id = None
                 item_requires_shipping = True
+                item_fulfillment_type = "physical"
                 if product_id is not None:
                     catalog_item = await CatalogManager.get_product_by_id(db, product_id)
                     if catalog_item:
                         item_source = catalog_item.source
                         item_external_id = catalog_item.external_id
                         item_requires_shipping = catalog_item.requires_shipping
+                        item_fulfillment_type = catalog_item.fulfillment_type or "physical"
 
                 await CartManager.add_item(
                     db=db,
@@ -272,6 +274,7 @@ class ToolExecutor:
                     external_id=item_external_id,
                     source=item_source,
                     requires_shipping=item_requires_shipping,
+                    fulfillment_type=item_fulfillment_type,
                 )
                 added_titles.append(itm.get("title"))
 

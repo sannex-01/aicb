@@ -29,6 +29,21 @@ class CartManager:
         return any(item.get("requires_shipping", True) for item in cart)
 
     @staticmethod
+    def group_by_fulfillment_type(cart: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
+        """Splits cart lines into {"physical": [...], "digital": [...],
+        "service": [...]} — used by FulfillmentManager to dispatch each
+        group through its own path after a single payment (one Order/one
+        charge; only the FULFILLMENT step is split, not the checkout
+        itself — see checkout.py's separate payment-routing split for
+        Bumpa, a different axis entirely). Missing the key defaults to
+        "physical", matching CatalogItem.fulfillment_type's own default."""
+        groups: Dict[str, List[Dict[str, Any]]] = {"physical": [], "digital": [], "service": []}
+        for item in cart:
+            ft = item.get("fulfillment_type") or "physical"
+            groups.setdefault(ft, []).append(item)
+        return groups
+
+    @staticmethod
     async def add_item(
         db: AsyncSession,
         session: ConversationSession,
@@ -43,6 +58,7 @@ class CartManager:
         source: Optional[str] = None,
         variant_external_id: Optional[str] = None,
         requires_shipping: bool = True,
+        fulfillment_type: str = "physical",
     ) -> List[Dict[str, Any]]:
         state = MemoryManager.get_flow_state_data(session)
         cart = state.get("cart", [])
@@ -75,6 +91,7 @@ class CartManager:
                 "source": source,
                 "variant_external_id": variant_external_id,
                 "requires_shipping": requires_shipping,
+                "fulfillment_type": fulfillment_type,
             })
 
         state["cart"] = cart
