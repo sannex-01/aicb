@@ -116,7 +116,7 @@ class NotificationManager:
         # Telegram
         try:
             from app.services.telegram_alerts import TelegramAlertService
-            await TelegramAlertService.send_alert(db=db, message=message)
+            await TelegramAlertService.send_alert(db=db, message=message, order=order)
         except Exception as e:
             logger.warning(f"Telegram order alert failed: {e}")
 

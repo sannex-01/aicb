@@ -478,144 +478,60 @@ export async function loadIntegrationsPage(container) {
     function renderAlertsTab() {
       const el = document.getElementById('integrations-tab-content');
       const sms = state.smsInfo || {};
-      const smsProvider = sms.provider || 'none';
-      const smsCfg = sms.config || {};
+      const email = state.emailInfo || {};
       const tg = state.telegramAlertsInfo || {};
       const tgCfg = tg.config || {};
       const recipients = state.alertRecipientsInfo || { emails: [], phones: [] };
+
+      const emailReady = Boolean(email.configured);
+      const smsReady = Boolean(sms.configured);
+      const tgBotReady = Boolean(tgCfg.has_telegram_bot);
 
       el.innerHTML = `
         <div class="space-y-6">
           <div class="card space-y-6">
             <div>
               <h3 class="font-bold text-base text-main">Order Alerts</h3>
-              <p class="text-xs text-muted mt-0.5">Get notified the moment a customer pays — pick as many channels as you like, using your own provider accounts</p>
+              <p class="text-xs text-muted mt-0.5">Get notified the moment a customer pays — each channel below only works once its underlying setup is done elsewhere.</p>
             </div>
 
-            <!-- Recipients (Email / SMS) -->
-            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-3">
+            <!-- Who Gets Notified -->
+            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
               <div class="flex items-center gap-2 text-xs font-semibold text-main">
                 <i data-lucide="users" class="w-4 h-4 text-brand"></i> Who Gets Notified
               </div>
-              <p class="text-[12px] text-muted -mt-1">Email and SMS alerts go to these addresses/numbers (Telegram uses the chat set up below instead).</p>
               <form id="alert-recipients-form" class="space-y-3">
                 <div class="form-group">
-                  <label class="form-label">Alert Email Addresses</label>
-                  <input type="text" id="alert-recipient-emails" class="form-control text-xs" value="${escapeHtml((recipients.emails || []).join(', '))}" placeholder="owner@example.com, manager@example.com" />
-                  <p class="text-[12px] text-muted mt-1">Comma-separated. Requires Email Delivery configured below.</p>
+                  <label class="form-label flex items-center justify-between">
+                    <span>Alert Email Addresses</span>
+                    <span class="badge ${emailReady ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${emailReady ? 'Ready' : 'Needs Email Delivery'}</span>
+                  </label>
+                  <input type="text" id="alert-recipient-emails" class="form-control text-xs" ${emailReady ? '' : 'disabled'} value="${escapeHtml((recipients.emails || []).join(', '))}" placeholder="owner@example.com, manager@example.com" />
+                  <p class="text-[12px] text-muted mt-1">${emailReady ? 'Comma-separated.' : 'Set up Email Delivery below to enable this.'}</p>
                 </div>
                 <div class="form-group">
-                  <label class="form-label">Alert Phone Numbers</label>
-                  <input type="text" id="alert-recipient-phones" class="form-control text-xs" value="${escapeHtml((recipients.phones || []).join(', '))}" placeholder="+2348012345678, +2348098765432" />
-                  <p class="text-[12px] text-muted mt-1">Comma-separated. Requires an SMS provider configured below.</p>
+                  <label class="form-label flex items-center justify-between">
+                    <span>Alert Phone Numbers</span>
+                    <span class="badge ${smsReady ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${smsReady ? 'Ready' : 'Needs SMS'}</span>
+                  </label>
+                  <input type="text" id="alert-recipient-phones" class="form-control text-xs" ${smsReady ? '' : 'disabled'} value="${escapeHtml((recipients.phones || []).join(', '))}" placeholder="+2348012345678, +2348098765432" />
+                  <p class="text-[12px] text-muted mt-1">${smsReady ? 'Comma-separated.' : 'Set up SMS under Integrations → Messaging Channels to enable this.'}</p>
                 </div>
-                <div class="flex justify-end">
-                  <button type="submit" class="btn btn-primary btn-sm">Save Recipients</button>
-                </div>
-              </form>
-            </div>
-
-            <!-- SMS -->
-            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-semibold text-main">
-                  <i data-lucide="message-square-text" class="w-4 h-4 text-brand"></i> SMS
-                </div>
-                <span class="badge ${sms.configured ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${sms.configured ? 'Active' : 'Not Configured'}</span>
-              </div>
-
-              <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'africastalking' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
-                  <input type="radio" name="sms-provider" value="africastalking" ${smsProvider === 'africastalking' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('africastalking')" />
-                  <div>
-                    <div class="font-semibold text-sm text-main">Africa's Talking</div>
-                    <div class="text-[12px] text-muted mt-0.5">Pan-African SMS API</div>
-                  </div>
-                </label>
-                <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'termii' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
-                  <input type="radio" name="sms-provider" value="termii" ${smsProvider === 'termii' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('termii')" />
-                  <div>
-                    <div class="font-semibold text-sm text-main">Termii</div>
-                    <div class="text-[12px] text-muted mt-0.5">Nigerian SMS/OTP API</div>
-                  </div>
-                </label>
-                <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'none' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
-                  <input type="radio" name="sms-provider" value="none" ${smsProvider === 'none' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('none')" />
-                  <div>
-                    <div class="font-semibold text-sm text-main">Disabled</div>
-                  </div>
-                </label>
-              </div>
-
-              <form id="sms-settings-form" class="space-y-3">
-                <div id="sms-fields-africastalking" class="${smsProvider === 'africastalking' ? '' : 'hidden'} grid grid-cols-2 gap-3 p-3 rounded-lg border border-subtle bg-surface">
-                  <div class="form-group col-span-2 sm:col-span-1">
-                    <label class="form-label flex items-center justify-between">
-                      <span>API Key</span>
-                      ${smsProvider === 'africastalking' && smsCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved</span>` : ''}
-                    </label>
-                    <input type="password" id="sms-at-key" class="form-control font-mono text-xs" placeholder="${smsProvider === 'africastalking' && smsCfg.api_key_configured ? '•••••••••• (leave blank to keep)' : 'atsk_...'}" />
-                  </div>
-                  <div class="form-group col-span-2 sm:col-span-1">
-                    <label class="form-label">Username</label>
-                    <input type="text" id="sms-at-username" class="form-control text-xs" value="${smsProvider === 'africastalking' ? escapeHtml(smsCfg.username || '') : ''}" placeholder="sandbox (or your live username)" />
-                  </div>
-                  <div class="form-group col-span-2">
-                    <label class="form-label">Sender ID (Optional)</label>
-                    <input type="text" id="sms-at-sender" class="form-control text-xs" value="${smsProvider === 'africastalking' ? escapeHtml(smsCfg.sender_id || '') : ''}" placeholder="e.g. your brand's approved short code" />
-                  </div>
-                </div>
-                <div id="sms-fields-termii" class="${smsProvider === 'termii' ? '' : 'hidden'} grid grid-cols-2 gap-3 p-3 rounded-lg border border-subtle bg-surface">
-                  <div class="form-group col-span-2 sm:col-span-1">
-                    <label class="form-label flex items-center justify-between">
-                      <span>API Key</span>
-                      ${smsProvider === 'termii' && smsCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved</span>` : ''}
-                    </label>
-                    <input type="password" id="sms-termii-key" class="form-control font-mono text-xs" placeholder="${smsProvider === 'termii' && smsCfg.api_key_configured ? '•••••••••• (leave blank to keep)' : 'TL...'}" />
-                  </div>
-                  <div class="form-group col-span-2 sm:col-span-1">
-                    <label class="form-label">Sender ID</label>
-                    <input type="text" id="sms-termii-sender" class="form-control text-xs" value="${smsProvider === 'termii' ? escapeHtml(smsCfg.sender_id || '') : ''}" placeholder="Your approved sender ID" />
-                  </div>
+                <div class="form-group">
+                  <label class="form-label flex items-center justify-between">
+                    <span>Telegram Alert Group ID</span>
+                    <span class="badge ${tgBotReady ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${tgBotReady ? 'Ready' : 'Needs a Telegram Bot'}</span>
+                  </label>
+                  <input type="text" id="alert-telegram-chat-id" class="form-control text-xs" ${tgBotReady ? '' : 'disabled'} value="${escapeHtml(tgCfg.chat_id || '')}" placeholder="e.g. -1001234567890 (or a personal chat ID)" />
+                  <p class="text-[12px] text-muted mt-1">
+                    ${tgBotReady
+                      ? 'Add any of your agents\' Telegram bots to a group with your team, send any message in it, then check it with <a href="https://t.me/getidsbot" target="_blank" class="text-brand hover:underline">@getidsbot</a>. Alerts for an order are sent via whichever agent sold it (falling back to any agent with a Telegram bot).'
+                      : 'Connect a Telegram bot on at least one agent in AI Agents Studio to enable this — no separate alerts-only bot needed.'}
+                  </p>
                 </div>
                 <div class="flex items-center justify-between gap-3">
-                  ${sms.configured ? `
-                    <div class="flex items-center gap-2 flex-1">
-                      <input type="tel" id="sms-test-to" class="form-control text-xs flex-1" placeholder="+2348012345678" />
-                      <button type="button" id="btn-test-sms" class="btn btn-secondary btn-sm flex-shrink-0">Send Test</button>
-                    </div>
-                  ` : '<div></div>'}
-                  <button type="submit" class="btn btn-primary btn-sm flex-shrink-0">Save SMS Settings</button>
-                </div>
-              </form>
-            </div>
-
-            <!-- Telegram -->
-            <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2 text-xs font-semibold text-sky">
-                  <i data-lucide="send" class="w-4 h-4"></i> Telegram (Alerts Bot + Group)
-                </div>
-                <span class="badge ${tg.configured ? 'badge-sky' : 'badge-subtle'} text-[12px]">${tg.configured ? 'Active' : 'Not Configured'}</span>
-              </div>
-              <p class="text-[12px] text-muted -mt-2">Create a small second bot via <a href="https://t.me/BotFather" target="_blank" class="text-brand hover:underline">@BotFather</a> (separate from any customer-facing bot), add it to a Telegram group with your team, and paste that group's chat ID below — everyone in the group gets order alerts.</p>
-
-              <form id="telegram-alerts-form" class="grid grid-cols-2 gap-3">
-                <div class="form-group col-span-2 sm:col-span-1">
-                  <label class="form-label flex items-center justify-between">
-                    <span>Bot Token</span>
-                    ${tgCfg.bot_token_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved (${escapeHtml(tgCfg.bot_token_masked || '')})</span>` : ''}
-                  </label>
-                  <input type="password" id="tg-alerts-token" class="form-control font-mono text-xs" placeholder="${tgCfg.bot_token_configured ? '•••••••••• (leave blank to keep)' : '123456789:ABC...'}" />
-                </div>
-                <div class="form-group col-span-2 sm:col-span-1">
-                  <label class="form-label">Group Chat ID</label>
-                  <input type="text" id="tg-alerts-chat" class="form-control text-xs" value="${escapeHtml(tgCfg.chat_id || '')}" placeholder="e.g. -1001234567890 (or a personal chat ID)" />
-                  <p class="text-[12px] text-muted mt-1">Add the bot to your group, send any message, then check it with <a href="https://t.me/getidsbot" target="_blank" class="text-brand hover:underline">@getidsbot</a>.</p>
-                </div>
-                <div class="col-span-2 flex items-center justify-between gap-3">
-                  ${tg.configured ? `<button type="button" id="btn-test-tg-alert" class="btn btn-secondary btn-sm">Send Test Alert</button>` : '<div></div>'}
-                  <button type="submit" class="btn btn-primary btn-sm">Save Telegram Alerts</button>
+                  ${tgBotReady && tg.configured ? `<button type="button" id="btn-test-tg-alert" class="btn btn-secondary btn-sm">Send Test Telegram Alert</button>` : '<div></div>'}
+                  <button type="submit" class="btn btn-primary btn-sm">Save</button>
                 </div>
               </form>
             </div>
@@ -632,87 +548,25 @@ export async function loadIntegrationsPage(container) {
         </div>
       `;
 
-      window.switchSmsProviderUI = (provider) => {
-        document.getElementById('sms-fields-africastalking')?.classList.toggle('hidden', provider !== 'africastalking');
-        document.getElementById('sms-fields-termii')?.classList.toggle('hidden', provider !== 'termii');
-        document.querySelectorAll('input[name="sms-provider"]').forEach(inp => {
-          const card = inp.closest('label');
-          if (card) {
-            card.className = inp.value === provider
-              ? 'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all border-brand bg-brand/5 shadow-sm'
-              : 'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all border-subtle bg-surface-elevated/40 hover:bg-surface-hover';
-          }
-        });
-      };
-
       document.getElementById('alert-recipients-form').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const emails = document.getElementById('alert-recipient-emails').value.split(',').map(s => s.trim()).filter(Boolean);
-        const phones = document.getElementById('alert-recipient-phones').value.split(',').map(s => s.trim()).filter(Boolean);
+        const emails = emailReady ? document.getElementById('alert-recipient-emails').value.split(',').map(s => s.trim()).filter(Boolean) : (recipients.emails || []);
+        const phones = smsReady ? document.getElementById('alert-recipient-phones').value.split(',').map(s => s.trim()).filter(Boolean) : (recipients.phones || []);
+
         try {
           const res = await api('/settings/alerts/recipients', { method: 'PUT', body: JSON.stringify({ emails, phones }) });
           state.alertRecipientsInfo = res;
-          showToast('Alert recipients saved successfully', 'success');
-        } catch (err) {
-          showToast(err.message || 'Failed to save alert recipients', 'error');
-        }
-      });
 
-      document.getElementById('sms-settings-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const selected = document.querySelector('input[name="sms-provider"]:checked')?.value || 'none';
-        let configPayload = {};
-        if (selected === 'africastalking') {
-          configPayload = {
-            api_key: document.getElementById('sms-at-key').value.trim() || undefined,
-            username: document.getElementById('sms-at-username').value.trim(),
-            sender_id: document.getElementById('sms-at-sender').value.trim(),
-          };
-        } else if (selected === 'termii') {
-          configPayload = {
-            api_key: document.getElementById('sms-termii-key').value.trim() || undefined,
-            sender_id: document.getElementById('sms-termii-sender').value.trim(),
-          };
-        }
-        try {
-          const res = await api('/settings/sms', { method: 'PUT', body: JSON.stringify({ provider: selected === 'none' ? null : selected, config: configPayload }) });
-          state.smsInfo = res;
-          showToast('SMS alert settings saved successfully', 'success');
+          if (tgBotReady) {
+            const chatId = document.getElementById('alert-telegram-chat-id').value.trim();
+            const tgRes = await api('/settings/alerts/telegram', { method: 'PUT', body: JSON.stringify({ chat_id: chatId }) });
+            state.telegramAlertsInfo = tgRes;
+          }
+
+          showToast('Order alert settings saved successfully', 'success');
           renderAlertsTab();
         } catch (err) {
-          showToast(err.message || 'Failed to save SMS settings', 'error');
-        }
-      });
-
-      document.getElementById('btn-test-sms')?.addEventListener('click', async () => {
-        const to = document.getElementById('sms-test-to').value.trim();
-        if (!to) { showToast('Enter a phone number to test.', 'warning'); return; }
-        const btn = document.getElementById('btn-test-sms');
-        const orig = btn.innerHTML;
-        btn.innerHTML = 'Sending...'; btn.disabled = true;
-        try {
-          const res = await api('/settings/sms/test', { method: 'POST', body: JSON.stringify({ to_phone: to }) });
-          showToast(res.message || 'Test SMS sent', 'success');
-        } catch (err) {
-          showToast(err.message || 'Failed to send test SMS', 'error');
-        } finally {
-          btn.innerHTML = orig; btn.disabled = false;
-        }
-      });
-
-      document.getElementById('telegram-alerts-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const payload = {
-          bot_token: document.getElementById('tg-alerts-token').value.trim() || undefined,
-          chat_id: document.getElementById('tg-alerts-chat').value.trim(),
-        };
-        try {
-          const res = await api('/settings/alerts/telegram', { method: 'PUT', body: JSON.stringify(payload) });
-          state.telegramAlertsInfo = res;
-          showToast('Telegram alert settings saved successfully', 'success');
-          renderAlertsTab();
-        } catch (err) {
-          showToast(err.message || 'Failed to save Telegram alert settings', 'error');
+          showToast(err.message || 'Failed to save order alert settings', 'error');
         }
       });
 
@@ -742,6 +596,9 @@ export async function loadIntegrationsPage(container) {
       const wa = ch.whatsapp || {};
       const tg = ch.telegram || {};
       const domain = ch.domain || window.location.origin;
+      const sms = state.smsInfo || {};
+      const smsProvider = sms.provider || 'none';
+      const smsCfg = sms.config || {};
 
       el.innerHTML = `
         <div class="card space-y-6">
@@ -857,6 +714,82 @@ export async function loadIntegrationsPage(container) {
               <button type="submit" class="btn btn-primary" id="btn-save-channels">Save Messaging Settings</button>
             </div>
           </form>
+
+          <!-- SMS -->
+          <div class="p-4 rounded-xl border border-subtle bg-surface-elevated/20 space-y-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2 text-xs font-semibold text-main">
+                <i data-lucide="message-square-text" class="w-4 h-4 text-brand"></i> SMS
+              </div>
+              <span class="badge ${sms.configured ? 'badge-emerald' : 'badge-subtle'} text-[12px]">${sms.configured ? 'Active' : 'Not Configured'}</span>
+            </div>
+            <p class="text-[12px] text-muted -mt-2">Used for order alerts (Integrations → Order Alerts) once configured here.</p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'africastalking' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="sms-provider" value="africastalking" ${smsProvider === 'africastalking' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('africastalking')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Africa's Talking</div>
+                  <div class="text-[12px] text-muted mt-0.5">Pan-African SMS API</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'termii' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="sms-provider" value="termii" ${smsProvider === 'termii' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('termii')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Termii</div>
+                  <div class="text-[12px] text-muted mt-0.5">Nigerian SMS/OTP API</div>
+                </div>
+              </label>
+              <label class="flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all ${smsProvider === 'none' ? 'border-brand bg-brand/5 shadow-sm' : 'border-subtle bg-surface-elevated/40 hover:bg-surface-hover'}">
+                <input type="radio" name="sms-provider" value="none" ${smsProvider === 'none' ? 'checked' : ''} class="mt-1 text-brand focus:ring-brand" onchange="window.switchSmsProviderUI('none')" />
+                <div>
+                  <div class="font-semibold text-sm text-main">Disabled</div>
+                </div>
+              </label>
+            </div>
+
+            <form id="sms-settings-form" class="space-y-3">
+              <div id="sms-fields-africastalking" class="${smsProvider === 'africastalking' ? '' : 'hidden'} grid grid-cols-2 gap-3 p-3 rounded-lg border border-subtle bg-surface">
+                <div class="form-group col-span-2 sm:col-span-1">
+                  <label class="form-label flex items-center justify-between">
+                    <span>API Key</span>
+                    ${smsProvider === 'africastalking' && smsCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved</span>` : ''}
+                  </label>
+                  <input type="password" id="sms-at-key" class="form-control font-mono text-xs" placeholder="${smsProvider === 'africastalking' && smsCfg.api_key_configured ? '•••••••••• (leave blank to keep)' : 'atsk_...'}" />
+                </div>
+                <div class="form-group col-span-2 sm:col-span-1">
+                  <label class="form-label">Username</label>
+                  <input type="text" id="sms-at-username" class="form-control text-xs" value="${smsProvider === 'africastalking' ? escapeHtml(smsCfg.username || '') : ''}" placeholder="sandbox (or your live username)" />
+                </div>
+                <div class="form-group col-span-2">
+                  <label class="form-label">Sender ID (Optional)</label>
+                  <input type="text" id="sms-at-sender" class="form-control text-xs" value="${smsProvider === 'africastalking' ? escapeHtml(smsCfg.sender_id || '') : ''}" placeholder="e.g. your brand's approved short code" />
+                </div>
+              </div>
+              <div id="sms-fields-termii" class="${smsProvider === 'termii' ? '' : 'hidden'} grid grid-cols-2 gap-3 p-3 rounded-lg border border-subtle bg-surface">
+                <div class="form-group col-span-2 sm:col-span-1">
+                  <label class="form-label flex items-center justify-between">
+                    <span>API Key</span>
+                    ${smsProvider === 'termii' && smsCfg.api_key_configured ? `<span class="badge badge-emerald text-[12px] font-mono lowercase">saved</span>` : ''}
+                  </label>
+                  <input type="password" id="sms-termii-key" class="form-control font-mono text-xs" placeholder="${smsProvider === 'termii' && smsCfg.api_key_configured ? '•••••••••• (leave blank to keep)' : 'TL...'}" />
+                </div>
+                <div class="form-group col-span-2 sm:col-span-1">
+                  <label class="form-label">Sender ID</label>
+                  <input type="text" id="sms-termii-sender" class="form-control text-xs" value="${smsProvider === 'termii' ? escapeHtml(smsCfg.sender_id || '') : ''}" placeholder="Your approved sender ID" />
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-3">
+                ${sms.configured ? `
+                  <div class="flex items-center gap-2 flex-1">
+                    <input type="tel" id="sms-test-to" class="form-control text-xs flex-1" placeholder="+2348012345678" />
+                    <button type="button" id="btn-test-sms" class="btn btn-secondary btn-sm flex-shrink-0">Send Test</button>
+                  </div>
+                ` : '<div></div>'}
+                <button type="submit" class="btn btn-primary btn-sm flex-shrink-0">Save SMS Settings</button>
+              </div>
+            </form>
+          </div>
 
           <!-- Webhook Setup & Live Test Instructions -->
           <div class="p-5 rounded-2xl border border-subtle bg-surface-elevated/40 space-y-4">
@@ -1029,6 +962,61 @@ export async function loadIntegrationsPage(container) {
           btn.innerHTML = orig;
           btn.disabled = false;
           if (window.lucide) lucide.createIcons();
+        }
+      });
+
+      window.switchSmsProviderUI = (provider) => {
+        document.getElementById('sms-fields-africastalking')?.classList.toggle('hidden', provider !== 'africastalking');
+        document.getElementById('sms-fields-termii')?.classList.toggle('hidden', provider !== 'termii');
+        document.querySelectorAll('input[name="sms-provider"]').forEach(inp => {
+          const card = inp.closest('label');
+          if (card) {
+            card.className = inp.value === provider
+              ? 'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all border-brand bg-brand/5 shadow-sm'
+              : 'flex items-start gap-3 p-3 rounded-xl border cursor-pointer transition-all border-subtle bg-surface-elevated/40 hover:bg-surface-hover';
+          }
+        });
+      };
+
+      document.getElementById('sms-settings-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const selected = document.querySelector('input[name="sms-provider"]:checked')?.value || 'none';
+        let configPayload = {};
+        if (selected === 'africastalking') {
+          configPayload = {
+            api_key: document.getElementById('sms-at-key').value.trim() || undefined,
+            username: document.getElementById('sms-at-username').value.trim(),
+            sender_id: document.getElementById('sms-at-sender').value.trim(),
+          };
+        } else if (selected === 'termii') {
+          configPayload = {
+            api_key: document.getElementById('sms-termii-key').value.trim() || undefined,
+            sender_id: document.getElementById('sms-termii-sender').value.trim(),
+          };
+        }
+        try {
+          const res = await api('/settings/sms', { method: 'PUT', body: JSON.stringify({ provider: selected === 'none' ? null : selected, config: configPayload }) });
+          state.smsInfo = res;
+          showToast('SMS settings saved successfully', 'success');
+          renderChannelsTab();
+        } catch (err) {
+          showToast(err.message || 'Failed to save SMS settings', 'error');
+        }
+      });
+
+      document.getElementById('btn-test-sms')?.addEventListener('click', async () => {
+        const to = document.getElementById('sms-test-to').value.trim();
+        if (!to) { showToast('Enter a phone number to test.', 'warning'); return; }
+        const btn = document.getElementById('btn-test-sms');
+        const orig = btn.innerHTML;
+        btn.innerHTML = 'Sending...'; btn.disabled = true;
+        try {
+          const res = await api('/settings/sms/test', { method: 'POST', body: JSON.stringify({ to_phone: to }) });
+          showToast(res.message || 'Test SMS sent', 'success');
+        } catch (err) {
+          showToast(err.message || 'Failed to send test SMS', 'error');
+        } finally {
+          btn.innerHTML = orig; btn.disabled = false;
         }
       });
     }

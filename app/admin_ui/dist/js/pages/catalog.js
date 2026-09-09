@@ -359,6 +359,18 @@ async function editProductModal(product) {
     const subcatSelect = document.getElementById('prod-subcat');
     const options = subcategoriesFor(e.target.value);
     subcatSelect.innerHTML = options.map(sc => `<option value="${escapeHtml(sc)}">${escapeHtml(sc)}</option>`).join('');
+    // The category select is enhanced into a custom dropdown widget
+    // (see initAllCustomSelects, called on every openModal) that only
+    // reads the native <select>'s options once at build time — rebuilding
+    // the native options above doesn't refresh what the widget itself
+    // shows. Push the new option list into the sub-category widget
+    // directly (keepValue=false: always reset to the new category's
+    // first option, never silently keep an incompatible one from before).
+    if (subcatSelect._customSelectInstance) {
+      const newOpts = options.map(sc => ({ value: sc, label: sc }));
+      subcatSelect._customSelectInstance.setOptions(newOpts, false);
+      subcatSelect.value = subcatSelect._customSelectInstance.getValue();
+    }
   });
 
   window.switchFulfillmentTypeUI = (type) => {

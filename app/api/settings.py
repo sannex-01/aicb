@@ -344,7 +344,6 @@ async def send_test_sms(
 
 
 class UpdateTelegramAlertsConfigRequest(BaseModel):
-    bot_token: Optional[str] = None
     chat_id: Optional[str] = None
 
 
@@ -353,7 +352,9 @@ async def get_telegram_alerts_settings(
     current_user: AdminUser = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db),
 ):
-    """Returns current Telegram order-alerts bot configuration, masked."""
+    """Returns the current Telegram order-alerts group chat_id, plus whether
+    any agent has a Telegram bot connected (the actual sending bot — see
+    TelegramAlertService, no separate alerts-only bot to configure)."""
     from app.services.telegram_alerts import TelegramAlertService
     return await TelegramAlertService.get_config(db)
 
@@ -364,10 +365,10 @@ async def update_telegram_alerts_settings(
     current_user: AdminUser = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db),
 ):
-    """Updates the dedicated Telegram alerts bot's token and recipient chat id."""
+    """Updates the group chat_id order alerts are sent to."""
     from app.services.telegram_alerts import TelegramAlertService
     try:
-        return await TelegramAlertService.save_config(db, {"bot_token": req.bot_token, "chat_id": req.chat_id})
+        return await TelegramAlertService.save_config(db, {"chat_id": req.chat_id})
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
@@ -377,7 +378,8 @@ async def send_test_telegram_alert(
     current_user: AdminUser = Depends(require_admin_role),
     db: AsyncSession = Depends(get_db),
 ):
-    """Sends a test alert message to verify the bot token and chat id."""
+    """Sends a test alert message to verify the group chat_id and that some
+    agent's Telegram bot can actually deliver to it."""
     from app.services.telegram_alerts import TelegramAlertService
     try:
         biz_res = await db.execute(select(BusinessProfile).limit(1))
@@ -386,7 +388,7 @@ async def send_test_telegram_alert(
 
         await TelegramAlertService.send_alert(
             db=db,
-            message=f"✅ Test alert from {biz_name}: your AICB order alerts bot is configured correctly.",
+            message=f"✅ Test alert from {biz_name}: your AICB order alerts are configured correctly.",
         )
         return {"status": "ok", "message": "Test alert sent successfully."}
     except Exception as e:
