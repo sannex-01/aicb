@@ -72,7 +72,7 @@ export async function loadIntegrationsPage(container) {
         </div>
 
         <div class="flex flex-col md:flex-row gap-6 items-start">
-          <nav class="w-full md:w-60 flex-shrink-0 flex flex-row md:flex-col gap-1 p-1.5 bg-surface rounded-xl border border-subtle overflow-x-auto">
+          <nav class="w-full md:w-60 flex-shrink-0 flex flex-row md:flex-col gap-1 p-1.5 bg-sidebar rounded-xl border border-subtle overflow-x-auto">
             ${tabs.map(t => `
               <button class="integrations-tab flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[14px] font-medium text-left transition-colors whitespace-nowrap ${activeTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-tab="${t.id}">
                 <i data-lucide="${t.icon}" class="w-4 h-4 flex-shrink-0"></i>
@@ -525,7 +525,7 @@ export async function loadIntegrationsPage(container) {
                   <input type="text" id="alert-telegram-chat-id" class="form-control text-xs" ${tgBotReady ? '' : 'disabled'} value="${escapeHtml(tgCfg.chat_id || '')}" placeholder="e.g. -1001234567890 (or a personal chat ID)" />
                   <p class="text-[12px] text-muted mt-1">
                     ${tgBotReady
-                      ? 'Add any of your agents\' Telegram bots to a group with your team, send any message in it, then check it with <a href="https://t.me/getidsbot" target="_blank" class="text-brand hover:underline">@getidsbot</a>. Alerts for an order are sent via whichever agent sold it (falling back to any agent with a Telegram bot).'
+                      ? 'Alerts for an order are sent via whichever agent sold it (falling back to any agent with a Telegram bot). Follow the steps below to get your Group ID.'
                       : 'Connect a Telegram bot on at least one agent in AI Agents Studio to enable this — no separate alerts-only bot needed.'}
                   </p>
                 </div>
@@ -534,6 +534,21 @@ export async function loadIntegrationsPage(container) {
                   <button type="submit" class="btn btn-primary btn-sm">Save</button>
                 </div>
               </form>
+
+              <!-- Telegram Alert Group Setup Guide -->
+              <div class="p-4 rounded-xl border border-subtle bg-surface space-y-2.5 text-xs">
+                <div class="font-bold text-main flex items-center gap-1.5 text-sky">
+                  <i data-lucide="check-circle-2" class="w-4 h-4"></i> Telegram Alert Group — Setup Instructions
+                </div>
+                <ol class="list-decimal list-inside space-y-1.5 text-muted leading-relaxed">
+                  <li>Add your agent's <span class="font-semibold text-main">Telegram bot</span> to the desired group chat with your team.</li>
+                  <li>Add <a href="https://t.me/getidsbot" target="_blank" class="font-mono text-[12px] text-brand hover:underline">@getidsbot</a> to the exact same group chat.</li>
+                  <li>As soon as it's added, <span class="font-semibold text-main">@getidsbot</span> replies with the group's info — no need to send a message first.</li>
+                  <li>Copy the <span class="font-semibold text-main">"id"</span> value from its reply (Note: group IDs in Telegram always start with a minus sign, like <span class="font-mono text-[12px] text-main">-1001234567890</span>).</li>
+                  <li>Paste this ID into the <span class="font-semibold text-main">Telegram Alert Group ID</span> field above and click <span class="font-semibold text-main">Save</span>.</li>
+                  <li>Remove <span class="font-semibold text-main">@getidsbot</span> from the group once you have copied the ID, for security and cleanliness.</li>
+                </ol>
+              </div>
             </div>
 
             <!-- WhatsApp (not yet built) -->
@@ -614,7 +629,7 @@ export async function loadIntegrationsPage(container) {
             <p class="text-xs text-muted mt-0.5">Configure global webhook verification tokens, channel secrets, and test live webhooks</p>
           </div>
 
-          <div class="flex gap-1 p-1 bg-surface rounded-xl border border-subtle overflow-x-auto">
+          <div class="flex gap-1 p-1 bg-sidebar rounded-xl border border-subtle overflow-x-auto">
             ${subTabs.map(t => `
               <button type="button" class="channels-sub-tab flex items-center gap-2 px-3.5 py-2 rounded-lg text-[13px] font-medium transition-colors whitespace-nowrap ${activeSubTab === t.id ? 'bg-brand/10 text-brand font-semibold' : 'text-muted hover:bg-surface-hover hover:text-main'}" data-subtab="${t.id}">
                 <i data-lucide="${t.icon}" class="w-3.5 h-3.5 flex-shrink-0"></i>

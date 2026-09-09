@@ -7,17 +7,21 @@ export async function loadCatalogPage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 6 });
   try {
     const isAdmin = ['admin', 'super_admin'].includes(state.user?.role);
-    const [data, storageInfo, groups, importProviders, catalogStats] = await Promise.all([
+    const [data, storageInfo, groups, importStatus, catalogStats] = await Promise.all([
       api('/admin/catalog'),
       api('/settings/storage').catch(() => ({ configured: false })),
       api('/access-groups').catch(() => []),
-      isAdmin ? api('/admin/catalog/import/providers').catch(() => ({})) : Promise.resolve({}),
+      // Cheap, DB-only configured-check for whether to show the Import
+      // Catalog button — does NOT hit Bumpa/Paystack live (that only
+      // happens once the modal is actually opened, see below), so this
+      // page load stays fast even in the background.
+      isAdmin ? api('/admin/catalog/import/status').catch(() => ({})) : Promise.resolve({}),
       api('/admin/catalog/stats').catch(() => null),
     ]);
     state.storageInfo = storageInfo;
     state.accessGroups = groups || [];
     const items = data.items || [];
-    const hasImportSource = Object.values(importProviders || {}).some(p => p?.configured);
+    const hasImportSource = Object.values(importStatus || {}).some(p => p?.configured);
     const currency = state.business?.currency || state.user?.business?.currency || 'NGN';
 
     const statCards = catalogStats ? `
@@ -89,7 +93,7 @@ export async function loadCatalogPage(container) {
     `;
 
     if (hasImportSource) {
-      document.getElementById('btn-import-catalog').addEventListener('click', () => importCatalogModal(importProviders));
+      document.getElementById('btn-import-catalog').addEventListener('click', () => importCatalogModal());
     }
 
     const columns = [
@@ -498,9 +502,12 @@ async function editProductModal(product) {
 
 const IMPORT_PROVIDER_LABELS = { bumpa: 'Bumpa', paystack: 'Paystack' };
 
-function importCatalogModal(providers) {
-  const available = Object.entries(providers || {}).filter(([, p]) => p?.configured);
-
+function importCatalogModal() {
+  // Opens immediately with a loading state, then fetches the live
+  // /import/providers preview count on demand — this is the one place
+  // that's allowed to hit Bumpa/Paystack for a real product count, since
+  // it only runs when the business actually asks to import, not on every
+  // background catalog page load.
   openModal(`
     <div class="modal-dialog max-w-md">
       <div class="modal-header">
@@ -513,30 +520,48 @@ function importCatalogModal(providers) {
           products already imported from that source are updated with the latest
           price, stock, and image.
         </p>
-        <div id="import-provider-list">
-          ${renderSelectCards({
-            name: 'import-source',
-            type: 'radio',
-            items: available.map(([key, info]) => ({
-              value: key,
-              title: IMPORT_PROVIDER_LABELS[key] || key,
-              badge: info.preview_count === null ? 'Count unavailable' : `${info.preview_count} product${info.preview_count === 1 ? '' : 's'} found`,
-              badgeClass: 'badge-subtle',
-            })),
-            selectedValues: available.length === 1 ? [available[0][0]] : [],
-            gridClass: 'space-y-2',
-          })}
+        <div id="import-provider-list" class="flex items-center gap-2 text-sm text-muted py-4">
+          <i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Checking connected sources...
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" onclick="closeModal()">Cancel</button>
-        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-import">
+        <button type="button" class="btn btn-primary btn-sm" id="btn-confirm-import" disabled>
           <i data-lucide="download-cloud" class="w-4 h-4"></i> Confirm Import
         </button>
       </div>
     </div>
   `);
   if (window.lucide) lucide.createIcons();
+
+  (async () => {
+    let providers = {};
+    try {
+      providers = await api('/admin/catalog/import/providers');
+    } catch (err) {
+      const listEl = document.getElementById('import-provider-list');
+      if (listEl) listEl.innerHTML = `<p class="text-sm text-rose">Failed to check sources: ${escapeHtml(err.message || 'Unknown error')}</p>`;
+      return;
+    }
+    const available = Object.entries(providers || {}).filter(([, p]) => p?.configured);
+    const listEl = document.getElementById('import-provider-list');
+    if (!listEl) return; // modal was closed before the fetch resolved
+    listEl.className = '';
+    listEl.innerHTML = renderSelectCards({
+      name: 'import-source',
+      type: 'radio',
+      items: available.map(([key, info]) => ({
+        value: key,
+        title: IMPORT_PROVIDER_LABELS[key] || key,
+        badge: info.preview_count === null ? 'Count unavailable' : `${info.preview_count} product${info.preview_count === 1 ? '' : 's'} found`,
+        badgeClass: 'badge-subtle',
+      })),
+      selectedValues: available.length === 1 ? [available[0][0]] : [],
+      gridClass: 'space-y-2',
+    });
+    document.getElementById('btn-confirm-import').disabled = false;
+    if (window.lucide) lucide.createIcons();
+  })();
 
   document.getElementById('btn-confirm-import').addEventListener('click', async (e) => {
     const selected = document.querySelector('input[name="import-source"]:checked');

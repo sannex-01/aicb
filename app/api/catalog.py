@@ -424,6 +424,39 @@ class CatalogImportRequest(BaseModel):
     source: Literal["bumpa", "paystack"]
 
 
+@router.get("/import/status")
+async def get_import_status(
+    db: AsyncSession = Depends(get_db),
+    _: AdminUser = Depends(get_current_admin_user),
+):
+    """Cheap, DB-only check of which external sources have a key configured
+    — just enough to decide whether to show the "Import Catalog" button on
+    page load. Deliberately does NOT call out to Bumpa/Paystack (unlike
+    /import/providers below, which fetches the real product list for a
+    live preview count) — that live fetch only needs to happen once the
+    business actually opens the Import Catalog modal, not on every catalog
+    page load/background refresh."""
+    from app.services.store_connections import StoreConnectionService
+
+    bumpa_secret_key = await StoreConnectionService.get_effective_bumpa_key(db)
+    bumpa_public_key = await StoreConnectionService.get_effective_public_key(db, "bumpa")
+    bumpa_configured = bool(bumpa_secret_key or bumpa_public_key)
+
+    paystack_key = await StoreConnectionService.get_effective_key(db, "paystack")
+    if not paystack_key:
+        biz_res = await db.execute(select(BusinessProfile).limit(1))
+        biz = biz_res.scalar_one_or_none()
+        meta = json.loads(biz.metadata_json or "{}") if biz else {}
+        if meta.get("payments", {}).get("provider") == "paystack":
+            paystack_key = meta.get("payments", {}).get("config", {}).get("secret_key")
+    paystack_key = paystack_key or settings.PAYSTACK_SECRET_KEY
+
+    return {
+        "bumpa": {"configured": bumpa_configured},
+        "paystack": {"configured": bool(paystack_key)},
+    }
+
+
 @router.get("/import/providers")
 async def list_import_providers(
     db: AsyncSession = Depends(get_db),
