@@ -42,7 +42,7 @@ class WhatsAppRenderer:
                         "caption": f"{card.title}\n{card.price:,.2f} {card.currency}"
                         + (f"\n{card.description}" if card.description else ""),
                         "button_id": card.buy_action_id,
-                        "button_title": f"🛒 Buy {card.title}",
+                        "button_title": f"💳 Buy {card.title}",
                     }
                     for card in cards_with_images
                 ]

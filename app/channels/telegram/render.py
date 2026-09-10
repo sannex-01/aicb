@@ -135,14 +135,21 @@ class TelegramRenderer:
                     {"text": "🛒 View Cart", "callback_data": "flow_view_cart"},
                 ]
             else:
-                caption += "\n\n👉 Tap below to buy:"
-                # If there's no bot_username configured (e.g. token-only setup), fall back
-                # to inline callback buttons instead of returning empty results.
+                # Search run from a group or a non-bot DM. The only button is
+                # "Buy" and it must be a deep link into the bot's own DM — a
+                # callback button here can silently fail because Telegram forbids
+                # a bot from messaging a user who has never started it. The DM
+                # then receives "/start cart_add_<id>", which adds the item to
+                # that user's cart and replies to them privately.
+                caption += "\n\n👉 Tap *Buy* to add this to your cart in a private chat with us:"
                 if bot_username:
                     clean_username = bot_username.lstrip("@")
                     deep_link_url = f"https://t.me/{clean_username}?start={card.buy_action_id}"
                     buttons = [{"text": f"💳 Buy {card.title[:20]}", "url": deep_link_url}]
                 else:
+                    # No username even after a getMe lookup (token-only/dev setup).
+                    # Fall back to a callback button; the webhook will toast the
+                    # user to open the bot first if the DM can't be delivered.
                     buttons = [{"text": f"💳 Buy {card.title[:20]}", "callback_data": card.buy_action_id}]
 
             # Configure the message content dropped into chat

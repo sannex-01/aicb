@@ -104,6 +104,22 @@ async def handle_telegram_webhook(
 
         logger.info(f"Found {len(products)} matching products for inline query '{query_text}'")
 
+        # Resolve the bot @username for cross-chat "Buy" deep links. Prefer the
+        # configured value; otherwise ask Telegram (getMe) once and cache it
+        # back onto the agent so foreign-chat buys always route into the bot DM
+        # via t.me/<bot>?start=... instead of an unreliable callback button.
+        bot_username = agent.telegram_username if agent else None
+        if not bot_username:
+            try:
+                me = await tg_client.get_me()
+                if me.get("ok"):
+                    bot_username = me["result"].get("username")
+                    if bot_username and agent:
+                        agent.telegram_username = bot_username
+                        await db.commit()
+            except Exception as e:
+                logger.warning(f"getMe lookup for inline-search deep link failed: {e}")
+
         cards = [
             ProductCard(
                 id=p.id,
@@ -119,7 +135,7 @@ async def handle_telegram_webhook(
         results = TelegramRenderer.inline_query_results(
             cards=cards,
             chat_type=chat_type,
-            bot_username=agent.telegram_username if agent else None,
+            bot_username=bot_username,
         )
         logger.info(f"Generated {len(results)} inline article cards to return to Telegram:\n{json.dumps(results, indent=2)}")
 
@@ -146,7 +162,23 @@ async def handle_telegram_webhook(
         message_id = message_obj.get("message_id")
         inline_message_id = cb.get("inline_message_id")
 
-        await tg_client.answer_callback_query(cb_id)
+        # A click that carries only inline_message_id (no message object) came
+        # from an inline-search result card — either dropped in the bot's own DM
+        # or shared into a foreign chat/group. Either way we cannot edit that
+        # card in place; we always send a fresh follow-up message into the
+        # clicking user's DM with the bot (their user id == the DM chat id).
+        from_inline_card = bool(inline_message_id) and not message_id
+        if from_inline_card:
+            chat_id = from_user.get("id")
+
+        # For a normal in-chat button we ack immediately. For an inline-search
+        # card click we defer the ack until after we've tried to deliver the DM
+        # follow-up, so we can surface an error toast if delivery is blocked
+        # (Telegram only honours the first answerCallbackQuery per click).
+        callback_answered = False
+        if not from_inline_card:
+            await tg_client.answer_callback_query(cb_id)
+            callback_answered = True
 
         session = await MemoryManager.get_or_create_session(db, channel="telegram", customer_identifier=user_id)
         flow_res = await FlowEngine.handle_action(
@@ -190,9 +222,25 @@ async def handle_telegram_webhook(
 
             if not edit_success and chat_id:
                 if rendered["inline_keyboard"]:
-                    await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
+                    send_res = await tg_client.send_inline_buttons(chat_id=chat_id, text=rendered["text"], buttons=rendered["inline_keyboard"])
                 else:
-                    await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+                    send_res = await tg_client.send_message(chat_id=chat_id, text=rendered["text"])
+
+                # If the follow-up DM couldn't be delivered (Telegram forbids a
+                # bot from messaging a user who has never started it), tell the
+                # user in-place via the callback toast to open the bot first.
+                if from_inline_card and isinstance(send_res, dict) and not send_res.get("ok"):
+                    bot_handle = agent.telegram_username if agent and agent.telegram_username else None
+                    hint = f"Open @{bot_handle} and tap Start" if bot_handle else "Open a chat with the bot and tap Start"
+                    await tg_client.answer_callback_query(
+                        cb_id,
+                        text=f"⚠️ I couldn't message you directly. {hint}, then try again.",
+                    )
+                    callback_answered = True
+
+        # Ensure every inline-card click is acknowledged even on the happy path.
+        if from_inline_card and not callback_answered:
+            await tg_client.answer_callback_query(cb_id)
 
         # Track interactive button action telemetry
         telemetry_client.track(

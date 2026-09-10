@@ -133,6 +133,12 @@ class TelegramClient:
                 res = await self._post("sendPhoto", payload)
         return res
 
+    async def get_me(self) -> Dict[str, Any]:
+        """Returns the bot's own identity (id, username, ...) via getMe.
+        Used to resolve the bot @username for inline-search deep links when it
+        hasn't been configured on the agent record."""
+        return await self._post("getMe")
+
     async def answer_inline_query(
         self,
         inline_query_id: str,
