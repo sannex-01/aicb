@@ -62,23 +62,46 @@ async def handle_telegram_webhook(
     logger.info(f"=== TELEGRAM INCOMING UPDATE ===\n{json.dumps(update, indent=2)}")
 
     from app.models.agent import Agent
+    from sqlalchemy.orm import selectinload
+
     agent = None
     if agent_id:
         if agent_id.isdigit():
             stmt = select(Agent).where(Agent.id == int(agent_id), Agent.is_active == True)
         else:
             stmt = select(Agent).where(Agent.slug == agent_id, Agent.is_active == True)
-        res = await db.execute(stmt)
+        res = await db.execute(stmt.options(selectinload(Agent.group)))
         agent = res.scalar_one_or_none()
+        if not agent:
+            logger.warning(f"Telegram webhook: no active agent matched path id/slug '{agent_id}' — falling back.")
+
+    # Fallbacks only when the URL carried no agent discriminator (legacy
+    # single-bot setup, or a webhook registered before per-agent scoping).
+    # With 2+ token-bearing agents there is no reliable way to tell them
+    # apart from the payload alone, so we must NOT silently answer as the
+    # first one — that is exactly the "agent 2's messages answered by agent
+    # 1" bug. Re-register each agent's webhook (PUT the agent, or the
+    # Settings > Channels sync) so its URL is /webhooks/telegram/<id>.
+    if not agent:
+        tokened = (await db.execute(
+            select(Agent)
+            .where(Agent.telegram_bot_token.is_not(None), Agent.is_active == True)
+            .options(selectinload(Agent.group))
+        )).scalars().all()
+        if len(tokened) == 1:
+            agent = tokened[0]
+        elif len(tokened) > 1:
+            logger.error(
+                f"Telegram webhook received with no agent id in the URL but {len(tokened)} active agents "
+                f"have bot tokens ({[a.id for a in tokened]}). Cannot route reliably — re-register each "
+                f"agent's Telegram webhook so its URL is /webhooks/telegram/<agent_id>. Dropping update."
+            )
+            return {"ok": True}
 
     if not agent:
-        stmt = select(Agent).where(Agent.telegram_bot_token.is_not(None), Agent.is_active == True).limit(1)
-        res = await db.execute(stmt)
-        agent = res.scalar_one_or_none()
-
-    if not agent:
-        stmt = select(Agent).where(Agent.is_active == True).limit(1)
-        res = await db.execute(stmt)
+        res = await db.execute(
+            select(Agent).where(Agent.is_active == True).options(selectinload(Agent.group)).limit(1)
+        )
         agent = res.scalar_one_or_none()
 
     tg_client = TelegramClient(token=agent.telegram_bot_token if agent and agent.telegram_bot_token else None)
@@ -96,11 +119,18 @@ async def handle_telegram_webhook(
 
         from app.commerce.catalog_provider import CatalogManager
         from app.schemas.bot_response import ProductCard
+        from app.core.access import get_effective_agent_tags
+
+        # Scope search results to THIS agent's catalog (its access groups /
+        # tags) — the same scoping the AI-orchestrator path uses. Without it,
+        # inline search returns every agent's products (in practice the first
+        # agent's, since that's who the update used to resolve to).
+        allowed_tags = get_effective_agent_tags(agent) if agent else None
 
         if not query_text:
-            products = await CatalogManager.get_featured_products(db, limit=10)
+            products = await CatalogManager.get_featured_products(db, limit=10, allowed_access_tags=allowed_tags)
         else:
-            products = await CatalogManager.search_products(db, query=query_text, limit=10)
+            products = await CatalogManager.search_products(db, query=query_text, limit=10, allowed_access_tags=allowed_tags)
 
         logger.info(f"Found {len(products)} matching products for inline query '{query_text}'")
 

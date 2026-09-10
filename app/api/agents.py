@@ -199,15 +199,44 @@ async def create_agent(
     res = await db.execute(select(Agent).options(selectinload(Agent.group)).where(Agent.id == agent.id))
     loaded = res.scalar_one()
 
-    # Automatically set Telegram Webhook if telegram token was supplied
+    # Automatically set Telegram Webhook if telegram token was supplied.
+    # Scope it to this agent's id so inbound updates resolve to THIS agent
+    # (its own bot token, catalog, AI config) rather than the first active one.
     if loaded.telegram_bot_token:
         try:
             from app.services.channels import ChannelService
-            await ChannelService.set_telegram_webhook(loaded.telegram_bot_token, db)
+            await ChannelService.set_telegram_webhook(loaded.telegram_bot_token, db, agent_id=loaded.id)
         except Exception:
             pass
 
     return _serialize_agent(loaded)
+
+
+@router.post("/telegram/resync-webhooks")
+async def resync_telegram_webhooks(
+    current_user: AdminUser = Depends(require_admin_role),
+    db: AsyncSession = Depends(get_db),
+):
+    """Re-registers every token-bearing agent's Telegram webhook so its URL is
+    scoped to that agent (/webhooks/telegram/<id>). Run this once after
+    upgrading to per-agent routing, or any time inbound updates seem to reach
+    the wrong agent."""
+    from app.services.channels import ChannelService
+
+    res = await db.execute(select(Agent).where(Agent.telegram_bot_token.is_not(None), Agent.is_active == True))
+    agents = res.scalars().all()
+
+    results = []
+    for a in agents:
+        try:
+            r = await ChannelService.set_telegram_webhook(
+                a.telegram_bot_token, db, drop_pending_updates=False, agent_id=a.id
+            )
+            results.append({"agent_id": a.id, "name": a.name, "ok": bool(r.get("ok")), "detail": r.get("description")})
+        except Exception as e:
+            results.append({"agent_id": a.id, "name": a.name, "ok": False, "detail": str(e)})
+
+    return {"count": len(results), "results": results}
 
 
 @router.get("/{agent_id}")
@@ -317,7 +346,7 @@ async def update_agent(
     if loaded.telegram_bot_token:
         try:
             from app.services.channels import ChannelService
-            await ChannelService.set_telegram_webhook(loaded.telegram_bot_token, db)
+            await ChannelService.set_telegram_webhook(loaded.telegram_bot_token, db, agent_id=loaded.id)
         except Exception:
             pass
 

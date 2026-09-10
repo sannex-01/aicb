@@ -777,6 +777,18 @@ export async function loadIntegrationsPage(container) {
                   </div>
                   <div id="tg-test-result" class="hidden text-xs p-2.5 rounded-lg"></div>
                 </div>
+
+                <div class="pt-2 border-t border-subtle space-y-2">
+                  <p class="text-muted leading-relaxed">
+                    Running more than one agent with its own bot? Re-sync so each agent's webhook is scoped to it —
+                    otherwise inbound messages and inline search can all be handled by the first agent.
+                  </p>
+                  <button type="button" id="btn-resync-tg-webhooks" class="btn btn-secondary text-xs flex items-center gap-1.5">
+                    <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    <span>Re-sync all agent webhooks</span>
+                  </button>
+                  <div id="tg-resync-result" class="hidden text-xs p-2.5 rounded-lg"></div>
+                </div>
               </div>
 
               <div class="flex justify-end pt-2 border-t border-subtle">
@@ -954,6 +966,37 @@ export async function loadIntegrationsPage(container) {
             <p class="text-[12px]">${escapeHtml(err.message || 'Connection failed')}</p>
           `;
           if (window.lucide) lucide.createIcons();
+        } finally {
+          btn.disabled = false;
+          btn.innerHTML = orig;
+          if (window.lucide) lucide.createIcons();
+        }
+      });
+
+      document.getElementById('btn-resync-tg-webhooks')?.addEventListener('click', async () => {
+        const btn = document.getElementById('btn-resync-tg-webhooks');
+        const resultDiv = document.getElementById('tg-resync-result');
+        const orig = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Re-syncing...`;
+        if (window.lucide) lucide.createIcons();
+
+        try {
+          const res = await api('/agents/telegram/resync-webhooks', { method: 'POST' });
+          const okCount = (res.results || []).filter(r => r.ok).length;
+          const failed = (res.results || []).filter(r => !r.ok);
+          resultDiv.classList.remove('hidden');
+          resultDiv.className = `text-xs p-2.5 rounded-lg border ${failed.length ? 'bg-amber-500/10 text-amber-600 border-amber-500/20' : 'bg-emerald/10 text-emerald border-emerald/20'}`;
+          resultDiv.innerHTML = `
+            <div class="font-bold mb-0.5">${okCount}/${res.count || 0} agent webhook(s) re-synced${failed.length ? ` — ${failed.length} failed` : ''}</div>
+            ${failed.length ? `<p class="text-[12px] leading-relaxed">${failed.map(f => escapeHtml(`${f.name}: ${f.detail || 'error'}`)).join('<br>')}</p>` : ''}
+          `;
+          if (window.lucide) lucide.createIcons();
+          if (okCount) showToast(`${okCount} agent webhook(s) re-synced`, 'success');
+        } catch (err) {
+          resultDiv.classList.remove('hidden');
+          resultDiv.className = 'text-xs p-2.5 rounded-lg border bg-rose/10 text-rose border-rose/20';
+          resultDiv.innerHTML = `<p class="text-[12px]">${escapeHtml(err.message || 'Re-sync failed')}</p>`;
         } finally {
           btn.disabled = false;
           btn.innerHTML = orig;

@@ -131,17 +131,28 @@ class ChannelService:
 
     @staticmethod
     async def set_telegram_webhook(
-        bot_token: str, 
-        db: AsyncSession, 
-        drop_pending_updates: bool = False
+        bot_token: str,
+        db: AsyncSession,
+        drop_pending_updates: bool = False,
+        agent_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Registers or refreshes the Telegram webhook URL and secret token with Telegram Bot API."""
+        """Registers or refreshes the Telegram webhook URL and secret token with Telegram Bot API.
+
+        When agent_id is given the webhook URL is suffixed with /{agent_id} so
+        the inbound webhook handler can tell which agent (and which bot token,
+        catalog scope, AI config) an update belongs to. Without it, multiple
+        agents sharing the one global URL all resolve to the first active agent
+        — the cause of "agent 2's messages get answered by agent 1" and inline
+        search only ever returning agent 1's products.
+        """
         if not bot_token or not bot_token.strip():
             return {"ok": False, "description": "No Telegram bot token provided."}
 
         token = bot_token.strip()
         cfg = await ChannelService.get_config(db)
         webhook_url = cfg["telegram"]["webhook_url"]
+        if agent_id is not None:
+            webhook_url = f"{webhook_url.rstrip('/')}/{agent_id}"
         secret_token = cfg["telegram"].get("webhook_secret") or settings.TELEGRAM_WEBHOOK_SECRET or ""
 
         url = f"https://api.telegram.org/bot{token}/setWebhook"
