@@ -55,6 +55,9 @@ async def _seed_two_agents(db: AsyncSession):
                        access_tags_json=json.dumps([str(g1.id), "store-one"])))
     db.add(CatalogItem(title="Two Gadget", price=2000.0, currency="NGN", in_stock=True,
                        access_tags_json=json.dumps([str(g2.id), "store-two"])))
+    # A globally-scoped product (no groups, no tags) — must show for every agent.
+    db.add(CatalogItem(title="Shared Sticker", price=100.0, currency="NGN", in_stock=True,
+                       access_group_ids_json="[]", access_tags_json="[]"))
     await db.commit()
     return a1, a2
 
@@ -96,6 +99,8 @@ async def test_inline_search_scoped_to_agent_in_url(client: AsyncClient, test_se
     titles_a2 = " ".join(captured["iq-a2"])
     assert "One Widget" in titles_a1 and "Two Gadget" not in titles_a1
     assert "Two Gadget" in titles_a2 and "One Widget" not in titles_a2
+    # The globally-scoped product is visible to BOTH agents.
+    assert "Shared Sticker" in titles_a1 and "Shared Sticker" in titles_a2
 
 
 @pytest.mark.asyncio
