@@ -185,6 +185,60 @@ class CatalogManager:
         return result.scalars().first()
 
     @staticmethod
+    async def decrement_stock_for_order(db: AsyncSession, order) -> None:
+        """Reduces inventory for a paid order, once. Call from the single
+        payment-success path (see webhooks._notify_customer_payment_success).
+
+        - Skips any line whose product (or variant) has track_stock=False —
+          services, digital goods, and anything a business marked unlimited.
+        - Decrements the variant's stock when the line carries a variant_id,
+          otherwise the parent product's stock. Clamps at 0 and flips
+          in_stock off when it hits 0.
+        - Idempotent via order.metadata_json["stock_decremented"]; a webhook
+          redelivery or a second gateway callback for the same order won't
+          double-count.
+        """
+        meta = json.loads(order.metadata_json or "{}")
+        if meta.get("stock_decremented"):
+            return
+
+        try:
+            lines = json.loads(order.items_json or "[]")
+        except Exception as e:
+            logger.error(f"decrement_stock_for_order: bad items_json on {getattr(order, 'order_reference', '?')}: {e}")
+            return
+
+        for line in lines:
+            qty = int(line.get("quantity", 1) or 1)
+            if qty <= 0:
+                continue
+            variant_id = line.get("variant_id")
+            item_id = line.get("item_id")
+
+            target = None
+            if variant_id is not None:
+                target = await CatalogManager.get_variant_by_id(db, variant_id)
+            if target is None and item_id is not None:
+                target = await CatalogManager.get_product_by_id(db, item_id)
+            if target is None:
+                continue
+
+            # Unlimited stock — nothing to count down.
+            if not getattr(target, "track_stock", True):
+                continue
+
+            current = target.stock_quantity or 0
+            new_qty = max(0, current - qty)
+            target.stock_quantity = new_qty
+            if new_qty == 0:
+                target.in_stock = False
+
+        meta["stock_decremented"] = True
+        order.metadata_json = json.dumps(meta)
+        await db.commit()
+        logger.info(f"Stock decremented for order {getattr(order, 'order_reference', '?')} ({len(lines)} line(s))")
+
+    @staticmethod
     async def sync_external_catalog(db: AsyncSession, source: Optional[str] = None) -> int:
         """Syncs catalog products from Paystack or Bumpa into local database.
         Returns the total count synced (imported + updated) — kept for

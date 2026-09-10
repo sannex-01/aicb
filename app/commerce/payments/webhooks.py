@@ -70,6 +70,12 @@ async def _notify_customer_payment_success(db: AsyncSession, order: Order) -> No
             logger.error(f"Failed to finalize Bumpa checkout for order {order.order_reference}: {e}")
 
     try:
+        from app.commerce.catalog_provider import CatalogManager
+        await CatalogManager.decrement_stock_for_order(db, order)
+    except Exception as e:
+        logger.error(f"Failed to decrement stock for order {order.order_reference}: {e}")
+
+    try:
         from app.commerce.fulfillment import FulfillmentManager
         await FulfillmentManager.dispatch_order(db, order)
     except Exception as e:

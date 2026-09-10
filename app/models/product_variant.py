@@ -24,6 +24,12 @@ class ProductVariant(Base):
     stock_quantity = Column(Integer, default=100)
     in_stock = Column(Boolean, default=True)
 
+    # Per-variant inventory switch, same semantics as CatalogItem.track_stock:
+    # False = unlimited, never decremented. Independent of the parent's flag
+    # so a business can, e.g., cap a limited-edition colourway while leaving
+    # the standard variants unlimited.
+    track_stock = Column(Boolean, default=True)
+
     # Structured attributes for future filtering/display, e.g. {"size": "L", "color": "Blue"}.
     # Not required — `name` alone is enough for the chat flow to show/store
     # a variant today; this is groundwork, not load-bearing yet.

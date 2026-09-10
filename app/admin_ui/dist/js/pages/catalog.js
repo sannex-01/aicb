@@ -138,7 +138,10 @@ export async function loadCatalogPage(container) {
         label: 'Stock',
         sortable: true,
         type: 'number',
-        render: (val, row) => `<span class="badge ${row.in_stock ? 'badge-emerald' : 'badge-rose'}">${row.in_stock ? `${val} in stock` : 'Out of Stock'}</span>`
+        render: (val, row) => {
+          if (row.track_stock === false) return `<span class="badge badge-emerald">Unlimited</span>`;
+          return `<span class="badge ${row.in_stock ? 'badge-emerald' : 'badge-rose'}">${row.in_stock ? `${val} in stock` : 'Out of Stock'}</span>`;
+        }
       },
       {
         key: 'access_scope',
@@ -275,7 +278,11 @@ async function editProductModal(product) {
             </div>
             <div class="form-group">
               <label class="form-label">Stock Quantity</label>
-              <input type="number" id="prod-stock" class="form-control" value="${product?.stock_quantity ?? 100}" />
+              <input type="number" id="prod-stock" class="form-control" value="${product?.stock_quantity ?? 100}" ${(product ? product.track_stock === false : false) ? 'disabled' : ''} />
+              <label class="flex items-center gap-2 mt-1.5 text-[12px] text-muted cursor-pointer">
+                <input type="checkbox" id="prod-unlimited-stock" ${(product ? product.track_stock === false : false) ? 'checked' : ''} onchange="document.getElementById('prod-stock').disabled = this.checked" />
+                Unlimited stock (don't track inventory — best for services & digital items)
+              </label>
             </div>
             <div class="form-group">
               <label class="form-label">Category</label>
@@ -391,7 +398,11 @@ async function editProductModal(product) {
       <input type="text" class="form-control variant-name" placeholder="e.g. Large / Blue" value="${escapeHtml(variant?.name || '')}" style="flex: 2;" />
       <input type="text" class="form-control variant-sku" placeholder="SKU (optional)" value="${escapeHtml(variant?.sku || '')}" style="flex: 1.5;" />
       <input type="number" class="form-control variant-price" placeholder="Price override" step="0.01" value="${variant?.price_override ?? ''}" style="flex: 1;" />
-      <input type="number" class="form-control variant-stock" placeholder="Stock" value="${variant?.stock_quantity ?? 100}" style="flex: 1;" />
+      <input type="number" class="form-control variant-stock" placeholder="Stock" value="${variant?.stock_quantity ?? 100}" style="flex: 1;" ${variant?.track_stock === false ? 'disabled' : ''} />
+      <label class="flex items-center gap-1 text-[11px] text-muted cursor-pointer whitespace-nowrap" title="Unlimited stock for this variant">
+        <input type="checkbox" class="variant-unlimited" ${variant?.track_stock === false ? 'checked' : ''} onchange="this.closest('.variant-row').querySelector('.variant-stock').disabled = this.checked" />
+        ∞
+      </label>
       <button type="button" class="btn btn-icon btn-secondary btn-sm text-rose hover:bg-rose/10 btn-remove-variant" title="Remove variant">
         <i data-lucide="x" class="w-4 h-4"></i>
       </button>
@@ -424,6 +435,13 @@ async function editProductModal(product) {
 
   window.switchFulfillmentTypeUI = (type) => {
     document.getElementById('prod-fulfillment-digital-field')?.classList.toggle('hidden', type !== 'digital');
+    // Service & digital items have nothing to count — default them to
+    // unlimited stock, but leave it editable so a business can still opt in.
+    const unlimitedEl = document.getElementById('prod-unlimited-stock');
+    if (unlimitedEl) {
+      unlimitedEl.checked = (type !== 'physical');
+      document.getElementById('prod-stock').disabled = unlimitedEl.checked;
+    }
     document.querySelectorAll('input[name="prod-fulfillment-type"]').forEach(inp => {
       const card = inp.closest('label');
       if (card) {
@@ -450,12 +468,15 @@ async function editProductModal(product) {
         const name = row.querySelector('.variant-name').value.trim();
         if (!name) return null;
         const priceVal = row.querySelector('.variant-price').value;
+        const variantUnlimited = row.querySelector('.variant-unlimited')?.checked || false;
+        const variantStock = parseInt(row.querySelector('.variant-stock').value, 10) || 0;
         const v = {
           name,
           sku: row.querySelector('.variant-sku').value.trim() || null,
           price_override: priceVal !== '' ? parseFloat(priceVal) : null,
-          stock_quantity: parseInt(row.querySelector('.variant-stock').value, 10) || 0,
-          in_stock: (parseInt(row.querySelector('.variant-stock').value, 10) || 0) > 0,
+          stock_quantity: variantStock,
+          in_stock: variantUnlimited || variantStock > 0,
+          track_stock: !variantUnlimited,
         };
         if (row.dataset.variantId) v.id = parseInt(row.dataset.variantId, 10);
         return v;
@@ -463,6 +484,8 @@ async function editProductModal(product) {
       .filter(Boolean);
 
     const fulfillmentType = document.querySelector('input[name="prod-fulfillment-type"]:checked')?.value || 'physical';
+    const unlimitedStock = document.getElementById('prod-unlimited-stock')?.checked || false;
+    const stockQty = parseInt(document.getElementById('prod-stock').value, 10) || 0;
 
     const payload = {
       title: document.getElementById('prod-title').value.trim(),
@@ -470,10 +493,12 @@ async function editProductModal(product) {
       price: parseFloat(document.getElementById('prod-price').value),
       category: document.getElementById('prod-cat').value || null,
       subcategory: document.getElementById('prod-subcat').value || null,
-      stock_quantity: parseInt(document.getElementById('prod-stock').value, 10),
+      stock_quantity: stockQty,
+      track_stock: !unlimitedStock,
       image_url: document.getElementById('prod-img').value.trim() || null,
       access_group_ids: accessGroupIds,
-      in_stock: parseInt(document.getElementById('prod-stock').value, 10) > 0,
+      // An unlimited item is always in stock; a tracked one is in stock while it has units.
+      in_stock: unlimitedStock || stockQty > 0,
       // Always included (not conditionally omitted) since the form's rows
       // always reflect the product's true current variant state — whether
       // pre-populated from an existing product or freshly empty for a new

@@ -28,6 +28,7 @@ class ProductVariantRequest(BaseModel):
     price_override: Optional[float] = None
     stock_quantity: int = 100
     in_stock: bool = True
+    track_stock: bool = True  # False = unlimited, never decremented
 
 
 class CatalogItemCreateRequest(BaseModel):
@@ -49,6 +50,9 @@ class CatalogItemCreateRequest(BaseModel):
     image_url: Optional[str] = None
     in_stock: bool = True
     stock_quantity: int = 100
+    # None = derive from fulfillment_type (physical -> True, service/digital
+    # -> False). An explicit bool always wins.
+    track_stock: Optional[bool] = None
     access_group_ids: Optional[List[int]] = []
     access_tags: Optional[List[str]] = []
     variants: Optional[List[ProductVariantRequest]] = None
@@ -67,6 +71,7 @@ class CatalogItemUpdateRequest(BaseModel):
     image_url: Optional[str] = None
     in_stock: Optional[bool] = None
     stock_quantity: Optional[int] = None
+    track_stock: Optional[bool] = None
     access_group_ids: Optional[List[int]] = None
     access_tags: Optional[List[str]] = None
     fulfillment_type: Optional[Literal["physical", "digital", "service"]] = None
@@ -90,6 +95,7 @@ def _serialize_variant(v: ProductVariant) -> dict:
         "price_override": v.price_override,
         "stock_quantity": v.stock_quantity,
         "in_stock": v.in_stock,
+        "track_stock": bool(getattr(v, "track_stock", True)),
     }
 
 
@@ -116,6 +122,7 @@ def _serialize_catalog_item(itm: CatalogItem, groups_map: Optional[dict] = None,
         "image_url": itm.image_url,
         "in_stock": itm.in_stock,
         "stock_quantity": itm.stock_quantity,
+        "track_stock": bool(getattr(itm, "track_stock", True)),
         "access_group_ids": group_ids,
         "access_group_names": group_names,
         "access_tags": tags,
@@ -146,6 +153,7 @@ async def _replace_variants(db: AsyncSession, catalog_item_id: int, variant_reqs
             v.price_override = vr.price_override
             v.stock_quantity = vr.stock_quantity
             v.in_stock = vr.in_stock
+            v.track_stock = vr.track_stock
             keep_ids.add(vr.id)
         else:
             new_variant = ProductVariant(
@@ -155,6 +163,7 @@ async def _replace_variants(db: AsyncSession, catalog_item_id: int, variant_reqs
                 price_override=vr.price_override,
                 stock_quantity=vr.stock_quantity,
                 in_stock=vr.in_stock,
+                track_stock=vr.track_stock,
             )
             db.add(new_variant)
 
@@ -185,9 +194,16 @@ async def get_catalog_stats(
     all_items_res = await db.execute(select(CatalogItem))
     all_items = all_items_res.scalars().all()
 
-    total_retail_value = sum((itm.price or 0.0) * (itm.stock_quantity or 0) for itm in all_items if itm.in_stock)
-    total_units_in_stock = sum((itm.stock_quantity or 0) for itm in all_items if itm.in_stock)
-    out_of_stock_count = sum(1 for itm in all_items if not itm.in_stock or (itm.stock_quantity or 0) <= 0)
+    # Unlimited-stock items (track_stock=False — services, digital goods)
+    # have no meaningful unit count, so they're excluded from unit/value
+    # totals and can never be "out of stock".
+    tracked_in_stock = [itm for itm in all_items if itm.in_stock and getattr(itm, "track_stock", True)]
+    total_retail_value = sum((itm.price or 0.0) * (itm.stock_quantity or 0) for itm in tracked_in_stock)
+    total_units_in_stock = sum((itm.stock_quantity or 0) for itm in tracked_in_stock)
+    out_of_stock_count = sum(
+        1 for itm in all_items
+        if getattr(itm, "track_stock", True) and (not itm.in_stock or (itm.stock_quantity or 0) <= 0)
+    )
 
     # Products sold: real units sold across PAID orders, matched by the
     # cart line's own item_id/product_id (same approach as the Reports
@@ -274,6 +290,11 @@ async def _build_catalog_item_from_request(db: AsyncSession, req: CatalogItemCre
     # in-store, no delivery address needed even though it's a real good).
     effective_requires_shipping = req.requires_shipping if req.requires_shipping is not None else (req.fulfillment_type == "physical")
 
+    # track_stock defaults to "does this have countable inventory" — physical
+    # goods are tracked, service/digital items aren't (nothing to count) —
+    # unless the caller explicitly sets it either way.
+    effective_track_stock = req.track_stock if req.track_stock is not None else (req.fulfillment_type == "physical")
+
     # A locally-created product always uses the business's own default
     # currency — no per-product currency picker on the dashboard form
     # anymore. Whatever req.currency carries (the field still exists for
@@ -295,6 +316,7 @@ async def _build_catalog_item_from_request(db: AsyncSession, req: CatalogItemCre
         image_url=req.image_url.strip() if req.image_url else None,
         in_stock=req.in_stock,
         stock_quantity=req.stock_quantity,
+        track_stock=effective_track_stock,
         access_group_ids_json=json.dumps(group_ids),
         access_tags_json=json.dumps(combined_tags),
         has_variants=bool(req.variants),
@@ -314,6 +336,7 @@ async def _build_catalog_item_from_request(db: AsyncSession, req: CatalogItemCre
                 price_override=vr.price_override,
                 stock_quantity=vr.stock_quantity,
                 in_stock=vr.in_stock,
+                track_stock=vr.track_stock,
             ))
 
     return item
@@ -385,6 +408,8 @@ async def update_catalog_item(
         item.in_stock = req.in_stock
     if req.stock_quantity is not None:
         item.stock_quantity = req.stock_quantity
+    if req.track_stock is not None:
+        item.track_stock = req.track_stock
     if req.fulfillment_type is not None:
         item.fulfillment_type = req.fulfillment_type
     if req.digital_asset_url is not None:

@@ -19,6 +19,15 @@ class CatalogItem(Base):
     in_stock = Column(Boolean, default=True)
     stock_quantity = Column(Integer, default=100)
 
+    # When False, this item has no inventory limit: it's always purchasable
+    # regardless of stock_quantity, and stock is never decremented on
+    # purchase. The natural default for service/digital items (which have
+    # nothing to count) — the product form auto-unsets it when
+    # fulfillment_type is "service" or "digital", but a business can still
+    # override either way. When True (physical goods default), each paid
+    # order reduces stock_quantity and flips in_stock off at zero.
+    track_stock = Column(Boolean, default=True)
+
     # True when this item has one or more rows in product_variants (see
     # app/models/product_variant.py). A cheap flag so callers (the chat
     # flow's cart_add_ handler, the dashboard's product list) can check
