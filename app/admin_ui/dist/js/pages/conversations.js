@@ -239,6 +239,14 @@ export async function loadConversationsPage(container) {
     const searchInput = document.getElementById('conv-search-input');
     const searchClear = document.getElementById('conv-search-clear');
 
+    // A prefilter set by another page (e.g. "View Conversation" on a
+    // customer) — apply it once, then clear it so it doesn't stick.
+    if (state.conversationsPrefilter && searchInput) {
+      searchInput.value = state.conversationsPrefilter;
+      state.conversationsPrefilter = null;
+      applyFiltersAndReload();
+    }
+
     if (searchInput) {
       searchInput.addEventListener('input', () => {
         clearTimeout(searchDebounceTimer);

@@ -93,13 +93,20 @@ async function viewCustomerDetails(customerId) {
   try {
     const data = await api(`/customers/${customerId}`);
     const c = data.customer;
+    const conv = data.conversation_summary || {};
+    const identLines = [
+      c.phone_number && ['Phone', c.phone_number],
+      c.email && ['Email', c.email],
+      c.wa_id && ['WhatsApp ID', c.wa_id],
+      c.telegram_id && ['Telegram ID', c.telegram_id],
+    ].filter(Boolean);
 
     openModal(`
       <div class="modal-dialog max-w-2xl">
         <div class="modal-header">
           <div>
             <h3 class="font-bold text-lg text-main">${escapeHtml(c.name || 'Customer')}</h3>
-            <div class="text-xs text-muted font-mono">${escapeHtml(c.phone_number || c.email || '')}</div>
+            <div class="text-xs text-muted font-mono">${escapeHtml(c.phone_number || c.email || c.wa_id || c.telegram_id || '')}</div>
           </div>
           <button class="btn btn-icon btn-secondary btn-sm" onclick="closeModal()"><i data-lucide="x" class="w-4 h-4"></i></button>
         </div>
@@ -116,6 +123,28 @@ async function viewCustomerDetails(customerId) {
           </div>
 
           <div>
+            <h4 class="text-xs font-bold text-muted mb-3">Contact & Identifiers</h4>
+            <div class="text-xs space-y-1.5">
+              ${identLines.map(([k, v]) => `<div class="flex justify-between gap-4"><span class="text-muted">${k}</span><span class="font-mono text-main truncate">${escapeHtml(v)}</span></div>`).join('') || '<p class="text-muted">No contact details on file.</p>'}
+              <div class="flex justify-between gap-4"><span class="text-muted">Channels</span><span>${(c.channels || []).map(ch => `<span class="badge ${ch === 'whatsapp' ? 'badge-emerald' : 'badge-sky'} text-[12px] capitalize ml-1">${escapeHtml(ch)}</span>`).join('') || '—'}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-muted">First seen</span><span class="text-main">${formatDate(c.created_at)}</span></div>
+              <div class="flex justify-between gap-4"><span class="text-muted">Last active</span><span class="text-main">${formatDate(c.last_seen_at)}</span></div>
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <h4 class="text-xs font-bold text-muted">Conversations</h4>
+              <button class="btn btn-secondary btn-sm" onclick="window.viewCustomerConversation('${escapeHtml(conv.search_term || c.name || '')}')">
+                <i data-lucide="message-square" class="w-3.5 h-3.5"></i> View Conversation
+              </button>
+            </div>
+            <p class="text-xs text-muted">
+              ${conv.session_count || 0} session${(conv.session_count || 0) === 1 ? '' : 's'}${conv.last_conversation_at ? ` · last active ${formatDate(conv.last_conversation_at)}` : ''}
+            </p>
+          </div>
+
+          <div>
             <h4 class="text-xs font-bold text-muted mb-3">Order History</h4>
             ${data.orders.length === 0 ? '<p class="text-xs text-muted">No orders associated with this customer.</p>' : `
               <div class="card p-0 overflow-hidden border border-subtle">
@@ -125,38 +154,15 @@ async function viewCustomerDetails(customerId) {
                   </thead>
                   <tbody class="divide-y divide-subtle">
                     ${data.orders.map(o => `
-                      <tr>
-                        <td class="font-mono text-xs">${escapeHtml(o.order_reference)}</td>
+                      <tr class="cursor-pointer hover:bg-surface-hover" onclick="window.viewOrderDetails(${o.id})">
+                        <td class="font-mono text-xs text-brand">${escapeHtml(o.order_reference)}</td>
                         <td class="font-semibold">${formatCurrency(o.total_amount, o.currency)}</td>
-                        <td><span class="badge ${o.status === 'paid' ? 'badge-emerald' : 'badge-amber'}">${escapeHtml(o.status)}</span></td>
+                        <td><span class="badge ${o.status === 'paid' ? 'badge-emerald' : o.status === 'failed' || o.status === 'cancelled' ? 'badge-rose' : 'badge-amber'}">${escapeHtml(o.status)}</span></td>
                         <td class="text-muted">${formatDate(o.created_at)}</td>
                       </tr>
                     `).join('')}
                   </tbody>
                 </table>
-              </div>
-            `}
-          </div>
-
-          <div>
-            <h4 class="text-xs font-bold text-muted mb-3">Recent Conversation Transcripts</h4>
-            ${data.sessions.length === 0 ? '<p class="text-xs text-muted">No chat logs recorded.</p>' : `
-              <div class="space-y-4">
-                ${data.sessions.map(s => `
-                  <div class="border border-subtle rounded-xl p-3 bg-surface-elevated/40 space-y-2">
-                    <div class="flex justify-between text-xs text-muted mb-2">
-                      <span class="badge badge-subtle capitalize">${escapeHtml(s.channel)}</span>
-                      <span>${formatDate(s.last_active_at)}</span>
-                    </div>
-                    <div class="space-y-2 max-h-48 overflow-y-auto">
-                      ${s.messages.map(m => `
-                        <div class="text-xs ${m.role === 'user' ? 'text-brand font-medium' : 'text-main'}">
-                          <span class="font-semibold text-xs text-muted">${m.role === 'user' ? 'Customer' : 'Bot'}:</span> ${escapeHtml(m.content)}
-                        </div>
-                      `).join('')}
-                    </div>
-                  </div>
-                `).join('')}
               </div>
             `}
           </div>
@@ -172,4 +178,11 @@ async function viewCustomerDetails(customerId) {
   }
 }
 
+function viewCustomerConversation(searchTerm) {
+  state.conversationsPrefilter = searchTerm || '';
+  closeModal();
+  navigate('/_/admin/conversations');
+}
+
 window.viewCustomerDetails = viewCustomerDetails;
+window.viewCustomerConversation = viewCustomerConversation;

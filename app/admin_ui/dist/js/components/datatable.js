@@ -54,7 +54,10 @@ export class DataTable {
     this.currentPage = 1;
     this.emptyMessage = options.emptyMessage || 'No records found.';
     this.tableClass = options.tableClass || 'data-table';
-    
+    // Optional: called with the row object when a row is clicked (clicks on
+    // links/buttons/inputs inside a cell are ignored so inline actions still work).
+    this.onRowClick = typeof options.onRowClick === 'function' ? options.onRowClick : null;
+
     this.uid = 'dt_' + Math.random().toString(36).substring(2, 9);
 
     if (this.sortKey) {
@@ -288,7 +291,7 @@ export class DataTable {
     return rows.map((row, rowIndex) => {
       const actualIndex = (this.currentPage - 1) * (this.pageSize || 0) + rowIndex;
       return `
-        <tr class="hover:bg-surface-hover/60 transition-colors">
+        <tr class="hover:bg-surface-hover/60 transition-colors ${this.onRowClick ? 'cursor-pointer' : ''}" data-dt-row-index="${actualIndex}">
           ${this.columns.map(col => {
             const alignClass = col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left';
             let cellContent = '';
@@ -387,6 +390,21 @@ export class DataTable {
         this.handleSort(key);
       });
     });
+
+    // Row click (delegated so it survives pagination / filter re-renders).
+    if (this.onRowClick) {
+      const tbody = document.getElementById(`${this.uid}-tbody`);
+      if (tbody) {
+        tbody.addEventListener('click', (e) => {
+          if (e.target.closest('a, button, input, select, label, [onclick]')) return;
+          const tr = e.target.closest('tr[data-dt-row-index]');
+          if (!tr) return;
+          const idx = Number(tr.getAttribute('data-dt-row-index'));
+          const row = this.filteredData[idx];
+          if (row) this.onRowClick(row);
+        });
+      }
+    }
 
     this.attachPaginationListeners();
   }

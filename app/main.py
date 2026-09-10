@@ -24,7 +24,6 @@ from app.telemetry.client import telemetry_client
 from app.telemetry.sync_worker import router as sync_router, start_sync_scheduler, shutdown_sync_scheduler
 from typing import Optional
 from app.models.catalog import CatalogItem
-from app.models.order import Order
 from app.models.agent import Agent
 from app.core.access import get_effective_agent_tags, filter_items_by_access_tags
 
@@ -42,6 +41,7 @@ from app.api.knowledge import router as admin_knowledge_router
 from app.api.conversations import router as conversations_router
 from app.api.system import router as system_router
 from app.api.reports import router as reports_router
+from app.api.orders import router as orders_router
 
 WIDGET_BUNDLE_PATH = os.path.join(os.path.dirname(__file__), "..", "widget", "dist", "widget.js")
 ADMIN_DIST_DIR = os.path.join(os.path.dirname(__file__), "admin_ui", "dist")
@@ -234,6 +234,7 @@ app.include_router(admin_knowledge_router, prefix="/api/v1")
 app.include_router(conversations_router, prefix="/api/v1")
 app.include_router(system_router, prefix="/api/v1")
 app.include_router(reports_router, prefix="/api/v1")
+app.include_router(orders_router, prefix="/api/v1")
 
 
 
@@ -271,20 +272,6 @@ async def list_catalog_items(
             items = filter_items_by_access_tags(items, allowed_tags)
 
     return items
-
-
-@app.get("/api/v1/orders", tags=["Orders"])
-async def list_orders(
-    customer_id: Optional[str] = None,
-    db: AsyncSession = Depends(get_db),
-    _: None = Depends(get_current_admin_user),
-):
-    stmt = select(Order)
-    if customer_id:
-        stmt = stmt.where(Order.customer_id == customer_id)
-    stmt = stmt.order_by(Order.created_at.desc()).limit(20)
-    res = await db.execute(stmt)
-    return res.scalars().all()
 
 
 # Standalone Admin Embedded SPA Routes (served at /_/admin)

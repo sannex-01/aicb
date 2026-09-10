@@ -9,10 +9,36 @@ from app.core.database import get_db
 from app.core.security import get_current_admin_user, require_admin_role, require_operator_or_above
 from app.models.customer import Customer
 from app.models.order import Order
-from app.models.session import ConversationSession, MessageLog
+from app.models.session import ConversationSession
 from app.models.user import AdminUser
 
 router = APIRouter(prefix="/customers", tags=["Customers Management"])
+
+_PAID_STATUSES = ("paid", "processing", "completed")
+
+
+def _order_identifiers(c: Customer) -> set[str]:
+    """Every value an Order row might carry that identifies this customer.
+    Orders have no customer_id FK — they're matched loosely on the channel
+    identifier / phone / email captured at checkout."""
+    vals = set()
+    for v in (c.wa_id, c.telegram_id, c.phone_number, c.email):
+        if v:
+            vals.add(v.strip().lower())
+    return vals
+
+
+def _order_matches_customer(o: Order, idents: set[str]) -> bool:
+    for v in (o.customer_identifier, o.customer_phone, o.customer_email):
+        if v and v.strip().lower() in idents:
+            return True
+    return False
+
+
+def _live_order_stats(orders: list[Order]) -> tuple[int, float]:
+    """(order count, amount spent on paid/processing/completed orders)."""
+    spent = sum(float(o.total_amount or 0.0) for o in orders if (o.status or "") in _PAID_STATUSES)
+    return len(orders), spent
 
 
 class CustomerUpdateRequest(BaseModel):
@@ -66,6 +92,13 @@ async def list_customers(
     res = await db.execute(stmt)
     customers = res.scalars().all()
 
+    # Order counts / spend are computed live from the orders table rather
+    # than read from customers.total_orders / total_spent, which are never
+    # maintained anywhere and so are always stale (usually 0). One query for
+    # all orders on this page, matched in Python on the loose identifiers.
+    all_orders_res = await db.execute(select(Order))
+    all_orders = list(all_orders_res.scalars().all())
+
     items = []
     for c in customers:
         channels = []
@@ -73,6 +106,10 @@ async def list_customers(
             channels.append("whatsapp")
         if c.telegram_id:
             channels.append("telegram")
+
+        idents = _order_identifiers(c)
+        cust_orders = [o for o in all_orders if idents and _order_matches_customer(o, idents)]
+        order_count, spent = _live_order_stats(cust_orders)
 
         items.append({
             "id": c.id,
@@ -82,8 +119,8 @@ async def list_customers(
             "wa_id": c.wa_id,
             "telegram_id": c.telegram_id,
             "channels": channels,
-            "total_orders": c.total_orders or 0,
-            "total_spent": float(c.total_spent or 0.0),
+            "total_orders": order_count,
+            "total_spent": spent,
             "last_seen_at": c.last_seen_at.isoformat() if c.last_seen_at else None,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         })
@@ -102,7 +139,9 @@ async def get_customer_details(
     db: AsyncSession = Depends(get_db),
     _: AdminUser = Depends(get_current_admin_user),
 ):
-    """Retrieves full customer profile, order history, and recent chat transcripts."""
+    """Retrieves the customer profile, live order history, and a lightweight
+    conversation summary (no message transcripts — those are viewed on the
+    Conversations page)."""
     stmt = select(Customer).where(Customer.id == customer_id)
     res = await db.execute(stmt)
     customer = res.scalar_one_or_none()
@@ -110,69 +149,44 @@ async def get_customer_details(
     if not customer:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Customer not found")
 
-    # Fetch orders associated with customer
-    identifiers = [id_val for id_val in [customer.wa_id, customer.telegram_id, customer.phone_number] if id_val]
-    order_conditions = []
-    if identifiers:
-        order_conditions.append(Order.customer_identifier.in_(identifiers))
-    if customer.email:
-        order_conditions.append(Order.customer_email == customer.email)
-    if customer.phone_number:
-        order_conditions.append(Order.customer_phone == customer.phone_number)
+    idents = _order_identifiers(customer)
 
     orders = []
-    if order_conditions:
-        order_stmt = select(Order).where(or_(*order_conditions)).order_by(desc(Order.created_at)).limit(20)
-        order_res = await db.execute(order_stmt)
-        for o in order_res.scalars().all():
+    order_rows: list[Order] = []
+    if idents:
+        order_res = await db.execute(select(Order).order_by(desc(Order.created_at)))
+        order_rows = [o for o in order_res.scalars().all() if _order_matches_customer(o, idents)]
+        for o in order_rows[:50]:
             orders.append({
                 "id": o.id,
                 "order_reference": o.order_reference,
-                "total_amount": o.total_amount,
+                "total_amount": float(o.total_amount or 0.0),
                 "currency": o.currency,
                 "status": o.status,
+                "fulfillment_status": o.fulfillment_status,
                 "channel": o.channel,
                 "items_count": len(json.loads(o.items_json)) if o.items_json else 0,
                 "checkout_url": o.checkout_url,
                 "created_at": o.created_at.isoformat() if o.created_at else None,
             })
 
-    # Fetch recent conversation sessions & messages
-    session_conditions = []
-    if customer.wa_id:
-        session_conditions.append(ConversationSession.customer_identifier == customer.wa_id)
-    if customer.telegram_id:
-        session_conditions.append(ConversationSession.customer_identifier == customer.telegram_id)
-    if customer.phone_number:
-        session_conditions.append(ConversationSession.customer_identifier == customer.phone_number)
+    order_count, spent = _live_order_stats(order_rows)
 
-    recent_sessions = []
-    if session_conditions:
-        sess_stmt = select(ConversationSession).where(or_(*session_conditions)).order_by(desc(ConversationSession.last_active_at)).limit(5)
-        sess_res = await db.execute(sess_stmt)
-        session_rows = sess_res.scalars().all()
-
-        for s in session_rows:
-            # Fetch message logs
-            msg_stmt = select(MessageLog).where(MessageLog.session_id == s.id).order_by(MessageLog.created_at.asc()).limit(50)
-            msg_res = await db.execute(msg_stmt)
-            msgs = msg_res.scalars().all()
-
-            recent_sessions.append({
-                "session_id": s.id,
-                "session_key": s.session_key,
-                "channel": s.channel,
-                "last_active_at": s.last_active_at.isoformat() if s.last_active_at else None,
-                "messages": [
-                    {
-                        "id": m.id,
-                        "role": m.role,
-                        "content": m.content,
-                        "created_at": m.created_at.isoformat() if m.created_at else None,
-                    }
-                    for m in msgs
-                ],
-            })
+    # Conversation summary only — count of sessions + last activity, so the
+    # offcanvas can link to the full transcripts on the Conversations page.
+    session_ids = [v for v in (customer.wa_id, customer.telegram_id, customer.phone_number) if v]
+    session_count = 0
+    last_conversation_at = None
+    if session_ids:
+        sess_res = await db.execute(
+            select(ConversationSession)
+            .where(ConversationSession.customer_identifier.in_(session_ids))
+            .order_by(desc(ConversationSession.last_active_at))
+        )
+        sess_rows = sess_res.scalars().all()
+        session_count = len(sess_rows)
+        if sess_rows and sess_rows[0].last_active_at:
+            last_conversation_at = sess_rows[0].last_active_at.isoformat()
 
     channels = []
     if customer.wa_id:
@@ -189,14 +203,19 @@ async def get_customer_details(
             "wa_id": customer.wa_id,
             "telegram_id": customer.telegram_id,
             "channels": channels,
-            "total_orders": customer.total_orders or len(orders),
-            "total_spent": float(customer.total_spent or sum(o["total_amount"] for o in orders if o["status"] in ("paid", "completed"))),
+            "total_orders": order_count,
+            "total_spent": spent,
             "last_seen_at": customer.last_seen_at.isoformat() if customer.last_seen_at else None,
             "created_at": customer.created_at.isoformat() if customer.created_at else None,
             "metadata": json.loads(customer.metadata_json or "{}"),
         },
         "orders": orders,
-        "sessions": recent_sessions,
+        "conversation_summary": {
+            "session_count": session_count,
+            "last_conversation_at": last_conversation_at,
+            # The term the Conversations page search matches on.
+            "search_term": customer.phone_number or customer.email or customer.name or customer.wa_id or customer.telegram_id or "",
+        },
     }
 
 
