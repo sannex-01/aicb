@@ -1,13 +1,17 @@
 import { state } from '../state.js';
 import { api } from '../api.js';
 import { navigate } from '../router.js';
-import { showToast, openModal, closeModal, openConfirmModal, escapeHtml, formatCurrency, formatDate, skeletonPage, renderDataTable } from '../utils.js';
+import { showToast, openModal, closeModal, openConfirmModal, escapeHtml, formatCurrency, formatDate, skeletonPage, renderDataTable, renderSelectCards } from '../utils.js';
 
 export async function loadKnowledgePage(container) {
   container.innerHTML = skeletonPage({ stats: 0, rows: 6 });
   try {
     const isAdmin = ['admin', 'super_admin'].includes(state.user?.role);
-    const data = await api('/admin/knowledge');
+    const [data, groups] = await Promise.all([
+      api('/admin/knowledge'),
+      api('/access-groups').catch(() => []),
+    ]);
+    state.accessGroups = groups || [];
     const items = data.items || [];
 
     container.innerHTML = `
@@ -48,14 +52,21 @@ export async function loadKnowledgePage(container) {
         render: (val) => `<span class="text-xs text-muted line-clamp-2 max-w-md">${escapeHtml(val || '')}</span>`
       },
       {
-        key: 'access_tags',
+        key: 'access_scope',
         label: 'Access Scope',
         sortable: false,
-        render: (val) => {
-          const tags = Array.isArray(val) ? val : [];
-          return tags.length 
-            ? tags.map(t => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(t)}</span>`).join('') 
-            : '<span class="badge badge-subtle text-[12px]">Public (All Agents)</span>';
+        render: (_, row) => {
+          const groupIds = Array.isArray(row.access_group_ids) ? row.access_group_ids : [];
+          const tags = Array.isArray(row.access_tags) ? row.access_tags : [];
+          const groupNames = groupIds
+            .map(id => (state.accessGroups || []).find(g => g.id === id)?.name || `Group ${id}`);
+          const chips = [
+            ...groupNames.map(n => `<span class="badge badge-violet mr-1 text-[12px]">${escapeHtml(n)}</span>`),
+            ...tags.map(t => `<span class="badge badge-sky mr-1 text-[12px]">${escapeHtml(t)}</span>`),
+          ];
+          return chips.length
+            ? chips.join('')
+            : '<span class="badge badge-subtle text-[12px]">All Agents</span>';
         }
       }
     ];
@@ -99,6 +110,8 @@ export async function loadKnowledgePage(container) {
 
 function editKnowledgeModal(doc) {
   const isEdit = Boolean(doc);
+  const selectedGroupIds = new Set(doc?.access_group_ids || []);
+  const groups = state.accessGroups || [];
   openModal(`
     <div class="modal-dialog">
       <div class="modal-header">
@@ -121,10 +134,29 @@ function editKnowledgeModal(doc) {
             <label class="form-label">Document Content (Markdown supported)</label>
             <textarea id="doc-content" class="form-control font-mono text-xs" rows="6" required placeholder="Customers may return undamaged items within 14 days...">${escapeHtml(doc?.content || '')}</textarea>
           </div>
-          <div class="form-group">
-            <label class="form-label">Access Tags (comma-separated, empty = public to all agents)</label>
-            <input type="text" id="doc-tags" class="form-control" value="${escapeHtml((doc?.access_tags || []).join(', '))}" placeholder="support, billing, enterprise" />
+          <div class="p-3.5 rounded-xl border border-subtle bg-app/40 space-y-2.5">
+            <div class="flex items-center justify-between">
+              <label class="form-label font-semibold text-main m-0">Access Groups</label>
+              <span class="text-[12px] text-muted">None selected = all agents</span>
+            </div>
+            <p class="text-[12px] text-muted">Select which Access Groups' agents can retrieve this document. If none are selected, every agent can use it.</p>
+            <div class="max-h-44 overflow-y-auto pr-1">
+              ${renderSelectCards({
+                name: 'doc-group',
+                type: 'checkbox',
+                items: groups.map(g => ({ id: g.id, title: g.name, description: g.description })),
+                selectedValues: selectedGroupIds,
+                gridClass: 'select-card-grid grid grid-cols-1 sm:grid-cols-2 gap-2',
+                emptyMessage: 'No access groups created yet. Documents are available to all agents by default.',
+              })}
+            </div>
           </div>
+
+          <details class="form-group" ${(doc?.access_tags || []).length ? 'open' : ''}>
+            <summary class="form-label cursor-pointer text-[12px] text-muted">Advanced: free-form access tags</summary>
+            <input type="text" id="doc-tags" class="form-control mt-1.5" value="${escapeHtml((doc?.access_tags || []).join(', '))}" placeholder="support, billing, enterprise" />
+            <p class="text-[12px] text-muted mt-1">Comma-separated. Matched against an agent's own tags in addition to its access groups.</p>
+          </details>
         </div>
         <div class="modal-footer">
           ${isEdit ? `<button type="button" class="btn btn-danger btn-sm mr-auto" onclick="window.deleteKnowledgeDoc(${doc.id}, '${escapeHtml(doc.title)}')">Delete</button>` : ''}
@@ -137,13 +169,16 @@ function editKnowledgeModal(doc) {
 
   document.getElementById('knowledge-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const rawTags = document.getElementById('doc-tags').value;
+    const rawTags = document.getElementById('doc-tags')?.value || '';
     const tags = rawTags.split(',').map(t => t.trim()).filter(Boolean);
+    const groupIds = Array.from(document.querySelectorAll('input[name="doc-group"]:checked'))
+      .map(el => parseInt(el.value, 10));
 
     const payload = {
       title: document.getElementById('doc-title').value,
       category: document.getElementById('doc-cat').value || null,
       content: document.getElementById('doc-content').value,
+      access_group_ids: groupIds,
       access_tags: tags,
     };
 

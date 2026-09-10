@@ -9,9 +9,20 @@ from app.core.database import get_db
 from app.core.security import get_current_admin_user, require_admin_role
 from app.models.knowledge import KnowledgeDoc
 from app.models.user import AdminUser
-from app.core.access import parse_tags_json
+from app.core.access import parse_tags_json, parse_ids_json
 
 router = APIRouter(prefix="/admin/knowledge", tags=["Admin Knowledge Base Management"])
+
+
+def _access_json_from(group_ids: Optional[List[int]], access_tags: Optional[List[str]]) -> tuple[str, str]:
+    """Returns (access_group_ids_json, access_tags_json). Mirrors the catalog:
+    group IDs are stored as their own list AND copied into the tags list (as
+    strings) so the tag-based access filter and RAG retrieval match them
+    without a join. Non-numeric free tags are kept alongside."""
+    gids = [int(g) for g in (group_ids or []) if g]
+    free_tags = [t.strip().lower() for t in (access_tags or []) if t.strip() and not t.strip().isdigit()]
+    combined = sorted(set(free_tags + [str(g) for g in gids]))
+    return json.dumps(gids), json.dumps(combined)
 
 
 class KnowledgeDocCreateRequest(BaseModel):
@@ -19,7 +30,8 @@ class KnowledgeDocCreateRequest(BaseModel):
     category: Optional[str] = None
     content: str
     tags: Optional[str] = None
-    access_tags: List[str] = []
+    access_group_ids: Optional[List[int]] = []
+    access_tags: Optional[List[str]] = []
 
 
 class KnowledgeDocUpdateRequest(BaseModel):
@@ -27,6 +39,7 @@ class KnowledgeDocUpdateRequest(BaseModel):
     category: Optional[str] = None
     content: Optional[str] = None
     tags: Optional[str] = None
+    access_group_ids: Optional[List[int]] = None
     access_tags: Optional[List[str]] = None
 
 
@@ -69,7 +82,8 @@ async def list_admin_knowledge(
                 "category": doc.category or "General",
                 "content": doc.content,
                 "tags": doc.tags,
-                "access_tags": parse_tags_json(doc.access_tags_json),
+                "access_group_ids": parse_ids_json(getattr(doc, "access_group_ids_json", "[]")),
+                "access_tags": [t for t in parse_tags_json(doc.access_tags_json) if not t.isdigit()],
                 "created_at": doc.created_at.isoformat() if doc.created_at else None,
             }
             for doc in docs
@@ -86,15 +100,16 @@ async def create_knowledge_doc(
     db: AsyncSession = Depends(get_db),
     _: AdminUser = Depends(require_admin_role),
 ):
-    """Creates a new knowledge document with access tags."""
-    tags_clean = [t.strip().lower() for t in req.access_tags if t.strip()]
+    """Creates a new knowledge document scoped to access groups (and/or tags)."""
+    group_ids_json, tags_json = _access_json_from(req.access_group_ids, req.access_tags)
 
     doc = KnowledgeDoc(
         title=req.title,
         category=req.category,
         content=req.content,
         tags=req.tags,
-        access_tags_json=json.dumps(tags_clean),
+        access_group_ids_json=group_ids_json,
+        access_tags_json=tags_json,
     )
     db.add(doc)
     await db.commit()
@@ -104,7 +119,8 @@ async def create_knowledge_doc(
         "id": doc.id,
         "title": doc.title,
         "category": doc.category,
-        "access_tags": tags_clean,
+        "access_group_ids": parse_ids_json(doc.access_group_ids_json),
+        "access_tags": [t for t in parse_tags_json(doc.access_tags_json) if not t.isdigit()],
     }
 
 
@@ -126,7 +142,8 @@ async def get_knowledge_doc(
         "category": doc.category or "General",
         "content": doc.content,
         "tags": doc.tags,
-        "access_tags": parse_tags_json(doc.access_tags_json),
+        "access_group_ids": parse_ids_json(getattr(doc, "access_group_ids_json", "[]")),
+        "access_tags": [t for t in parse_tags_json(doc.access_tags_json) if not t.isdigit()],
         "created_at": doc.created_at.isoformat() if doc.created_at else None,
     }
 
@@ -152,9 +169,11 @@ async def update_knowledge_doc(
         doc.content = req.content
     if req.tags is not None:
         doc.tags = req.tags
-    if req.access_tags is not None:
-        tags_clean = [t.strip().lower() for t in req.access_tags if t.strip()]
-        doc.access_tags_json = json.dumps(tags_clean)
+    if req.access_group_ids is not None or req.access_tags is not None:
+        # Preserve whichever side wasn't sent in this request.
+        gids = req.access_group_ids if req.access_group_ids is not None else parse_ids_json(getattr(doc, "access_group_ids_json", "[]"))
+        free = req.access_tags if req.access_tags is not None else [t for t in parse_tags_json(doc.access_tags_json) if not t.isdigit()]
+        doc.access_group_ids_json, doc.access_tags_json = _access_json_from(gids, free)
 
     await db.commit()
     await db.refresh(doc)

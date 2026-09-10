@@ -14,6 +14,13 @@ class KnowledgeDoc(Base):
     embedding_json = Column(Text, nullable=True) # Serialized list of floats for fast in-process cosine search
     tags = Column(String(255), nullable=True)
     
+    # Access Group Scoping: JSON array of group IDs e.g. [1, 2]. Empty [] =
+    # available to every agent. Mirrors CatalogItem's model — the primary
+    # way the dashboard scopes a doc. The group IDs are also mirrored into
+    # access_tags_json (as strings) so filter_items_by_access_tags / the RAG
+    # retrieval path match them without a second query.
+    access_group_ids_json = Column(Text, default="[]")
+
     # Access Tagging: JSON array of strings e.g. ["support", "billing"]. Empty [] = public to all agents.
     access_tags_json = Column(Text, default="[]")
     

@@ -87,6 +87,7 @@ def _sync_columns(sync_conn) -> None:
         ("catalog_items", "track_stock", "BOOLEAN", "TRUE"),
         ("product_variants", "track_stock", "BOOLEAN", "TRUE"),
         ("knowledge_docs", "access_tags_json", "TEXT", "'[]'"),
+        ("knowledge_docs", "access_group_ids_json", "TEXT", "'[]'"),
         ("orders", "group_reference", "VARCHAR(100)", "NULL"),
         ("orders", "fulfillment_status", "VARCHAR(30)", "NULL"),
         ("orders", "tracking_url", "VARCHAR(500)", "NULL"),

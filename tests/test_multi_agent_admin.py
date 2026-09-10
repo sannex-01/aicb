@@ -479,6 +479,29 @@ async def test_access_groups_llm_keys_multi_agent_and_product_scoping(client: As
     items = cat_list.json()["items"]
     assert len(items) >= 2
 
+    # 6. Knowledge base documents scope by access group the same way
+    kb_scoped = await client.post("/api/v1/admin/knowledge", headers=headers, json={
+        "title": "Enterprise SLA Terms",
+        "content": "Enterprise customers get a 4-hour response SLA.",
+        "access_group_ids": [grp1["id"]],
+    })
+    assert kb_scoped.status_code == 201
+    assert kb_scoped.json()["access_group_ids"] == [grp1["id"]]
+
+    kb_public = await client.post("/api/v1/admin/knowledge", headers=headers, json={
+        "title": "General Returns Policy",
+        "content": "Return any item within 14 days.",
+        "access_group_ids": [],
+    })
+    assert kb_public.status_code == 201
+    assert kb_public.json()["access_group_ids"] == []
+
+    kb_list = await client.get("/api/v1/admin/knowledge", headers=headers)
+    by_title = {d["title"]: d for d in kb_list.json()["items"]}
+    assert by_title["Enterprise SLA Terms"]["access_group_ids"] == [grp1["id"]]
+    # The mirrored group id must not leak into the free-tag list shown in the UI.
+    assert by_title["Enterprise SLA Terms"]["access_tags"] == []
+
 
 @pytest.mark.asyncio
 async def test_conversations_filter_by_channel_agent_and_search(client: AsyncClient, db_session: AsyncSession):

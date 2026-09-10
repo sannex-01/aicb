@@ -38,3 +38,37 @@ async def test_rag_retrieval(test_db: AsyncSession):
     context = await RAGEngine.retrieve_relevant_context(test_db, query="How do I return an item?", top_k=1)
     assert "Return Policy" in context
     assert "14 days" in context
+
+
+@pytest.mark.asyncio
+async def test_rag_retrieval_scoped_by_access_group(test_db: AsyncSession):
+    # Doc scoped to access group 5 — the group id is mirrored into
+    # access_tags_json exactly as the knowledge API writes it.
+    scoped = KnowledgeDoc(
+        title="VIP Concierge Playbook",
+        category="Internal",
+        content="Offer VIP customers free next-day delivery and a dedicated line.",
+        access_group_ids_json="[5]",
+        access_tags_json='["5"]',
+    )
+    public = KnowledgeDoc(
+        title="Store Hours",
+        category="General",
+        content="We are open Monday to Saturday, 9am to 6pm.",
+        access_group_ids_json="[]",
+        access_tags_json="[]",
+    )
+    test_db.add_all([scoped, public])
+    await test_db.commit()
+
+    # An agent in group 5 sees both.
+    ctx_in = await RAGEngine.retrieve_relevant_context(
+        test_db, query="VIP delivery perks", top_k=5, allowed_access_tags={"5"}
+    )
+    assert "VIP Concierge Playbook" in ctx_in
+
+    # An agent in a different group only sees the public doc.
+    ctx_out = await RAGEngine.retrieve_relevant_context(
+        test_db, query="VIP delivery perks", top_k=5, allowed_access_tags={"9"}
+    )
+    assert "VIP Concierge Playbook" not in ctx_out
